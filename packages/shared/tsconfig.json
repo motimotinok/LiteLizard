@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "../../LiteLizard_schema_v1.json"],
+  "exclude": ["src/**/*.test.ts"]
+}

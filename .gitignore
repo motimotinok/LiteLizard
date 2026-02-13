@@ -1,0 +1,8 @@
+node_modules
+dist
+coverage
+playwright-report
+.vscode
+.DS_Store
+*.log
+apps/api/data
