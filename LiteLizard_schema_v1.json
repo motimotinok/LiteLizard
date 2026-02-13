@@ -45,7 +45,7 @@
       "properties": {
         "format": {
           "type": "string",
-          "enum": ["litelizard-json", "markdown-import"]
+          "enum": ["litelizard-json"]
         },
         "originPath": {
           "type": "string",
