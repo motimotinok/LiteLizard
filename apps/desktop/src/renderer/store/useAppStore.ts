@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AnalysisRunInput, FileNode, LiteLizardDocument, Session, UsageResponse } from '@litelizard/shared';
+import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard/shared';
 import {
   collectStaleParagraphs,
   reorderParagraphsInDocument,
@@ -13,23 +13,19 @@ interface AppState {
   document: LiteLizardDocument | null;
   revision: number;
   dirty: boolean;
-  session: Session | null;
-  usage: UsageResponse | null;
-  emailRequestId: string | null;
-  devCode: string | null;
+  apiKeyConfigured: boolean;
   statusMessage: string;
   openFolder: () => Promise<void>;
+  createFolder: (name: string) => Promise<void>;
   createDocument: (title: string) => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
-  bootstrapSession: () => Promise<void>;
-  requestEmailLink: (email: string) => Promise<void>;
-  verifyEmailLink: (email: string, code: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUsage: () => Promise<void>;
+  bootstrapApiKeyStatus: () => Promise<void>;
+  saveApiKey: (apiKey: string) => Promise<void>;
+  clearApiKey: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -39,19 +35,45 @@ export const useAppStore = create<AppState>((set, get) => ({
   document: null,
   revision: 0,
   dirty: false,
-  session: null,
-  usage: null,
-  emailRequestId: null,
-  devCode: null,
+  apiKeyConfigured: false,
   statusMessage: 'Ready',
 
   openFolder: async () => {
-    const root = await window.litelizard.openFolder();
+    try {
+      const root = await window.litelizard.openFolder();
+      if (!root) {
+        set({ statusMessage: 'Open folder cancelled' });
+        return;
+      }
+      const tree = await window.litelizard.listTree(root);
+      set({ rootPath: root, tree, statusMessage: `Opened: ${root}` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Open folder failed: ${message}` });
+    }
+  },
+
+  createFolder: async (name: string) => {
+    const root = get().rootPath;
     if (!root) {
+      set({ statusMessage: 'Open a folder first' });
       return;
     }
-    const tree = await window.litelizard.listTree(root);
-    set({ rootPath: root, tree, statusMessage: `Opened: ${root}` });
+
+    const trimmed = name.trim();
+    if (!trimmed) {
+      set({ statusMessage: 'Folder name is required' });
+      return;
+    }
+
+    try {
+      await window.litelizard.createFolder(root, trimmed);
+      const tree = await window.litelizard.listTree(root);
+      set({ tree, statusMessage: `Folder created: ${trimmed}` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Create folder failed: ${message}` });
+    }
   },
 
   createDocument: async (title: string) => {
@@ -61,16 +83,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const created = await window.litelizard.createDocument(root, title);
-    const tree = await window.litelizard.listTree(root);
-    set({
-      tree,
-      currentFilePath: created.filePath,
-      document: created.document,
-      revision: 0,
-      dirty: false,
-      statusMessage: 'Document created',
-    });
+    try {
+      const created = await window.litelizard.createDocument(root, title);
+      const tree = await window.litelizard.listTree(root);
+      set({
+        tree,
+        currentFilePath: created.filePath,
+        document: created.document,
+        revision: 0,
+        dirty: false,
+        statusMessage: 'Document created',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Create document failed: ${message}` });
+    }
   },
 
   loadDocument: async (filePath: string) => {
@@ -120,27 +147,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const result = await window.litelizard.saveDocument(currentFilePath, document, revision);
-    if (!result.ok) {
-      if (result.code === 'REVISION_MISMATCH') {
-        set({ statusMessage: 'Revision mismatch. Reload and retry.' });
+    try {
+      const result = await window.litelizard.saveDocument(currentFilePath, document, revision);
+      if (!result.ok) {
+        if (result.code === 'REVISION_MISMATCH') {
+          set({ statusMessage: 'Revision mismatch. Reload and retry.' });
+          return;
+        }
+        set({ statusMessage: 'Save failed' });
         return;
       }
-      set({ statusMessage: 'Save failed' });
-      return;
-    }
 
-    set({ dirty: false, revision: result.revision, statusMessage: 'Saved' });
+      set({ dirty: false, revision: result.revision, statusMessage: 'Saved' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Save failed: ${message}` });
+    }
   },
 
   runAnalysis: async () => {
-    const { document, session } = get();
+    const { document, apiKeyConfigured } = get();
     if (!document) {
       return;
     }
 
-    if (!session) {
-      set({ statusMessage: 'Login required for analysis (401).' });
+    if (!apiKeyConfigured) {
+      set({ statusMessage: 'API key is not configured. Open Settings and save your API key.' });
       return;
     }
 
@@ -175,7 +207,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     };
 
     try {
-      const result = await window.litelizard.runAnalysis(payload, session.accessToken);
+      const result = await window.litelizard.runAnalysis(payload);
       const resultMap = new Map(result.results.map((r) => [r.paragraphId, r]));
 
       const nextDoc: LiteLizardDocument = {
@@ -210,7 +242,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         dirty: true,
         statusMessage: 'Analysis complete',
       });
-      await get().refreshUsage();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed';
       const failedDoc: LiteLizardDocument = {
@@ -234,51 +265,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  bootstrapSession: async () => {
-    const session = await window.litelizard.getSession();
-    set({ session });
-    if (session) {
-      await get().refreshUsage();
+  bootstrapApiKeyStatus: async () => {
+    try {
+      const status = await window.litelizard.getApiKeyStatus();
+      set({ apiKeyConfigured: status.configured });
+    } catch {
+      set({ statusMessage: 'Failed to load API key status' });
     }
   },
 
-  requestEmailLink: async (email: string) => {
-    const result = await window.litelizard.requestEmailLink(email);
-    set({
-      emailRequestId: result.requestId,
-      devCode: result.devCode ?? null,
-      statusMessage: 'Email link requested',
-    });
-  },
-
-  verifyEmailLink: async (email: string, code: string) => {
-    const requestId = get().emailRequestId;
-    if (!requestId) {
-      set({ statusMessage: 'Request email link first' });
-      return;
-    }
-
-    const session = await window.litelizard.verifyEmailLink(email, code, requestId);
-    set({ session, statusMessage: 'Logged in' });
-    await get().refreshUsage();
-  },
-
-  logout: async () => {
-    await window.litelizard.logout();
-    set({ session: null, usage: null, statusMessage: 'Logged out' });
-  },
-
-  refreshUsage: async () => {
-    const session = get().session;
-    if (!session) {
+  saveApiKey: async (apiKey: string) => {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      set({ statusMessage: 'API key is required' });
       return;
     }
 
     try {
-      const usage = await window.litelizard.getUsage(session.accessToken);
-      set({ usage });
-    } catch {
-      set({ statusMessage: 'Failed to load usage' });
+      await window.litelizard.saveApiKey(trimmed);
+      set({ apiKeyConfigured: true, statusMessage: 'API key saved' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Failed to save API key: ${message}` });
+    }
+  },
+
+  clearApiKey: async () => {
+    try {
+      await window.litelizard.clearApiKey();
+      set({ apiKeyConfigured: false, statusMessage: 'API key cleared' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `Failed to clear API key: ${message}` });
     }
   },
 }));

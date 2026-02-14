@@ -1,17 +1,11 @@
-import type {
-  AnalysisRunInput,
-  AnalysisRunResult,
-  FileNode,
-  LiteLizardDocument,
-  Session,
-  UsageResponse,
-} from '@litelizard/shared';
+import type { AnalysisRunInput, AnalysisRunResult, FileNode, LiteLizardDocument } from '@litelizard/shared';
 
 declare global {
   interface Window {
     litelizard: {
       openFolder: () => Promise<string | null>;
       listTree: (root: string) => Promise<FileNode[]>;
+      createFolder: (root: string, name: string) => Promise<{ ok: boolean; path: string }>;
       loadDocument: (filePath: string) => Promise<LiteLizardDocument>;
       createDocument: (
         root: string,
@@ -22,12 +16,10 @@ declare global {
         doc: LiteLizardDocument,
         revision: number
       ) => Promise<{ ok: boolean; code?: string; revision: number }>;
-      getSession: () => Promise<Session | null>;
-      requestEmailLink: (email: string) => Promise<{ requestId: string; devCode?: string }>;
-      verifyEmailLink: (email: string, code: string, requestId: string) => Promise<Session>;
-      logout: () => Promise<{ ok: boolean }>;
-      runAnalysis: (input: AnalysisRunInput, accessToken: string) => Promise<AnalysisRunResult>;
-      getUsage: (accessToken: string) => Promise<UsageResponse>;
+      runAnalysis: (input: AnalysisRunInput) => Promise<AnalysisRunResult>;
+      getApiKeyStatus: () => Promise<{ configured: boolean }>;
+      saveApiKey: (apiKey: string) => Promise<{ ok: boolean }>;
+      clearApiKey: () => Promise<{ ok: boolean }>;
     };
   }
 }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { FileNode } from '@litelizard/shared';
 
 interface Props {
@@ -6,6 +6,7 @@ interface Props {
   tree: FileNode[];
   currentFilePath: string | null;
   onOpenFolder: () => void;
+  onCreateFolder: (name: string) => void;
   onCreateDocument: () => void;
   onSelectFile: (path: string) => void;
 }
@@ -37,6 +38,17 @@ function renderTree(nodes: FileNode[], currentFilePath: string | null, onSelectF
 }
 
 export function ExplorerPane(props: Props) {
+  const [folderName, setFolderName] = useState('');
+
+  const createFolder = () => {
+    const trimmed = folderName.trim();
+    if (!trimmed) {
+      return;
+    }
+    props.onCreateFolder(trimmed);
+    setFolderName('');
+  };
+
   return (
     <aside className="pane explorer-pane">
       <h2>Explorer</h2>
@@ -44,6 +56,17 @@ export function ExplorerPane(props: Props) {
         <button onClick={props.onOpenFolder}>Open Folder</button>
         <button onClick={props.onCreateDocument} disabled={!props.rootPath}>
           New Doc
+        </button>
+      </div>
+      <div className="explorer-actions">
+        <input
+          value={folderName}
+          placeholder="new-folder"
+          onChange={(event) => setFolderName(event.target.value)}
+          disabled={!props.rootPath}
+        />
+        <button onClick={createFolder} disabled={!props.rootPath || !folderName.trim()}>
+          New Folder
         </button>
       </div>
       <div className="hint">{props.rootPath ?? 'No folder opened'}</div>

@@ -2,7 +2,6 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { Session } from '@litelizard/shared';
 
 interface EncryptedPayload {
   version: 1;
@@ -19,13 +18,13 @@ function deriveKey(salt: Buffer) {
   return crypto.pbkdf2Sync(userMaterial, salt, 210_000, 32, 'sha256');
 }
 
-function encryptSession(session: Session): EncryptedPayload {
+function encryptValue(value: string): EncryptedPayload {
   const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(12);
   const key = deriveKey(salt);
 
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = JSON.stringify(session);
+  const plaintext = JSON.stringify({ value });
   const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
 
@@ -38,7 +37,7 @@ function encryptSession(session: Session): EncryptedPayload {
   };
 }
 
-function decryptSession(payload: EncryptedPayload): Session {
+function decryptValue(payload: EncryptedPayload): string {
   const salt = Buffer.from(payload.salt, 'base64');
   const iv = Buffer.from(payload.iv, 'base64');
   const tag = Buffer.from(payload.tag, 'base64');
@@ -48,34 +47,38 @@ function decryptSession(payload: EncryptedPayload): Session {
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(tag);
   const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-  return JSON.parse(plaintext) as Session;
+  const parsed = JSON.parse(plaintext) as { value?: unknown };
+  if (typeof parsed.value !== 'string') {
+    throw new Error('Invalid vault payload');
+  }
+  return parsed.value;
 }
 
-export function createSessionVault(userDataPath: string) {
-  const sessionPath = path.join(userDataPath, 'session.enc.json');
+export function createApiKeyVault(userDataPath: string) {
+  const apiKeyPath = path.join(userDataPath, 'api-key.enc.json');
 
   return {
-    async load(): Promise<Session | null> {
+    async load(): Promise<string | null> {
       try {
-        const raw = await fs.readFile(sessionPath, 'utf8');
+        const raw = await fs.readFile(apiKeyPath, 'utf8');
         const parsed = JSON.parse(raw) as EncryptedPayload;
-        return decryptSession(parsed);
+        return decryptValue(parsed);
       } catch {
         return null;
       }
     },
 
-    async save(session: Session) {
-      const encrypted = encryptSession(session);
-      await fs.mkdir(path.dirname(sessionPath), { recursive: true });
-      await fs.writeFile(sessionPath, JSON.stringify(encrypted, null, 2), 'utf8');
+    async save(apiKey: string) {
+      const encrypted = encryptValue(apiKey);
+      await fs.mkdir(path.dirname(apiKeyPath), { recursive: true });
+      await fs.writeFile(apiKeyPath, JSON.stringify(encrypted, null, 2), 'utf8');
     },
 
     async clear() {
       try {
-        await fs.unlink(sessionPath);
+        await fs.unlink(apiKeyPath);
       } catch {
-        // ignore missing session
+        // ignore missing key
       }
     },
   };

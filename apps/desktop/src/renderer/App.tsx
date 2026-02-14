@@ -11,30 +11,29 @@ export function App() {
     currentFilePath,
     document,
     dirty,
-    session,
-    usage,
+    apiKeyConfigured,
     statusMessage,
-    devCode,
     openFolder,
+    createFolder,
     createDocument,
     loadDocument,
     updateParagraph,
     reorderParagraphs,
     saveNow,
     runAnalysis,
-    bootstrapSession,
-    requestEmailLink,
-    verifyEmailLink,
-    logout,
+    bootstrapApiKeyStatus,
+    saveApiKey,
+    clearApiKey,
   } = useAppStore();
 
   const [titleInput, setTitleInput] = useState('Untitled');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [explorerVisible, setExplorerVisible] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
-    void bootstrapSession();
-  }, [bootstrapSession]);
+    void bootstrapApiKeyStatus();
+  }, [bootstrapApiKeyStatus]);
 
   useEffect(() => {
     if (!dirty || !document || !currentFilePath) {
@@ -78,36 +77,14 @@ export function App() {
         <div className="top-right">
           <span>Dirty: {dirty ? 'yes' : 'no'}</span>
           <span>Stale: {staleCount}</span>
+          <button onClick={() => setExplorerVisible((current) => !current)}>
+            Explorer: {explorerVisible ? 'Hide' : 'Show'}
+          </button>
+          <button onClick={() => setSettingsOpen((current) => !current)}>
+            Settings: {settingsOpen ? 'Close' : 'Open'}
+          </button>
         </div>
       </header>
-
-      <section className="auth-bar">
-        {!session ? (
-          <>
-            <input
-              placeholder="Email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-            <button onClick={() => void requestEmailLink(email)}>Request Email Link</button>
-            <input
-              placeholder="6-digit code"
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-            />
-            <button onClick={() => void verifyEmailLink(email, code)}>Verify</button>
-            {devCode ? <span className="dev-code">Dev code: {devCode}</span> : null}
-          </>
-        ) : (
-          <>
-            <span>Logged in: {session.email}</span>
-            <button onClick={() => void logout()}>Logout</button>
-            <span>
-              Usage Today: {usage?.today.requestCount ?? 0} req / {usage?.today.inputTokens ?? 0} in tokens
-            </span>
-          </>
-        )}
-      </section>
 
       <section className="layout-controls">
         <input value={titleInput} onChange={(event) => setTitleInput(event.target.value)} />
@@ -119,15 +96,41 @@ export function App() {
         </button>
       </section>
 
-      <main className="main-grid">
-        <ExplorerPane
-          rootPath={rootPath}
-          tree={tree}
-          currentFilePath={currentFilePath}
-          onOpenFolder={() => void openFolder()}
-          onCreateDocument={() => void createDocument(titleInput)}
-          onSelectFile={(path) => void loadDocument(path)}
-        />
+      {settingsOpen ? (
+        <section className="settings-panel">
+          <h2>Settings</h2>
+          <div className="settings-row">
+            <span>OpenAI API Key: {apiKeyConfigured ? 'Configured' : 'Not configured'}</span>
+          </div>
+          <div className="settings-row">
+            <input
+              type="password"
+              placeholder="sk-..."
+              value={apiKeyInput}
+              onChange={(event) => setApiKeyInput(event.target.value)}
+            />
+            <button onClick={() => void saveApiKey(apiKeyInput)} disabled={!apiKeyInput.trim()}>
+              Save API Key
+            </button>
+            <button onClick={() => void clearApiKey()} disabled={!apiKeyConfigured}>
+              Clear API Key
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      <main className={explorerVisible ? 'main-grid' : 'main-grid explorer-hidden'}>
+        {explorerVisible ? (
+          <ExplorerPane
+            rootPath={rootPath}
+            tree={tree}
+            currentFilePath={currentFilePath}
+            onOpenFolder={() => void openFolder()}
+            onCreateFolder={(name) => void createFolder(name)}
+            onCreateDocument={() => void createDocument(titleInput)}
+            onSelectFile={(path) => void loadDocument(path)}
+          />
+        ) : null}
         <EditorPane
           document={document}
           onChangeParagraph={(paragraphId, text) => updateParagraph(paragraphId, text)}

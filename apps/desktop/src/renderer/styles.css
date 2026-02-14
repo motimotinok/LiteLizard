@@ -53,7 +53,6 @@ body {
   font-size: 13px;
 }
 
-.auth-bar,
 .layout-controls {
   display: flex;
   gap: 8px;
@@ -62,8 +61,9 @@ body {
   border-bottom: 1px solid var(--line);
 }
 
-.auth-bar input,
 .layout-controls input,
+.explorer-actions input,
+.settings-row input,
 textarea {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -92,6 +92,10 @@ button:hover {
   min-height: 0;
 }
 
+.main-grid.explorer-hidden {
+  grid-template-columns: 1fr 1fr;
+}
+
 .pane {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -116,6 +120,42 @@ button:hover {
 .file-button.active {
   border-color: var(--accent);
   background: #edf8f5;
+}
+
+.explorer-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.explorer-actions input {
+  width: 100%;
+}
+
+.settings-panel {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 16px;
+  background: #f8f3e2;
+}
+
+.settings-panel h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.settings-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.settings-row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-row input {
+  flex: 1;
 }
 
 .paragraph-list,
@@ -175,6 +215,10 @@ button:hover {
 
 @media (max-width: 1100px) {
   .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .main-grid.explorer-hidden {
     grid-template-columns: 1fr;
   }
 }

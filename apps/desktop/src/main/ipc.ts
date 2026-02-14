@@ -1,28 +1,72 @@
 import path from 'node:path';
+import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
 import type { AnalysisRunInput, LiteLizardDocument } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
-import { createSessionVault } from './sessionVault.js';
-import { authRequestEmailLink, authVerifyEmailLink, getUsage, runAnalysis } from './apiBridge.js';
+import { createApiKeyVault } from './sessionVault.js';
+import { runAnalysis } from './apiBridge.js';
 
 const fileService = createFileService();
-const sessionVault = createSessionVault(app.getPath('userData'));
+const apiKeyVault = createApiKeyVault(app.getPath('userData'));
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return 'Unknown error';
+}
+
+function validateFolderName(input: string) {
+  const name = input.trim();
+  if (!name) {
+    throw new Error('Folder name is required.');
+  }
+  if (name === '.' || name === '..') {
+    throw new Error('Folder name is invalid.');
+  }
+  if (name.includes('/') || name.includes('\\')) {
+    throw new Error('Folder name must not contain path separators.');
+  }
+  return name;
+}
 
 export function registerIpcHandlers() {
   ipcMain.handle('dialog:openFolder', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openDirectory'],
-    });
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory'],
+      });
 
-    if (result.canceled || result.filePaths.length === 0) {
-      return null;
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      return result.filePaths[0];
+    } catch (error) {
+      console.error('[IPC dialog:openFolder] failed', error);
+      throw new Error(`OPEN_FOLDER_FAILED: ${getErrorMessage(error)}`);
     }
-
-    return result.filePaths[0];
   });
 
   ipcMain.handle('fs:listTree', async (_, root: string) => {
-    return fileService.listTree(root);
+    try {
+      return await fileService.listTree(root);
+    } catch (error) {
+      console.error('[IPC fs:listTree] failed', error);
+      throw new Error(`LIST_TREE_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle('fs:createFolder', async (_, root: string, name: string) => {
+    try {
+      const validatedName = validateFolderName(name);
+      const folderPath = path.join(root, validatedName);
+      await fs.mkdir(folderPath);
+      return { ok: true as const, path: folderPath };
+    } catch (error) {
+      console.error('[IPC fs:createFolder] failed', error);
+      throw new Error(`CREATE_FOLDER_FAILED: ${getErrorMessage(error)}`);
+    }
   });
 
   ipcMain.handle('doc:load', async (_, filePath: string) => {
@@ -71,30 +115,30 @@ export function registerIpcHandlers() {
     return fileService.save(filePath, doc, revision);
   });
 
-  ipcMain.handle('auth:getSession', async () => {
-    return sessionVault.load();
+  ipcMain.handle('settings:apiKey:getStatus', async () => {
+    const apiKey = await apiKeyVault.load();
+    return { configured: Boolean(apiKey?.trim()) };
   });
 
-  ipcMain.handle('auth:requestEmailLink', async (_, email: string) => {
-    return authRequestEmailLink(email);
-  });
-
-  ipcMain.handle('auth:verifyEmailLink', async (_, email: string, code: string, requestId: string) => {
-    const session = await authVerifyEmailLink(email, code, requestId);
-    await sessionVault.save(session);
-    return session;
-  });
-
-  ipcMain.handle('auth:logout', async () => {
-    await sessionVault.clear();
+  ipcMain.handle('settings:apiKey:save', async (_, apiKey: string) => {
+    const trimmed = apiKey.trim();
+    if (!trimmed) {
+      throw new Error('API key must not be empty.');
+    }
+    await apiKeyVault.save(trimmed);
     return { ok: true };
   });
 
-  ipcMain.handle('analysis:run', async (_, input: AnalysisRunInput, accessToken: string) => {
-    return runAnalysis(input, accessToken);
+  ipcMain.handle('settings:apiKey:clear', async () => {
+    await apiKeyVault.clear();
+    return { ok: true };
   });
 
-  ipcMain.handle('usage:get', async (_, accessToken: string) => {
-    return getUsage(accessToken);
+  ipcMain.handle('analysis:run', async (_, input: AnalysisRunInput) => {
+    const apiKey = await apiKeyVault.load();
+    if (!apiKey) {
+      throw new Error('API key is not configured. Open Settings and save your API key.');
+    }
+    return runAnalysis(input, apiKey);
   });
 }

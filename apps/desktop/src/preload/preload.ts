@@ -1,16 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type {
-  AnalysisRunInput,
-  AnalysisRunResult,
-  FileNode,
-  LiteLizardDocument,
-  Session,
-  UsageResponse,
-} from '@litelizard/shared';
+import type { AnalysisRunInput, AnalysisRunResult, FileNode, LiteLizardDocument } from '@litelizard/shared';
 
 const api = {
   openFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:openFolder'),
   listTree: (root: string): Promise<FileNode[]> => ipcRenderer.invoke('fs:listTree', root),
+  createFolder: (root: string, name: string): Promise<{ ok: boolean; path: string }> =>
+    ipcRenderer.invoke('fs:createFolder', root, name),
   loadDocument: (filePath: string): Promise<LiteLizardDocument> => ipcRenderer.invoke('doc:load', filePath),
   createDocument: (
     root: string,
@@ -23,15 +18,10 @@ const api = {
     revision: number
   ): Promise<{ ok: boolean; code?: string; revision: number }> =>
     ipcRenderer.invoke('doc:save', filePath, doc, revision),
-  getSession: (): Promise<Session | null> => ipcRenderer.invoke('auth:getSession'),
-  requestEmailLink: (email: string): Promise<{ requestId: string; devCode?: string }> =>
-    ipcRenderer.invoke('auth:requestEmailLink', email),
-  verifyEmailLink: (email: string, code: string, requestId: string): Promise<Session> =>
-    ipcRenderer.invoke('auth:verifyEmailLink', email, code, requestId),
-  logout: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('auth:logout'),
-  runAnalysis: (input: AnalysisRunInput, accessToken: string): Promise<AnalysisRunResult> =>
-    ipcRenderer.invoke('analysis:run', input, accessToken),
-  getUsage: (accessToken: string): Promise<UsageResponse> => ipcRenderer.invoke('usage:get', accessToken),
+  runAnalysis: (input: AnalysisRunInput): Promise<AnalysisRunResult> => ipcRenderer.invoke('analysis:run', input),
+  getApiKeyStatus: (): Promise<{ configured: boolean }> => ipcRenderer.invoke('settings:apiKey:getStatus'),
+  saveApiKey: (apiKey: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('settings:apiKey:save', apiKey),
+  clearApiKey: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('settings:apiKey:clear'),
 };
 
 contextBridge.exposeInMainWorld('litelizard', api);

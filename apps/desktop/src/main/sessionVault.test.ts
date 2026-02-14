@@ -2,23 +2,17 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { createSessionVault } from './sessionVault.js';
+import { createApiKeyVault } from './sessionVault.js';
 
-describe('sessionVault', () => {
-  it('encrypts and decrypts session payload', async () => {
+describe('apiKeyVault', () => {
+  it('encrypts and decrypts API key', async () => {
     const dir = path.join(os.tmpdir(), `litelizard-vault-${Date.now()}`);
-    const vault = createSessionVault(dir);
+    const vault = createApiKeyVault(dir);
 
-    await vault.save({
-      accessToken: 'token',
-      userId: 'usr_001',
-      email: 'user@example.com',
-      expiresAt: new Date(Date.now() + 3600_000).toISOString(),
-    });
+    await vault.save('sk-test-123');
 
     const loaded = await vault.load();
-    expect(loaded?.accessToken).toBe('token');
-    expect(loaded?.userId).toBe('usr_001');
+    expect(loaded).toBe('sk-test-123');
 
     await vault.clear();
     await fs.rm(dir, { recursive: true, force: true });
