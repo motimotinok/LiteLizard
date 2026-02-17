@@ -4,7 +4,6 @@ import type { LizardStatus, LiteLizardDocument } from '@litelizard/shared';
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
-  apiKeyConfigured: boolean;
   onRunAnalysis: () => void;
 }
 
@@ -43,32 +42,26 @@ function statusLabel(status: LizardStatus) {
     return '解析中';
   }
   if (status === 'complete') {
-    return '解析済み';
+    return '最新';
   }
   if (status === 'failed') {
     return '失敗';
   }
-  return '未解析';
+  return '再解析待ち';
 }
 
-export function AnalysisPane({ document, activeParagraphId, apiKeyConfigured, onRunAnalysis }: Props) {
+export function AnalysisPane({ document, activeParagraphId, onRunAnalysis }: Props) {
   return (
     <section className="analysis-shell">
       <div className="analysis-sticky-header">
         <div>
-          <h2 className="analysis-title">パラグラフ分析</h2>
-          <p className="analysis-subtitle">各段落の意味と読者への影響を表示します。</p>
+          <h2 className="analysis-title">段落解析</h2>
+          <p className="analysis-subtitle">各段落の相対的意味と読者感想予測を表示します。</p>
         </div>
-        <button
-          className="action-button action-button-primary"
-          onClick={onRunAnalysis}
-          disabled={!document || !apiKeyConfigured}
-        >
-          分析を実行
+        <button className="action-button action-button-primary" onClick={onRunAnalysis} disabled={!document}>
+          全体解析を実行
         </button>
       </div>
-
-      {!apiKeyConfigured ? <div className="analysis-info">設定から API キーを登録すると分析を実行できます。</div> : null}
 
       {!document ? (
         <div className="analysis-empty">ドキュメントを開くと分析結果が表示されます。</div>
@@ -82,10 +75,6 @@ export function AnalysisPane({ document, activeParagraphId, apiKeyConfigured, on
               paragraph.lizard.emotion && paragraph.lizard.emotion.length > 0
                 ? `読者には「${paragraph.lizard.emotion.join(' / ')}」の印象として伝わる可能性があります。`
                 : '読者への影響はまだ推定されていません。';
-            const suggestions =
-              paragraph.lizard.theme && paragraph.lizard.theme.length > 0
-                ? paragraph.lizard.theme.map((theme) => `「${theme}」を軸に具体例を補強すると伝わりやすくなります。`)
-                : ['提案を作成するには分析結果が必要です。'];
 
             return (
               <article key={paragraph.id} className={active ? 'analysis-card active' : 'analysis-card'}>
@@ -98,22 +87,13 @@ export function AnalysisPane({ document, activeParagraphId, apiKeyConfigured, on
                 </div>
 
                 <div className="analysis-section">
-                  <div className="analysis-section-title">意味</div>
+                  <div className="analysis-section-title">相対的意味</div>
                   <p className="analysis-section-body">{meaning}</p>
                 </div>
 
                 <div className="analysis-section">
-                  <div className="analysis-section-title">読者への影響</div>
+                  <div className="analysis-section-title">読者感想予測</div>
                   <p className="analysis-section-body">{readerImpact}</p>
-                </div>
-
-                <div className="analysis-section">
-                  <div className="analysis-section-title">提案</div>
-                  <ul className="analysis-suggestion-list">
-                    {suggestions.map((suggestion, suggestionIndex) => (
-                      <li key={`${paragraph.id}-${suggestionIndex}`}>{suggestion}</li>
-                    ))}
-                  </ul>
                 </div>
 
                 {paragraph.lizard.error ? (

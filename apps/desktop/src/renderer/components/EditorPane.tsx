@@ -182,7 +182,7 @@ export function EditorPane({ document, dirty, activeParagraphId, setActiveParagr
             onKeyUp={onMoveCursor}
             onSelect={onMoveCursor}
             placeholder={
-              'ここに文章を入力してください...\n\n空行で段落を区切ると、右側に分析結果が表示されます。'
+              'ここにMarkdown本文を入力してください...\n\n空行で段落を区切ると、段落単位で解析結果が表示されます。'
             }
           />
         </div>
@@ -196,7 +196,7 @@ export function EditorPane({ document, dirty, activeParagraphId, setActiveParagr
         </div>
         <div className="editor-footer-right">
           <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
-          <span>{dirty ? '自動保存待ち' : '保存済み'}</span>
+          <span>{dirty ? '未保存の変更' : '保存済み'}</span>
         </div>
       </div>
     </section>
