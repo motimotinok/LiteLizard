@@ -2,14 +2,32 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { EditorPane } from './components/EditorPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
+import { SettingsDialog } from './components/SettingsDialog.js';
 import { useAppStore } from './store/useAppStore.js';
+
+function useIsNarrowLayout(breakpoint = 1100) {
+  const [isNarrow, setIsNarrow] = useState(() => window.innerWidth < breakpoint);
+
+  useEffect(() => {
+    const onResize = () => {
+      setIsNarrow(window.innerWidth < breakpoint);
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, [breakpoint]);
+
+  return isNarrow;
+}
 
 export function App() {
   const {
     rootPath,
     tree,
     currentFilePath,
-    document,
+    document: currentDocument,
     dirty,
     apiKeyConfigured,
     statusMessage,
@@ -17,26 +35,27 @@ export function App() {
     createFolder,
     createDocument,
     loadDocument,
-    updateParagraph,
-    reorderParagraphs,
-    saveNow,
+    replaceParagraphs,
     runAnalysis,
+    saveNow,
     bootstrapApiKeyStatus,
     saveApiKey,
     clearApiKey,
   } = useAppStore();
 
-  const [titleInput, setTitleInput] = useState('Untitled');
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [explorerVisible, setExplorerVisible] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
+  const [splitPercent, setSplitPercent] = useState(50);
+  const [resizing, setResizing] = useState(false);
+  const isNarrowLayout = useIsNarrowLayout(1100);
 
   useEffect(() => {
     void bootstrapApiKeyStatus();
   }, [bootstrapApiKeyStatus]);
 
   useEffect(() => {
-    if (!dirty || !document || !currentFilePath) {
+    if (!dirty || !currentDocument || !currentFilePath) {
       return;
     }
 
@@ -47,7 +66,7 @@ export function App() {
     return () => {
       window.clearTimeout(handle);
     };
-  }, [dirty, document, currentFilePath, saveNow]);
+  }, [dirty, currentDocument, currentFilePath, saveNow]);
 
   useEffect(() => {
     const onBeforeUnload = () => {
@@ -62,82 +81,135 @@ export function App() {
     };
   }, [dirty, saveNow]);
 
+  useEffect(() => {
+    if (!currentDocument?.paragraphs.length) {
+      setActiveParagraphId(null);
+      return;
+    }
+
+    if (
+      !activeParagraphId ||
+      !currentDocument.paragraphs.some((paragraph) => paragraph.id === activeParagraphId)
+    ) {
+      setActiveParagraphId(currentDocument.paragraphs[0].id);
+    }
+  }, [currentDocument, activeParagraphId]);
+
   const staleCount = useMemo(
-    () => (document ? document.paragraphs.filter((paragraph) => paragraph.lizard.status === 'stale').length : 0),
-    [document]
+    () =>
+      currentDocument
+        ? currentDocument.paragraphs.filter((paragraph) => paragraph.lizard.status === 'stale').length
+        : 0,
+    [currentDocument],
   );
 
+  useEffect(() => {
+    if (!resizing) {
+      return;
+    }
+
+    const onMove = (event: globalThis.MouseEvent) => {
+      const content = window.document.querySelector('.workspace-split-layout');
+      if (!content) {
+        return;
+      }
+      const rect = content.getBoundingClientRect();
+      if (isNarrowLayout) {
+        const y = event.clientY - rect.top;
+        const percent = (y / rect.height) * 100;
+        setSplitPercent(Math.min(70, Math.max(30, percent)));
+      } else {
+        const x = event.clientX - rect.left;
+        const percent = (x / rect.width) * 100;
+        setSplitPercent(Math.min(70, Math.max(30, percent)));
+      }
+    };
+
+    const onUp = () => {
+      setResizing(false);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizing, isNarrowLayout]);
+
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div className="top-left">
-          <h1>LiteLizard</h1>
-          <div className="status-line">{statusMessage}</div>
-        </div>
-        <div className="top-right">
-          <span>Dirty: {dirty ? 'yes' : 'no'}</span>
-          <span>Stale: {staleCount}</span>
-          <button onClick={() => setExplorerVisible((current) => !current)}>
-            Explorer: {explorerVisible ? 'Hide' : 'Show'}
-          </button>
-          <button onClick={() => setSettingsOpen((current) => !current)}>
-            Settings: {settingsOpen ? 'Close' : 'Open'}
-          </button>
-        </div>
-      </header>
+    <div className="workspace-root">
+      <ExplorerPane
+        rootPath={rootPath}
+        tree={tree}
+        currentFilePath={currentFilePath}
+        onOpenFolder={() => void openFolder()}
+        onCreateFolder={(name) => void createFolder(name)}
+        onCreateDocument={(title) => void createDocument(title)}
+        onSelectFile={(path) => void loadDocument(path)}
+        onSettingsClick={() => setSettingsOpen(true)}
+      />
 
-      <section className="layout-controls">
-        <input value={titleInput} onChange={(event) => setTitleInput(event.target.value)} />
-        <button onClick={() => void createDocument(titleInput)} disabled={!rootPath}>
-          Create Document
-        </button>
-        <button onClick={() => void saveNow()} disabled={!document}>
-          Save Now
-        </button>
-      </section>
-
-      {settingsOpen ? (
-        <section className="settings-panel">
-          <h2>Settings</h2>
-          <div className="settings-row">
-            <span>OpenAI API Key: {apiKeyConfigured ? 'Configured' : 'Not configured'}</span>
+      <main className="workspace-main">
+        <div className="workspace-toolbar">
+          <div className="workspace-toolbar-left">
+            <span className="toolbar-badge">{dirty ? '未保存の変更あり' : '保存済み'}</span>
+            <span className="toolbar-text">{statusMessage}</span>
           </div>
-          <div className="settings-row">
-            <input
-              type="password"
-              placeholder="sk-..."
-              value={apiKeyInput}
-              onChange={(event) => setApiKeyInput(event.target.value)}
+          <div className="workspace-toolbar-right">
+            <span className="toolbar-meta">未解析: {staleCount}</span>
+            <button className="action-button" onClick={() => void saveNow()} disabled={!currentDocument}>
+              今すぐ保存
+            </button>
+            <button
+              className="action-button action-button-primary"
+              onClick={() => void runAnalysis()}
+              disabled={!currentDocument}
+            >
+              分析を実行
+            </button>
+          </div>
+        </div>
+
+        <div className="workspace-content">
+          <div className={isNarrowLayout ? 'workspace-split-layout vertical' : 'workspace-split-layout'}>
+            <div className="split-panel" style={{ flexBasis: `${splitPercent}%` }}>
+              <EditorPane
+                document={currentDocument}
+                dirty={dirty}
+                activeParagraphId={activeParagraphId}
+                setActiveParagraphId={setActiveParagraphId}
+                onSyncParagraphs={(texts) => replaceParagraphs(texts)}
+              />
+            </div>
+            <div
+              className={isNarrowLayout ? 'resize-handle resize-handle-row' : 'resize-handle'}
+              onMouseDown={() => setResizing(true)}
+              role="separator"
+              aria-orientation={isNarrowLayout ? 'horizontal' : 'vertical'}
+              tabIndex={0}
             />
-            <button onClick={() => void saveApiKey(apiKeyInput)} disabled={!apiKeyInput.trim()}>
-              Save API Key
-            </button>
-            <button onClick={() => void clearApiKey()} disabled={!apiKeyConfigured}>
-              Clear API Key
-            </button>
+            <div className="split-panel" style={{ flexBasis: `${100 - splitPercent}%` }}>
+              <AnalysisPane
+                document={currentDocument}
+                activeParagraphId={activeParagraphId}
+                onRunAnalysis={() => void runAnalysis()}
+                apiKeyConfigured={apiKeyConfigured}
+              />
+            </div>
           </div>
-        </section>
-      ) : null}
-
-      <main className={explorerVisible ? 'main-grid' : 'main-grid explorer-hidden'}>
-        {explorerVisible ? (
-          <ExplorerPane
-            rootPath={rootPath}
-            tree={tree}
-            currentFilePath={currentFilePath}
-            onOpenFolder={() => void openFolder()}
-            onCreateFolder={(name) => void createFolder(name)}
-            onCreateDocument={() => void createDocument(titleInput)}
-            onSelectFile={(path) => void loadDocument(path)}
-          />
-        ) : null}
-        <EditorPane
-          document={document}
-          onChangeParagraph={(paragraphId, text) => updateParagraph(paragraphId, text)}
-          onReorder={(orderedIds) => reorderParagraphs(orderedIds)}
-        />
-        <AnalysisPane document={document} onRunAnalysis={() => void runAnalysis()} />
+        </div>
       </main>
+
+      <SettingsDialog
+        isOpen={settingsOpen}
+        apiKeyConfigured={apiKeyConfigured}
+        apiKeyInput={apiKeyInput}
+        onApiKeyInputChange={setApiKeyInput}
+        onSaveApiKey={() => void saveApiKey(apiKeyInput)}
+        onClearApiKey={() => void clearApiKey()}
+        onClose={() => setSettingsOpen(false)}
+      />
     </div>
   );
 }

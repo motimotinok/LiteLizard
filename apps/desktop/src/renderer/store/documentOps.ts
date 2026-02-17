@@ -50,3 +50,49 @@ export function reorderParagraphsInDocument(
 export function collectStaleParagraphs(document: LiteLizardDocument) {
   return document.paragraphs.filter((paragraph) => paragraph.lizard.status === 'stale');
 }
+
+function createParagraphId() {
+  return `p_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function replaceParagraphsInDocument(
+  document: LiteLizardDocument,
+  nextParagraphTexts: string[],
+): LiteLizardDocument {
+  const safeTexts = nextParagraphTexts.length > 0 ? nextParagraphTexts : [' '];
+
+  const paragraphs = safeTexts.map((text, index) => {
+    const existing = document.paragraphs[index];
+    if (!existing) {
+      return {
+        id: createParagraphId(),
+        order: index + 1,
+        light: {
+          text,
+          charCount: text.length,
+        },
+        lizard: {
+          status: 'stale' as const,
+        },
+      };
+    }
+
+    const changed = existing.light.text !== text;
+    return {
+      ...existing,
+      order: index + 1,
+      light: {
+        ...existing.light,
+        text,
+        charCount: text.length,
+      },
+      lizard: changed ? { status: 'stale' as const } : existing.lizard,
+    };
+  });
+
+  return {
+    ...document,
+    updatedAt: new Date().toISOString(),
+    paragraphs,
+  };
+}

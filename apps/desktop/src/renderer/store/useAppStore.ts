@@ -3,6 +3,7 @@ import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard
 import {
   collectStaleParagraphs,
   reorderParagraphsInDocument,
+  replaceParagraphsInDocument,
   updateParagraphInDocument,
 } from './documentOps.js';
 
@@ -21,6 +22,7 @@ interface AppState {
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
+  replaceParagraphs: (paragraphTexts: string[]) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
   bootstrapApiKeyStatus: () => Promise<void>;
@@ -138,6 +140,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       document: reorderParagraphsInDocument(document, orderedIds),
       dirty: true,
       statusMessage: 'Paragraphs reordered',
+    });
+  },
+
+  replaceParagraphs: (paragraphTexts: string[]) => {
+    const document = get().document;
+    if (!document) {
+      return;
+    }
+
+    set({
+      document: replaceParagraphsInDocument(document, paragraphTexts),
+      dirty: true,
+      statusMessage: '編集中',
     });
   },
 

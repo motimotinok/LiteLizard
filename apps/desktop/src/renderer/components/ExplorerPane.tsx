@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { FileNode } from '@litelizard/shared';
 
 interface Props {
@@ -7,70 +7,183 @@ interface Props {
   currentFilePath: string | null;
   onOpenFolder: () => void;
   onCreateFolder: (name: string) => void;
-  onCreateDocument: () => void;
+  onCreateDocument: (title: string) => void;
+  onSelectFile: (path: string) => void;
+  onSettingsClick: () => void;
+}
+
+interface TreeProps {
+  nodes: FileNode[];
+  currentFilePath: string | null;
+  depth?: number;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
   onSelectFile: (path: string) => void;
 }
 
-function renderTree(nodes: FileNode[], currentFilePath: string | null, onSelectFile: (path: string) => void) {
-  return nodes.map((node) => {
-    if (node.type === 'directory') {
-      return (
-        <li key={node.path}>
-          <strong>{node.name}</strong>
-          {node.children && node.children.length > 0 ? (
-            <ul>{renderTree(node.children, currentFilePath, onSelectFile)}</ul>
-          ) : null}
-        </li>
-      );
-    }
+function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectFile }: TreeProps) {
+  return (
+    <div className="explorer-tree-group">
+      {nodes.map((node) => {
+        if (node.type === 'directory') {
+          const isExpanded = expanded.has(node.path);
+          return (
+            <div key={node.path}>
+              <button
+                className="explorer-tree-item explorer-tree-item-folder"
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                onClick={() => onToggle(node.path)}
+              >
+                <span className="explorer-chevron">{isExpanded ? '▾' : '▸'}</span>
+                <span className="explorer-node-icon">D</span>
+                <span className="explorer-node-label">{node.name}</span>
+              </button>
+              {isExpanded && node.children && node.children.length > 0 ? (
+                <Tree
+                  nodes={node.children}
+                  currentFilePath={currentFilePath}
+                  depth={depth + 1}
+                  expanded={expanded}
+                  onToggle={onToggle}
+                  onSelectFile={onSelectFile}
+                />
+              ) : null}
+            </div>
+          );
+        }
 
-    return (
-      <li key={node.path}>
-        <button
-          className={node.path === currentFilePath ? 'file-button active' : 'file-button'}
-          onClick={() => onSelectFile(node.path)}
-        >
-          {node.name}
-        </button>
-      </li>
-    );
-  });
+        const isSelected = node.path === currentFilePath;
+        return (
+          <button
+            key={node.path}
+            className={isSelected ? 'explorer-tree-item explorer-tree-item-file active' : 'explorer-tree-item explorer-tree-item-file'}
+            style={{ paddingLeft: `${depth * 12 + 28}px` }}
+            onClick={() => onSelectFile(node.path)}
+          >
+            <span className="explorer-node-icon">F</span>
+            <span className="explorer-node-label">{node.name}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
-export function ExplorerPane(props: Props) {
-  const [folderName, setFolderName] = useState('');
+function collectDirectoryPaths(nodes: FileNode[]) {
+  const paths: string[] = [];
+  for (const node of nodes) {
+    if (node.type === 'directory') {
+      paths.push(node.path);
+      if (node.children && node.children.length > 0) {
+        paths.push(...collectDirectoryPaths(node.children));
+      }
+    }
+  }
+  return paths;
+}
+
+export function ExplorerPane({
+  rootPath,
+  tree,
+  currentFilePath,
+  onOpenFolder,
+  onCreateFolder,
+  onCreateDocument,
+  onSelectFile,
+  onSettingsClick,
+}: Props) {
+  const [newDocTitle, setNewDocTitle] = useState('Untitled');
+  const [newFolderName, setNewFolderName] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
+
+  const expandedFolders = expanded.size > 0 ? expanded : defaultExpanded;
+
+  const toggleFolder = (path: string) => {
+    setExpanded((current) => {
+      const source = current.size > 0 ? current : new Set(defaultExpanded);
+      const next = new Set(source);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  };
 
   const createFolder = () => {
-    const trimmed = folderName.trim();
+    const trimmed = newFolderName.trim();
     if (!trimmed) {
       return;
     }
-    props.onCreateFolder(trimmed);
-    setFolderName('');
+    onCreateFolder(trimmed);
+    setNewFolderName('');
+  };
+
+  const createDocument = () => {
+    const trimmed = newDocTitle.trim() || 'Untitled';
+    onCreateDocument(trimmed);
   };
 
   return (
-    <aside className="pane explorer-pane">
-      <h2>Explorer</h2>
-      <div className="explorer-actions">
-        <button onClick={props.onOpenFolder}>Open Folder</button>
-        <button onClick={props.onCreateDocument} disabled={!props.rootPath}>
-          New Doc
+    <aside className="explorer-layout">
+      <div className="explorer-iconbar">
+        <div className="explorer-icon">LL</div>
+        <button className="explorer-icon-button" onClick={onSettingsClick} title="設定">
+          S
         </button>
       </div>
-      <div className="explorer-actions">
-        <input
-          value={folderName}
-          placeholder="new-folder"
-          onChange={(event) => setFolderName(event.target.value)}
-          disabled={!props.rootPath}
-        />
-        <button onClick={createFolder} disabled={!props.rootPath || !folderName.trim()}>
-          New Folder
-        </button>
+
+      <div className="explorer-panel">
+        <div className="explorer-header">
+          <div className="explorer-title">LiteLizard</div>
+          <div className="explorer-root">{rootPath ?? 'フォルダ未選択'}</div>
+        </div>
+
+        <div className="explorer-actions-row">
+          <button className="action-button" onClick={onOpenFolder}>
+            フォルダを開く
+          </button>
+        </div>
+
+        <div className="explorer-actions-row">
+          <input
+            value={newDocTitle}
+            onChange={(event) => setNewDocTitle(event.target.value)}
+            className="input-control"
+            placeholder="新規ドキュメント名"
+            disabled={!rootPath}
+          />
+          <button className="action-button" onClick={createDocument} disabled={!rootPath}>
+            新規作成
+          </button>
+        </div>
+
+        <div className="explorer-actions-row">
+          <input
+            value={newFolderName}
+            onChange={(event) => setNewFolderName(event.target.value)}
+            className="input-control"
+            placeholder="新規フォルダ名"
+            disabled={!rootPath}
+          />
+          <button className="action-button" onClick={createFolder} disabled={!rootPath || !newFolderName.trim()}>
+            追加
+          </button>
+        </div>
+
+        <div className="explorer-tree">
+          <Tree
+            nodes={tree}
+            currentFilePath={currentFilePath}
+            expanded={expandedFolders}
+            onToggle={toggleFolder}
+            onSelectFile={onSelectFile}
+          />
+        </div>
       </div>
-      <div className="hint">{props.rootPath ?? 'No folder opened'}</div>
-      <ul className="tree">{renderTree(props.tree, props.currentFilePath, props.onSelectFile)}</ul>
     </aside>
   );
 }

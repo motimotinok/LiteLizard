@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { collectStaleParagraphs, reorderParagraphsInDocument, updateParagraphInDocument } from './documentOps.js';
+import {
+  collectStaleParagraphs,
+  reorderParagraphsInDocument,
+  replaceParagraphsInDocument,
+  updateParagraphInDocument,
+} from './documentOps.js';
 
 const doc = {
   version: 1 as const,
@@ -45,5 +50,16 @@ describe('document operations', () => {
     const stale = collectStaleParagraphs(doc);
     expect(stale).toHaveLength(1);
     expect(stale[0].id).toBe('p_bbbbbb');
+  });
+
+  it('replaces paragraphs and keeps unchanged lizard data', () => {
+    const next = replaceParagraphsInDocument(doc, ['a', 'new b', 'new c']);
+    expect(next.paragraphs).toHaveLength(3);
+    expect(next.paragraphs[0].id).toBe('p_aaaaaa');
+    expect(next.paragraphs[0].lizard.status).toBe('complete');
+    expect(next.paragraphs[1].id).toBe('p_bbbbbb');
+    expect(next.paragraphs[1].lizard.status).toBe('stale');
+    expect(next.paragraphs[2].id.startsWith('p_')).toBe(true);
+    expect(next.paragraphs[2].lizard.status).toBe('stale');
   });
 });
