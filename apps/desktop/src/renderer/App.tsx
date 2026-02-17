@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { EditorPane } from './components/EditorPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
-import { SettingsDialog } from './components/SettingsDialog.js';
 import { useAppStore } from './store/useAppStore.js';
 
 function useIsNarrowLayout(breakpoint = 1100) {
@@ -29,7 +28,6 @@ export function App() {
     currentFilePath,
     document: currentDocument,
     dirty,
-    apiKeyConfigured,
     statusMessage,
     openFolder,
     createFolder,
@@ -39,12 +37,8 @@ export function App() {
     runAnalysis,
     saveNow,
     bootstrapApiKeyStatus,
-    saveApiKey,
-    clearApiKey,
   } = useAppStore();
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
   const [splitPercent, setSplitPercent] = useState(50);
   const [resizing, setResizing] = useState(false);
@@ -147,7 +141,6 @@ export function App() {
         onCreateFolder={(name) => void createFolder(name)}
         onCreateDocument={(title) => void createDocument(title)}
         onSelectFile={(path) => void loadDocument(path)}
-        onSettingsClick={() => setSettingsOpen(true)}
       />
 
       <main className="workspace-main">
@@ -157,7 +150,7 @@ export function App() {
             <span className="toolbar-text">{statusMessage}</span>
           </div>
           <div className="workspace-toolbar-right">
-            <span className="toolbar-meta">未解析: {staleCount}</span>
+            <span className="toolbar-meta">再解析待ち: {staleCount}</span>
             <button className="action-button" onClick={() => void saveNow()} disabled={!currentDocument}>
               今すぐ保存
             </button>
@@ -166,7 +159,7 @@ export function App() {
               onClick={() => void runAnalysis()}
               disabled={!currentDocument}
             >
-              分析を実行
+              全体解析を実行
             </button>
           </div>
         </div>
@@ -194,22 +187,11 @@ export function App() {
                 document={currentDocument}
                 activeParagraphId={activeParagraphId}
                 onRunAnalysis={() => void runAnalysis()}
-                apiKeyConfigured={apiKeyConfigured}
               />
             </div>
           </div>
         </div>
       </main>
-
-      <SettingsDialog
-        isOpen={settingsOpen}
-        apiKeyConfigured={apiKeyConfigured}
-        apiKeyInput={apiKeyInput}
-        onApiKeyInputChange={setApiKeyInput}
-        onSaveApiKey={() => void saveApiKey(apiKeyInput)}
-        onClearApiKey={() => void clearApiKey()}
-        onClose={() => setSettingsOpen(false)}
-      />
     </div>
   );
 }

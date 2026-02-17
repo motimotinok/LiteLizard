@@ -9,7 +9,6 @@ interface Props {
   onCreateFolder: (name: string) => void;
   onCreateDocument: (title: string) => void;
   onSelectFile: (path: string) => void;
-  onSettingsClick: () => void;
 }
 
 interface TreeProps {
@@ -90,7 +89,6 @@ export function ExplorerPane({
   onCreateFolder,
   onCreateDocument,
   onSelectFile,
-  onSettingsClick,
 }: Props) {
   const [newDocTitle, setNewDocTitle] = useState('Untitled');
   const [newFolderName, setNewFolderName] = useState('');
@@ -131,9 +129,6 @@ export function ExplorerPane({
     <aside className="explorer-layout">
       <div className="explorer-iconbar">
         <div className="explorer-icon">LL</div>
-        <button className="explorer-icon-button" onClick={onSettingsClick} title="設定">
-          S
-        </button>
       </div>
 
       <div className="explorer-panel">
