@@ -5,7 +5,13 @@ declare global {
     litelizard: {
       openFolder: () => Promise<string | null>;
       listTree: (root: string) => Promise<FileNode[]>;
-      createFolder: (root: string, name: string) => Promise<{ ok: boolean; path: string }>;
+      createEntry: (
+        root: string,
+        type: 'file' | 'folder',
+        name: string
+      ) => Promise<{ ok: boolean; path: string; type: 'file' | 'folder' }>;
+      renameEntry: (targetPath: string, nextName: string) => Promise<{ ok: boolean; path: string }>;
+      deleteEntry: (targetPath: string) => Promise<{ ok: boolean }>;
       loadDocument: (filePath: string) => Promise<LiteLizardDocument>;
       createDocument: (
         root: string,

@@ -23,5 +23,5 @@ LiteLizard is an Electron desktop editor that keeps `light` (text) and `lizard` 
 - E2E: `RUN_E2E_ELECTRON=1 pnpm --filter @litelizard/e2e test`
 
 ## Notes
-- `.md` import/export is intentionally out of scope for MVP.
+- Desktop document storage uses `.md` + `*.litelizard.analysis.json`.
 - OpenAI API key is stored as encrypted local file (PBKDF2 + AES-GCM).

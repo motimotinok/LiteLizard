@@ -37,13 +37,29 @@ export interface LiteLizardDocument {
   createdAt: string;
   updatedAt: string;
   source?: {
-    format: 'litelizard-json';
+    format: 'litelizard-json' | 'markdown-md';
     originPath?: string;
   };
   paragraphs: Paragraph[];
   meta?: {
     tags?: string[];
   };
+}
+
+export interface LiteLizardAnalysisParagraph {
+  paragraphId: string;
+  order: number;
+  lizard: LizardData;
+}
+
+export interface LiteLizardAnalysisFile {
+  version: 1;
+  documentId: string;
+  title: string;
+  personaMode: PersonaMode;
+  createdAt: string;
+  updatedAt: string;
+  paragraphs: LiteLizardAnalysisParagraph[];
 }
 
 export interface FileNode {
