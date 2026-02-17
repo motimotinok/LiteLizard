@@ -162,6 +162,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           const document = get().document;
           set({
             currentFilePath: remapped,
+            revision: 0,
             document:
               document && remapped !== currentFilePath
                 ? {

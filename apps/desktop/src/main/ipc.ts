@@ -72,6 +72,15 @@ async function fileExists(filePath: string) {
   }
 }
 
+async function assertRenameTargetAvailable(sourcePath: string, targetPath: string) {
+  if (sourcePath === targetPath) {
+    return;
+  }
+  if (await fileExists(targetPath)) {
+    throw new Error(`Target already exists: ${targetPath}`);
+  }
+}
+
 export function registerIpcHandlers() {
   ipcMain.handle('dialog:openFolder', async () => {
     try {
@@ -134,6 +143,7 @@ export function registerIpcHandlers() {
       if (stats.isDirectory()) {
         const validName = validateEntryName(nextName);
         const nextPath = path.join(path.dirname(targetPath), validName);
+        await assertRenameTargetAvailable(targetPath, nextPath);
         await fs.rename(targetPath, nextPath);
         return { ok: true as const, path: nextPath };
       }
@@ -141,14 +151,24 @@ export function registerIpcHandlers() {
       const safeName = sanitizeFileStem(validateEntryName(nextName));
       const nextFileName = ensureMarkdownFileName(safeName);
       const nextPath = path.join(path.dirname(targetPath), nextFileName);
+      await assertRenameTargetAvailable(targetPath, nextPath);
 
-      await fs.rename(targetPath, nextPath);
-
-      if (targetPath.endsWith('.md')) {
+      if (/\.md$/i.test(targetPath)) {
         const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
         const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
 
-        if (await fileExists(oldAnalysisPath)) {
+        if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(nextAnalysisPath))) {
+          throw new Error(`Target analysis file already exists: ${nextAnalysisPath}`);
+        }
+      }
+
+      await fs.rename(targetPath, nextPath);
+
+      if (/\.md$/i.test(targetPath)) {
+        const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
+        const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
+
+        if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(oldAnalysisPath))) {
           await fs.rename(oldAnalysisPath, nextAnalysisPath);
         }
       }
@@ -171,7 +191,7 @@ export function registerIpcHandlers() {
 
       await fs.rm(targetPath, { force: true });
 
-      if (targetPath.endsWith('.md')) {
+      if (/\.md$/i.test(targetPath)) {
         const analysisPath = fileService.toAnalysisPath(targetPath);
         await fs.rm(analysisPath, { force: true });
       }

@@ -33,6 +33,7 @@ describe('fileService markdown + analysis', () => {
     await withTempDir(async (dir) => {
       await fs.mkdir(path.join(dir, 'nested'));
       await fs.writeFile(path.join(dir, 'essay.md'), 'hello', 'utf8');
+      await fs.writeFile(path.join(dir, 'Essay.MD'), 'hello2', 'utf8');
       await fs.writeFile(path.join(dir, 'essay.litelizard.analysis.json'), '{}', 'utf8');
       await fs.writeFile(path.join(dir, 'notes.txt'), 'ignore', 'utf8');
       await fs.writeFile(path.join(dir, 'nested', 'inside.md'), 'inside', 'utf8');
@@ -41,7 +42,7 @@ describe('fileService markdown + analysis', () => {
       const tree = await service.listTree(dir);
       const files = flattenFiles(tree).map((item) => path.basename(item)).sort();
 
-      expect(files).toEqual(['essay.md', 'inside.md']);
+      expect(files).toEqual(['Essay.MD', 'essay.md', 'inside.md']);
     });
   });
 
@@ -134,5 +135,10 @@ describe('fileService markdown + analysis', () => {
       expect(markdown).toContain('段落A');
       expect(analysis.paragraphs.map((item) => item.paragraphId)).toEqual(['p_a', 'p_b']);
     });
+  });
+
+  it('resolves analysis sidecar path for uppercase extension', async () => {
+    const service = createFileService();
+    expect(service.toAnalysisPath('/tmp/Essay.MD')).toBe('/tmp/Essay.litelizard.analysis.json');
   });
 });

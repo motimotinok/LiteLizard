@@ -16,7 +16,7 @@ function createParagraphId() {
 }
 
 function toAnalysisPath(markdownPath: string) {
-  if (markdownPath.endsWith('.md')) {
+  if (/\.md$/i.test(markdownPath)) {
     return `${markdownPath.slice(0, -3)}.litelizard.analysis.json`;
   }
   return `${markdownPath}.litelizard.analysis.json`;
@@ -208,7 +208,7 @@ async function walk(root: string): Promise<FileNode[]> {
       continue;
     }
 
-    if (entry.isFile() && entry.name.endsWith('.md')) {
+    if (entry.isFile() && /\.md$/i.test(entry.name)) {
       nodes.push({
         path: absolutePath,
         name: entry.name,

@@ -16,6 +16,7 @@ describe('ipc path utils', () => {
   it('normalizes markdown file names', () => {
     expect(ensureMarkdownFileName('draft')).toBe('draft.md');
     expect(ensureMarkdownFileName('draft.md')).toBe('draft.md');
+    expect(ensureMarkdownFileName('Essay.MD')).toBe('Essay.md');
   });
 
   it('sanitizes file stem and recovers fallback', () => {

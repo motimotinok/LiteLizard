@@ -23,7 +23,10 @@ export function sanitizeFileStem(input: string) {
 }
 
 export function ensureMarkdownFileName(name: string) {
-  return name.toLowerCase().endsWith('.md') ? name : `${name}.md`;
+  if (/\.md$/i.test(name)) {
+    return `${name.slice(0, -3)}.md`;
+  }
+  return `${name}.md`;
 }
 
 export function toTitleFromFileName(fileName: string) {
