@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { FileNode } from '@litelizard/shared';
 
 interface Props {
@@ -6,8 +6,9 @@ interface Props {
   tree: FileNode[];
   currentFilePath: string | null;
   onOpenFolder: () => void;
-  onCreateFolder: (name: string) => void;
-  onCreateDocument: (title: string) => void;
+  onCreateEntry: (parentPath: string, type: 'file' | 'folder', name: string) => void;
+  onRenameEntry: (targetPath: string, nextName: string) => void;
+  onDeleteEntry: (targetPath: string) => void;
   onSelectFile: (path: string) => void;
 }
 
@@ -18,9 +19,39 @@ interface TreeProps {
   expanded: Set<string>;
   onToggle: (path: string) => void;
   onSelectFile: (path: string) => void;
+  onOpenContextMenu: (event: React.MouseEvent<HTMLElement>, node: FileNode) => void;
 }
 
-function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectFile }: TreeProps) {
+interface ContextMenuState {
+  x: number;
+  y: number;
+  targetPath: string;
+  targetType: 'file' | 'directory';
+}
+
+function baseName(targetPath: string) {
+  const normalized = targetPath.replace(/\\/g, '/');
+  const parts = normalized.split('/');
+  return parts[parts.length - 1] ?? targetPath;
+}
+
+function dirName(targetPath: string) {
+  const slash = Math.max(targetPath.lastIndexOf('/'), targetPath.lastIndexOf('\\'));
+  if (slash < 0) {
+    return targetPath;
+  }
+  return targetPath.slice(0, slash);
+}
+
+function Tree({
+  nodes,
+  currentFilePath,
+  depth = 0,
+  expanded,
+  onToggle,
+  onSelectFile,
+  onOpenContextMenu,
+}: TreeProps) {
   return (
     <div className="explorer-tree-group">
       {nodes.map((node) => {
@@ -32,9 +63,12 @@ function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectF
                 className="explorer-tree-item explorer-tree-item-folder"
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
                 onClick={() => onToggle(node.path)}
+                onContextMenu={(event) => onOpenContextMenu(event, node)}
               >
                 <span className="explorer-chevron">{isExpanded ? '▾' : '▸'}</span>
-                <span className="explorer-node-icon">D</span>
+                <span className="explorer-node-icon" aria-hidden>
+                  📁
+                </span>
                 <span className="explorer-node-label">{node.name}</span>
               </button>
               {isExpanded && node.children && node.children.length > 0 ? (
@@ -45,6 +79,7 @@ function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectF
                   expanded={expanded}
                   onToggle={onToggle}
                   onSelectFile={onSelectFile}
+                  onOpenContextMenu={onOpenContextMenu}
                 />
               ) : null}
             </div>
@@ -55,11 +90,18 @@ function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectF
         return (
           <button
             key={node.path}
-            className={isSelected ? 'explorer-tree-item explorer-tree-item-file active' : 'explorer-tree-item explorer-tree-item-file'}
+            className={
+              isSelected
+                ? 'explorer-tree-item explorer-tree-item-file active'
+                : 'explorer-tree-item explorer-tree-item-file'
+            }
             style={{ paddingLeft: `${depth * 12 + 28}px` }}
             onClick={() => onSelectFile(node.path)}
+            onContextMenu={(event) => onOpenContextMenu(event, node)}
           >
-            <span className="explorer-node-icon">F</span>
+            <span className="explorer-node-icon" aria-hidden>
+              📄
+            </span>
             <span className="explorer-node-label">{node.name}</span>
           </button>
         );
@@ -86,17 +128,29 @@ export function ExplorerPane({
   tree,
   currentFilePath,
   onOpenFolder,
-  onCreateFolder,
-  onCreateDocument,
+  onCreateEntry,
+  onRenameEntry,
+  onDeleteEntry,
   onSelectFile,
 }: Props) {
-  const [newDocTitle, setNewDocTitle] = useState('Untitled');
-  const [newFolderName, setNewFolderName] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
-
   const expandedFolders = expanded.size > 0 ? expanded : defaultExpanded;
+
+  useEffect(() => {
+    const close = () => {
+      setContextMenu(null);
+      setQuickCreateOpen(false);
+    };
+
+    window.addEventListener('click', close);
+    return () => {
+      window.removeEventListener('click', close);
+    };
+  }, []);
 
   const toggleFolder = (path: string) => {
     setExpanded((current) => {
@@ -111,74 +165,163 @@ export function ExplorerPane({
     });
   };
 
-  const createFolder = () => {
-    const trimmed = newFolderName.trim();
-    if (!trimmed) {
+  const openCreatePrompt = (parentPath: string, type: 'file' | 'folder') => {
+    const message = type === 'file' ? '新規ファイル名' : '新規フォルダ名';
+    const fallback = type === 'file' ? 'Untitled' : 'New Folder';
+    const name = window.prompt(message, fallback)?.trim();
+    if (!name) {
       return;
     }
-    onCreateFolder(trimmed);
-    setNewFolderName('');
+    onCreateEntry(parentPath, type, name);
   };
 
-  const createDocument = () => {
-    const trimmed = newDocTitle.trim() || 'Untitled';
-    onCreateDocument(trimmed);
+  const openRenamePrompt = (targetPath: string) => {
+    const name = window.prompt('新しい名前', baseName(targetPath))?.trim();
+    if (!name) {
+      return;
+    }
+    onRenameEntry(targetPath, name);
   };
+
+  const runDelete = (targetPath: string) => {
+    if (!window.confirm('削除しますか？')) {
+      return;
+    }
+    onDeleteEntry(targetPath);
+  };
+
+  const resolveCreateParent = (menu: ContextMenuState) => {
+    if (menu.targetType === 'directory') {
+      return menu.targetPath;
+    }
+    return dirName(menu.targetPath);
+  };
+
+  const onOpenContextMenu = (event: React.MouseEvent<HTMLElement>, node: FileNode) => {
+    event.preventDefault();
+    setQuickCreateOpen(false);
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      targetPath: node.path,
+      targetType: node.type,
+    });
+  };
+
+  const canCreate = Boolean(rootPath);
 
   return (
     <aside className="explorer-layout">
-      <div className="explorer-iconbar">
-        <div className="explorer-icon">LL</div>
-      </div>
-
       <div className="explorer-panel">
         <div className="explorer-header">
-          <div className="explorer-title">LiteLizard</div>
-          <div className="explorer-root">{rootPath ?? 'フォルダ未選択'}</div>
+          <div className="explorer-title-row">
+            <div>
+              <div className="explorer-title">作品管理</div>
+              <div className="explorer-root">{rootPath ?? 'フォルダ未選択'}</div>
+            </div>
+            <div className="explorer-header-actions">
+              <button className="icon-button" onClick={onOpenFolder} title="フォルダを開く">
+                📂
+              </button>
+              <div className="explorer-plus-wrap">
+                <button
+                  className="icon-button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setContextMenu(null);
+                    setQuickCreateOpen((value) => !value);
+                  }}
+                  disabled={!canCreate}
+                  title="新規作成"
+                >
+                  ＋
+                </button>
+
+                {quickCreateOpen && rootPath ? (
+                  <div className="explorer-popover" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        openCreatePrompt(rootPath, 'file');
+                        setQuickCreateOpen(false);
+                      }}
+                    >
+                      新規ファイル
+                    </button>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        openCreatePrompt(rootPath, 'folder');
+                        setQuickCreateOpen(false);
+                      }}
+                    >
+                      新規フォルダ
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="explorer-actions-row">
-          <button className="action-button" onClick={onOpenFolder}>
-            フォルダを開く
-          </button>
-        </div>
-
-        <div className="explorer-actions-row">
-          <input
-            value={newDocTitle}
-            onChange={(event) => setNewDocTitle(event.target.value)}
-            className="input-control"
-            placeholder="新規ドキュメント名"
-            disabled={!rootPath}
-          />
-          <button className="action-button" onClick={createDocument} disabled={!rootPath}>
-            新規作成
-          </button>
-        </div>
-
-        <div className="explorer-actions-row">
-          <input
-            value={newFolderName}
-            onChange={(event) => setNewFolderName(event.target.value)}
-            className="input-control"
-            placeholder="新規フォルダ名"
-            disabled={!rootPath}
-          />
-          <button className="action-button" onClick={createFolder} disabled={!rootPath || !newFolderName.trim()}>
-            追加
-          </button>
-        </div>
-
-        <div className="explorer-tree">
+        <div className="explorer-tree" onContextMenu={(event) => event.preventDefault()}>
           <Tree
             nodes={tree}
             currentFilePath={currentFilePath}
             expanded={expandedFolders}
             onToggle={toggleFolder}
             onSelectFile={onSelectFile}
+            onOpenContextMenu={onOpenContextMenu}
           />
         </div>
       </div>
+
+      {contextMenu ? (
+        <div
+          className="context-menu"
+          style={{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="menu-item"
+            onClick={() => {
+              const parentPath = resolveCreateParent(contextMenu);
+              openCreatePrompt(parentPath, 'file');
+              setContextMenu(null);
+            }}
+          >
+            新規ファイル
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              const parentPath = resolveCreateParent(contextMenu);
+              openCreatePrompt(parentPath, 'folder');
+              setContextMenu(null);
+            }}
+          >
+            新規フォルダ
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              openRenamePrompt(contextMenu.targetPath);
+              setContextMenu(null);
+            }}
+          >
+            リネーム
+          </button>
+          <button
+            className="menu-item menu-item-danger"
+            onClick={() => {
+              runDelete(contextMenu.targetPath);
+              setContextMenu(null);
+            }}
+          >
+            削除
+          </button>
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -7,6 +7,8 @@ import {
   updateParagraphInDocument,
 } from './documentOps.js';
 
+export type EditorMode = 'writing' | 'structure' | 'reader';
+
 interface AppState {
   rootPath: string | null;
   tree: FileNode[];
@@ -15,19 +17,50 @@ interface AppState {
   revision: number;
   dirty: boolean;
   apiKeyConfigured: boolean;
+  editorMode: EditorMode;
+  analysisLayerOpen: boolean;
   statusMessage: string;
   openFolder: () => Promise<void>;
-  createFolder: (name: string) => Promise<void>;
-  createDocument: (title: string) => Promise<void>;
+  createDocument: (title: string, parentPath?: string) => Promise<void>;
+  createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
+  renameEntry: (targetPath: string, nextName: string) => Promise<void>;
+  deleteEntry: (targetPath: string) => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
   replaceParagraphs: (paragraphTexts: string[]) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
+  setEditorMode: (mode: EditorMode) => void;
+  cycleEditorMode: () => void;
+  setAnalysisLayerOpen: (open: boolean) => void;
+  toggleAnalysisLayer: () => void;
   bootstrapApiKeyStatus: () => Promise<void>;
   saveApiKey: (apiKey: string) => Promise<void>;
   clearApiKey: () => Promise<void>;
+}
+
+function isSameOrNestedPath(value: string, base: string) {
+  return value === base || value.startsWith(`${base}/`) || value.startsWith(`${base}\\`);
+}
+
+function remapPathForRename(current: string, source: string, target: string) {
+  if (current === source) {
+    return target;
+  }
+  if (current.startsWith(`${source}/`)) {
+    return `${target}${current.slice(source.length)}`;
+  }
+  if (current.startsWith(`${source}\\`)) {
+    return `${target}${current.slice(source.length)}`;
+  }
+  return current;
+}
+
+function titleFromPath(filePath: string) {
+  const normalized = filePath.replace(/\\/g, '/');
+  const fileName = normalized.split('/').pop() ?? filePath;
+  return fileName.replace(/\.md$/i, '');
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -38,6 +71,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   revision: 0,
   dirty: false,
   apiKeyConfigured: false,
+  editorMode: 'writing',
+  analysisLayerOpen: false,
   statusMessage: '準備完了',
 
   openFolder: async () => {
@@ -55,31 +90,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  createFolder: async (name: string) => {
-    const root = get().rootPath;
-    if (!root) {
-      set({ statusMessage: '先にフォルダを開いてください' });
-      return;
-    }
-
-    const trimmed = name.trim();
-    if (!trimmed) {
-      set({ statusMessage: 'フォルダ名を入力してください' });
-      return;
-    }
-
-    try {
-      await window.litelizard.createFolder(root, trimmed);
-      const tree = await window.litelizard.listTree(root);
-      set({ tree, statusMessage: `フォルダを作成しました: ${trimmed}` });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      set({ statusMessage: `フォルダ作成に失敗しました: ${message}` });
-    }
-  },
-
-  createDocument: async (title: string) => {
-    const root = get().rootPath;
+  createDocument: async (title: string, parentPath?: string) => {
+    const root = parentPath ?? get().rootPath;
     if (!root) {
       set({ statusMessage: '先にフォルダを開いてください' });
       return;
@@ -87,9 +99,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       const created = await window.litelizard.createDocument(root, title);
-      const tree = await window.litelizard.listTree(root);
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
       set({
-        tree,
         currentFilePath: created.filePath,
         document: created.document,
         revision: 0,
@@ -99,6 +114,98 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `ドキュメント作成に失敗しました: ${message}` });
+    }
+  },
+
+  createEntry: async (parentPath: string, type: 'file' | 'folder', name: string) => {
+    try {
+      const created = await window.litelizard.createEntry(parentPath, type, name);
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      if (created.type === 'file') {
+        const document = await window.litelizard.loadDocument(created.path);
+        set({
+          currentFilePath: created.path,
+          document,
+          revision: 0,
+          dirty: false,
+          statusMessage: '新規ファイルを作成しました',
+        });
+        return;
+      }
+
+      set({ statusMessage: '新規フォルダを作成しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `作成に失敗しました: ${message}` });
+    }
+  },
+
+  renameEntry: async (targetPath: string, nextName: string) => {
+    try {
+      const result = await window.litelizard.renameEntry(targetPath, nextName);
+
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      const currentFilePath = get().currentFilePath;
+      if (currentFilePath) {
+        const remapped = remapPathForRename(currentFilePath, targetPath, result.path);
+        if (remapped !== currentFilePath) {
+          const document = get().document;
+          set({
+            currentFilePath: remapped,
+            document:
+              document && remapped !== currentFilePath
+                ? {
+                    ...document,
+                    title: remapped === result.path ? titleFromPath(remapped) : document.title,
+                    updatedAt: document.updatedAt,
+                    source: { format: 'markdown-md', originPath: remapped },
+                  }
+                : document,
+          });
+        }
+      }
+
+      set({ statusMessage: '名前を変更しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `名前変更に失敗しました: ${message}` });
+    }
+  },
+
+  deleteEntry: async (targetPath: string) => {
+    try {
+      await window.litelizard.deleteEntry(targetPath);
+
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      const currentFilePath = get().currentFilePath;
+      if (currentFilePath && isSameOrNestedPath(currentFilePath, targetPath)) {
+        set({
+          currentFilePath: null,
+          document: null,
+          revision: 0,
+          dirty: false,
+        });
+      }
+
+      set({ statusMessage: '削除しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `削除に失敗しました: ${message}` });
     }
   },
 
@@ -278,6 +385,44 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
       set({ document: failedDoc, statusMessage: `解析に失敗しました: ${message}` });
     }
+  },
+
+  setEditorMode: (mode: EditorMode) => {
+    set({
+      editorMode: mode,
+      analysisLayerOpen: mode === 'writing' ? false : get().analysisLayerOpen,
+    });
+  },
+
+  cycleEditorMode: () => {
+    const mode = get().editorMode;
+    if (mode === 'writing') {
+      set({ editorMode: 'structure', analysisLayerOpen: true });
+      return;
+    }
+    if (mode === 'structure') {
+      set({ editorMode: 'reader' });
+      return;
+    }
+    set({ editorMode: 'writing', analysisLayerOpen: false });
+  },
+
+  setAnalysisLayerOpen: (open: boolean) => {
+    const mode = get().editorMode;
+    if (mode === 'writing') {
+      set({ analysisLayerOpen: false });
+      return;
+    }
+    set({ analysisLayerOpen: open });
+  },
+
+  toggleAnalysisLayer: () => {
+    const { editorMode, analysisLayerOpen } = get();
+    if (editorMode === 'writing') {
+      set({ editorMode: 'structure', analysisLayerOpen: true });
+      return;
+    }
+    set({ analysisLayerOpen: !analysisLayerOpen });
   },
 
   bootstrapApiKeyStatus: async () => {

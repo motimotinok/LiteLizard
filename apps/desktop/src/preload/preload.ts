@@ -4,8 +4,11 @@ import type { AnalysisRunInput, AnalysisRunResult, FileNode, LiteLizardDocument 
 const api = {
   openFolder: (): Promise<string | null> => ipcRenderer.invoke('dialog:openFolder'),
   listTree: (root: string): Promise<FileNode[]> => ipcRenderer.invoke('fs:listTree', root),
-  createFolder: (root: string, name: string): Promise<{ ok: boolean; path: string }> =>
-    ipcRenderer.invoke('fs:createFolder', root, name),
+  createEntry: (root: string, type: 'file' | 'folder', name: string): Promise<{ ok: boolean; path: string; type: 'file' | 'folder' }> =>
+    ipcRenderer.invoke('fs:create', root, type, name),
+  renameEntry: (targetPath: string, nextName: string): Promise<{ ok: boolean; path: string }> =>
+    ipcRenderer.invoke('fs:rename', targetPath, nextName),
+  deleteEntry: (targetPath: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('fs:delete', targetPath),
   loadDocument: (filePath: string): Promise<LiteLizardDocument> => ipcRenderer.invoke('doc:load', filePath),
   createDocument: (
     root: string,

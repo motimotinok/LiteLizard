@@ -7,6 +7,8 @@ interface Props {
   activeParagraphId: string | null;
   setActiveParagraphId: (paragraphId: string | null) => void;
   onSyncParagraphs: (paragraphTexts: string[]) => void;
+  onCreateEssay: () => void;
+  onOpenFolder: () => void;
 }
 
 interface ParagraphRange {
@@ -63,21 +65,26 @@ function parseParagraphRanges(text: string): ParagraphRange[] {
   return ranges;
 }
 
-export function EditorPane({ document, dirty, activeParagraphId, setActiveParagraphId, onSyncParagraphs }: Props) {
-  const textareaRef = useRef<any>(null);
+export function EditorPane({
+  document,
+  dirty,
+  activeParagraphId,
+  setActiveParagraphId,
+  onSyncParagraphs,
+  onCreateEssay,
+  onOpenFolder,
+}: Props) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [editorText, setEditorText] = useState(() => toEditorText(document));
-  const [lineCount, setLineCount] = useState(1);
   const [lastSyncedText, setLastSyncedText] = useState(() => toEditorText(document));
 
   useEffect(() => {
     const next = toEditorText(document);
     setEditorText(next);
     setLastSyncedText(next);
-    setLineCount(Math.max(1, next.split('\n').length));
   }, [document?.documentId]);
 
   const ranges = useMemo(() => parseParagraphRanges(editorText), [editorText]);
-  const paragraphCount = ranges.length;
 
   useEffect(() => {
     if (!document) {
@@ -124,10 +131,8 @@ export function EditorPane({ document, dirty, activeParagraphId, setActiveParagr
     setActiveParagraphId(document.paragraphs[safeIndex]?.id ?? null);
   };
 
-  const onChangeText = (event: React.ChangeEvent<any>) => {
-    const next = event.target.value;
-    setEditorText(next);
-    setLineCount(Math.max(1, next.split('\n').length));
+  const onChangeText = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditorText(event.target.value);
   };
 
   const onMoveCursor = () => {
@@ -138,41 +143,40 @@ export function EditorPane({ document, dirty, activeParagraphId, setActiveParagr
   if (!document) {
     return (
       <section className="editor-shell">
-        <div className="editor-header">
-          <div className="editor-title-wrap">
-            <span className="editor-title-dot" />
-            <span className="editor-title">ドキュメント未選択</span>
+        <div className="editor-empty-state">
+          <h2 className="editor-empty-title">構造を設計するための執筆エリア</h2>
+          <p className="editor-empty-description">段落単位で思考できるように、まずは作品ファイルを用意してください。</p>
+          <div className="editor-empty-actions">
+            <button className="action-button action-button-primary" onClick={onCreateEssay}>
+              ✍ 新しいエッセイを書く
+            </button>
+            <button className="action-button" onClick={onOpenFolder}>
+              📂 フォルダを開く
+            </button>
           </div>
         </div>
-        <div className="editor-empty">左のファイルツリーからドキュメントを選択してください。</div>
       </section>
     );
   }
 
   const activeParagraphIndex = document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId);
+  const paragraphCount = ranges.length;
 
   return (
     <section className="editor-shell">
-      <div className="editor-header">
-        <div className="editor-title-wrap">
-          <span className="editor-title-dot" />
-          <span className="editor-title">{document.title}</span>
-        </div>
-        <div className="editor-meta">{paragraphCount} パラグラフ</div>
-      </div>
+      <div className="editor-frame">
+        <header className="editor-header">
+          <div className="editor-title-wrap">
+            <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
+            <h1 className="editor-title">{document.title}</h1>
+          </div>
+          <div className="editor-meta">
+            <span>{paragraphCount} 段落</span>
+            {activeParagraphIndex >= 0 ? <span>注目 {activeParagraphIndex + 1}</span> : null}
+          </div>
+        </header>
 
-      <div className="editor-body">
-        <div className="line-number-column" aria-hidden>
-          {Array.from({ length: lineCount }, (_, index) => {
-            const line = index + 1;
-            return (
-              <div key={line} className="line-number">
-                {line}
-              </div>
-            );
-          })}
-        </div>
-        <div className="editor-text-wrap">
+        <div className="editor-body">
           <textarea
             ref={textareaRef}
             className="editor-textarea"
@@ -181,23 +185,19 @@ export function EditorPane({ document, dirty, activeParagraphId, setActiveParagr
             onClick={onMoveCursor}
             onKeyUp={onMoveCursor}
             onSelect={onMoveCursor}
-            placeholder={
-              'ここにMarkdown本文を入力してください...\n\n空行で段落を区切ると、段落単位で解析結果が表示されます。'
-            }
+            placeholder={'ここに本文を入力してください。\n\n空行で段落を区切ると、段落単位で構造を扱えます。'}
           />
         </div>
-      </div>
 
-      <div className="editor-footer">
-        <div className="editor-footer-left">
-          <span>{editorText.length} 文字</span>
-          <span>{lineCount} 行</span>
-          {activeParagraphIndex >= 0 ? <span>注目: {activeParagraphIndex + 1}</span> : null}
-        </div>
-        <div className="editor-footer-right">
-          <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
-          <span>{dirty ? '未保存の変更' : '保存済み'}</span>
-        </div>
+        <footer className="editor-footer">
+          <div className="editor-footer-left">
+            <span>{editorText.length} 文字</span>
+          </div>
+          <div className="editor-footer-right">
+            <span>{dirty ? '未保存' : '保存済み'}</span>
+            <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
+          </div>
+        </footer>
       </div>
     </section>
   );
