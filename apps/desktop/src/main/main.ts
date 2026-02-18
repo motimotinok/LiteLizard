@@ -35,7 +35,8 @@ function createMainWindow() {
     height: 900,
     webPreferences: {
       contextIsolation: true,
-      sandbox: false,
+      // Keep sandbox on by default. Only disable explicitly for local debugging.
+      sandbox: process.env.ELECTRON_DISABLE_SANDBOX === '1' ? false : undefined,
       preload: preloadPath,
       nodeIntegration: false,
     },
