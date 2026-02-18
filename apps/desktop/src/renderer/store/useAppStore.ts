@@ -86,6 +86,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ rootPath: root, tree, statusMessage: `フォルダを開きました: ${root}` });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Renderer openFolder] failed', error);
       set({ statusMessage: `フォルダを開けませんでした: ${message}` });
     }
   },
