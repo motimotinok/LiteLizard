@@ -27,4 +27,9 @@ const api = {
   clearApiKey: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('settings:apiKey:clear'),
 };
 
-contextBridge.exposeInMainWorld('litelizard', api);
+try {
+  contextBridge.exposeInMainWorld('litelizard', api);
+  console.log('[Preload] litelizard bridge exposed');
+} catch (error) {
+  console.error('[Preload] expose failed', error);
+}

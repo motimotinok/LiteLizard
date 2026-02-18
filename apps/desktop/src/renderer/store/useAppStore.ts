@@ -76,18 +76,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   statusMessage: '準備完了',
 
   openFolder: async () => {
+    if (!window.litelizard) {
+      set({ statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）' });
+      return;
+    }
+
+    let root: string | null = null;
     try {
-      const root = await window.litelizard.openFolder();
-      if (!root) {
-        set({ statusMessage: 'フォルダ選択をキャンセルしました' });
-        return;
-      }
+      root = await window.litelizard.openFolder();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Renderer openFolder] failed', error);
+      set({ statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}` });
+      return;
+    }
+
+    if (!root) {
+      set({ statusMessage: 'フォルダ選択をキャンセルしました' });
+      return;
+    }
+
+    try {
       const tree = await window.litelizard.listTree(root);
       set({ rootPath: root, tree, statusMessage: `フォルダを開きました: ${root}` });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Renderer openFolder] failed', error);
-      set({ statusMessage: `フォルダを開けませんでした: ${message}` });
+      console.error('[Renderer listTree] failed', error);
+      set({
+        rootPath: root,
+        tree: [],
+        statusMessage: `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
+      });
     }
   },
 
