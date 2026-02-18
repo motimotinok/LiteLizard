@@ -32,9 +32,8 @@ describe('fileService markdown + analysis', () => {
   it('lists only markdown files in tree', async () => {
     await withTempDir(async (dir) => {
       await fs.mkdir(path.join(dir, 'nested'));
-      await fs.writeFile(path.join(dir, 'essay.md'), 'hello', 'utf8');
       await fs.writeFile(path.join(dir, 'Essay.MD'), 'hello2', 'utf8');
-      await fs.writeFile(path.join(dir, 'essay.litelizard.analysis.json'), '{}', 'utf8');
+      await fs.writeFile(path.join(dir, 'Essay.litelizard.analysis.json'), '{}', 'utf8');
       await fs.writeFile(path.join(dir, 'notes.txt'), 'ignore', 'utf8');
       await fs.writeFile(path.join(dir, 'nested', 'inside.md'), 'inside', 'utf8');
 
@@ -42,7 +41,7 @@ describe('fileService markdown + analysis', () => {
       const tree = await service.listTree(dir);
       const files = flattenFiles(tree).map((item) => path.basename(item)).sort();
 
-      expect(files).toEqual(['Essay.MD', 'essay.md', 'inside.md']);
+      expect(files).toEqual(['Essay.MD', 'inside.md']);
     });
   });
 

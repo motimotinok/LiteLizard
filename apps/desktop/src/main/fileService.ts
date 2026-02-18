@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { FileNode, LiteLizardAnalysisFile, LiteLizardDocument, Paragraph } from '@litelizard/shared';
+import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
   id?: string;
@@ -191,19 +192,29 @@ async function writeDocumentFiles(markdownPath: string, document: LiteLizardDocu
   await fs.writeFile(analysisPath, JSON.stringify(analysis, null, 2), 'utf8');
 }
 
-async function walk(root: string): Promise<FileNode[]> {
-  const entries = await fs.readdir(root, { withFileTypes: true });
+async function walk(root: string, isRoot = false): Promise<FileNode[]> {
+  let entries: Dirent[];
+  try {
+    entries = (await fs.readdir(root, { withFileTypes: true })) as Dirent[];
+  } catch (error) {
+    if (isRoot) {
+      throw error;
+    }
+    return [];
+  }
+
   const nodes: FileNode[] = [];
 
   for (const entry of entries) {
     const absolutePath = path.join(root, entry.name);
 
     if (entry.isDirectory()) {
+      const children = await walk(absolutePath);
       nodes.push({
         path: absolutePath,
         name: entry.name,
         type: 'directory',
-        children: await walk(absolutePath),
+        children,
       });
       continue;
     }
@@ -230,7 +241,7 @@ export function createFileService() {
 
   return {
     async listTree(root: string) {
-      return walk(root);
+      return walk(root, true);
     },
 
     async load(filePath: string): Promise<LiteLizardDocument> {

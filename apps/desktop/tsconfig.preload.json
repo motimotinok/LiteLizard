@@ -6,6 +6,6 @@
     "types": ["node", "electron"],
     "declaration": false
   },
-  "include": ["src/preload/**/*.ts"],
+  "include": ["src/preload/**/*.ts", "src/preload/**/*.cts"],
   "exclude": ["src/preload/**/*.test.ts"]
 }
