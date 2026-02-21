@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { EditorPane } from './components/EditorPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
+import { LeftIconRail } from './components/LeftIconRail.js';
 import { useAppStore } from './store/useAppStore.js';
 
 export function App() {
@@ -105,16 +106,19 @@ export function App() {
 
   return (
     <div className="workspace-root">
-      <ExplorerPane
-        rootPath={rootPath}
-        tree={tree}
-        currentFilePath={currentFilePath}
-        onOpenFolder={() => void openFolder()}
-        onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
-        onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
-        onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
-        onSelectFile={(path) => void loadDocument(path)}
-      />
+      <div className="workspace-left">
+        <LeftIconRail />
+        <ExplorerPane
+          rootPath={rootPath}
+          tree={tree}
+          currentFilePath={currentFilePath}
+          onOpenFolder={() => void openFolder()}
+          onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
+          onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
+          onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
+          onSelectFile={(path) => void loadDocument(path)}
+        />
+      </div>
 
       <main className="workspace-main">
         <div className="workspace-toolbar">

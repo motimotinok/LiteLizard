@@ -41,10 +41,52 @@ textarea {
   background: var(--bg);
 }
 
-.explorer-layout {
-  width: 300px;
-  min-width: 300px;
+.workspace-left {
+  display: flex;
+  height: 100%;
   border-right: 1px solid var(--border);
+  background: #f8f8f8;
+  flex-shrink: 0;
+}
+
+.left-icon-rail {
+  width: 66px;
+  min-width: 66px;
+  border-right: 1px solid var(--border);
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0;
+}
+
+.rail-icon-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #4b5563;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rail-icon-button:hover {
+  background: #f1f5f9;
+  color: #1f2937;
+}
+
+.rail-icon-button.is-active {
+  color: #334155;
+  background: #eef2f7;
+  border-color: #dbe2ea;
+}
+
+.explorer-layout {
+  width: 260px;
+  min-width: 260px;
   background: #f8f8f8;
   position: relative;
   z-index: 1;
@@ -59,36 +101,67 @@ textarea {
 
 .explorer-header {
   border-bottom: 1px solid var(--border);
-  background: #fff;
-  padding: 14px 12px;
+  background: #f8f8f8;
+  padding: 12px 12px;
 }
 
 .explorer-title-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.explorer-title-wrap {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.explorer-brand-icon {
+  color: #475569;
+  display: inline-grid;
+  place-items: center;
 }
 
 .explorer-header-actions {
-  display: flex;
-  align-items: flex-start;
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
 }
 
 .explorer-title {
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 0.95;
   font-weight: 800;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.02em;
+  color: #111827;
 }
 
-.explorer-root {
-  margin-top: 6px;
+.explorer-header-actions .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  background: #ffffff;
+  color: #4b5563;
+}
+
+.explorer-header-actions .icon-button:hover {
+  border-color: #c5c5c5;
+  background: #f9fafb;
+}
+
+.explorer-header-actions .icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.explorer-tree-empty {
+  padding: 14px;
   font-size: 12px;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .explorer-plus-wrap {
@@ -139,45 +212,53 @@ textarea {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 8px 0;
+  padding: 8px 6px;
 }
 
 .explorer-tree-group {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .explorer-tree-item {
   width: 100%;
   border: 0;
   background: transparent;
-  height: 32px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   text-align: left;
   cursor: pointer;
-  color: var(--text);
+  color: #1f2937;
+  font-weight: 600;
 }
 
 .explorer-tree-item:hover {
-  background: #eeeeee;
+  background: #e9edf2;
 }
 
 .explorer-tree-item-file.active {
-  background: #e5e5e5;
+  background: #dfe3e8;
   font-weight: 700;
 }
 
 .explorer-chevron {
   width: 14px;
-  color: #6b6b6b;
+  color: #64748b;
 }
 
 .explorer-node-icon {
-  width: 18px;
-  text-align: center;
-  font-size: 14px;
+  width: 16px;
+  color: #64748b;
+  display: inline-grid;
+  place-items: center;
+}
+
+.explorer-node-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 .explorer-node-label {
@@ -186,6 +267,7 @@ textarea {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .workspace-main {
@@ -636,12 +718,22 @@ textarea {
     flex-direction: column;
   }
 
-  .explorer-layout {
+  .workspace-left {
     width: 100%;
-    min-width: 100%;
+    min-width: 0;
     height: 260px;
-    border-right: 0;
     border-bottom: 1px solid var(--border);
+    border-right: 0;
+  }
+
+  .left-icon-rail {
+    width: 64px;
+    min-width: 64px;
+  }
+
+  .explorer-layout {
+    flex: 1;
+    min-width: 0;
   }
 
   .workspace-content,
@@ -662,6 +754,24 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  .workspace-left {
+    height: 220px;
+  }
+
+  .left-icon-rail {
+    width: 56px;
+    min-width: 56px;
+    padding-top: 12px;
+  }
+
+  .explorer-title {
+    font-size: 24px;
+  }
+
+  .explorer-tree-item {
+    height: 34px;
+  }
+
   .workspace-toolbar {
     flex-direction: column;
     align-items: flex-start;

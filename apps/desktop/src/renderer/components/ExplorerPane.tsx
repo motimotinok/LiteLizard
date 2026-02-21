@@ -29,6 +29,51 @@ interface ContextMenuState {
   targetType: 'file' | 'directory';
 }
 
+function DocumentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden>
+      <path
+        d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm6 1.5V9h4.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M9 13.2h6M9 16.7h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
+      <path
+        d="M3.5 7.5a2 2 0 0 1 2-2h4l1.6 1.8h7.4a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
+      <path
+        d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Zm6 1.8V9h3.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function baseName(targetPath: string) {
   const normalized = targetPath.replace(/\\/g, '/');
   const parts = normalized.split('/');
@@ -61,13 +106,13 @@ function Tree({
             <div key={node.path}>
               <button
                 className="explorer-tree-item explorer-tree-item-folder"
-                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                style={{ paddingLeft: `${depth * 14 + 10}px` }}
                 onClick={() => onToggle(node.path)}
                 onContextMenu={(event) => onOpenContextMenu(event, node)}
               >
                 <span className="explorer-chevron">{isExpanded ? '▾' : '▸'}</span>
                 <span className="explorer-node-icon" aria-hidden>
-                  📁
+                  <FolderIcon />
                 </span>
                 <span className="explorer-node-label">{node.name}</span>
               </button>
@@ -95,12 +140,12 @@ function Tree({
                 ? 'explorer-tree-item explorer-tree-item-file active'
                 : 'explorer-tree-item explorer-tree-item-file'
             }
-            style={{ paddingLeft: `${depth * 12 + 28}px` }}
+            style={{ paddingLeft: `${depth * 14 + 32}px` }}
             onClick={() => onSelectFile(node.path)}
             onContextMenu={(event) => onOpenContextMenu(event, node)}
           >
             <span className="explorer-node-icon" aria-hidden>
-              📄
+              <FileIcon />
             </span>
             <span className="explorer-node-label">{node.name}</span>
           </button>
@@ -211,17 +256,19 @@ export function ExplorerPane({
   const canCreate = Boolean(rootPath);
 
   return (
-    <aside className="explorer-layout">
+    <aside className="explorer-layout" data-testid="file-browser-pane">
       <div className="explorer-panel">
         <div className="explorer-header">
           <div className="explorer-title-row">
-            <div>
-              <div className="explorer-title">作品管理</div>
-              <div className="explorer-root">{rootPath ?? 'フォルダ未選択'}</div>
+            <div className="explorer-title-wrap" data-testid="explorer-brand">
+              <span className="explorer-brand-icon" aria-hidden>
+                <DocumentIcon />
+              </span>
+              <div className="explorer-title">LiteLizard</div>
             </div>
             <div className="explorer-header-actions">
               <button className="icon-button" onClick={onOpenFolder} title="フォルダを開く">
-                📂
+                <FolderIcon />
               </button>
               <div className="explorer-plus-wrap">
                 <button
