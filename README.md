@@ -25,3 +25,6 @@ LiteLizard is an Electron desktop editor that keeps `light` (text) and `lizard` 
 ## Notes
 - Desktop document storage uses `.md` + `*.litelizard.analysis.json`.
 - OpenAI API key is stored as encrypted local file (PBKDF2 + AES-GCM).
+- 暫定対応として、現在の preload bridge は IPC ではなくモックデータを返す実装です（UI動作確認優先）。
+- このモック運用中は、preload 経由で実ファイルI/Oおよび実API呼び出しは行いません。
+- モック状態は preload 内メモリのみで保持され、アプリ再起動時に初期化されます。
