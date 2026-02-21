@@ -21,6 +21,7 @@ export function App() {
     renameEntry,
     deleteEntry,
     loadDocument,
+    reorderParagraphs,
     replaceParagraphs,
     saveNow,
     setEditorMode,
@@ -172,6 +173,7 @@ export function App() {
             activeParagraphId={activeParagraphId}
             setActiveParagraphId={setActiveParagraphId}
             onSyncParagraphs={(texts) => replaceParagraphs(texts)}
+            onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
             onCreateEssay={() => {
               if (!rootPath) {
                 void openFolder();
