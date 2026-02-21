@@ -18,7 +18,8 @@ test.describe('LiteLizard desktop smoke', () => {
     });
 
     const page = await app.firstWindow();
-    await expect(page.getByText('作品管理')).toBeVisible();
+    await expect(page.getByTestId('file-browser-pane')).toBeVisible();
+    await expect(page.getByTestId('explorer-brand')).toBeVisible();
 
     await app.close();
   });
