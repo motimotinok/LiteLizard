@@ -1,5 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $getNodeByKey,
+  $getRoot,
+  $getSelection,
+  $isParagraphNode,
+  $isRangeSelection,
+  type LexicalEditor,
+} from 'lexical';
+import { LexicalComposer } from '@lexical/react/LexicalComposer';
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
+import { ContentEditable } from '@lexical/react/LexicalContentEditable';
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
+import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 
 interface Props {
   document: LiteLizardDocument | null;
@@ -7,62 +23,181 @@ interface Props {
   activeParagraphId: string | null;
   setActiveParagraphId: (paragraphId: string | null) => void;
   onSyncParagraphs: (paragraphTexts: string[]) => void;
+  onReorderParagraphs?: (orderedIds: string[]) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
 }
 
-interface ParagraphRange {
-  text: string;
-  start: number;
-  end: number;
-}
-
-function toEditorText(document: LiteLizardDocument | null) {
+function getInitialParagraphTexts(document: LiteLizardDocument | null): string[] {
   if (!document || document.paragraphs.length === 0) {
-    return '';
+    return [''];
   }
-  return document.paragraphs.map((paragraph) => paragraph.light.text).join('\n\n');
+  return document.paragraphs.map((paragraph) => paragraph.light.text);
 }
 
-function parseParagraphRanges(text: string): ParagraphRange[] {
-  const normalized = text.replace(/\r\n/g, '\n');
-  const lines = normalized.split('\n');
-  const ranges: ParagraphRange[] = [];
+function toTextSyncSignature(paragraphTexts: string[]) {
+  return JSON.stringify(paragraphTexts);
+}
 
-  let offset = 0;
-  let start: number | null = null;
-  let chunk: string[] = [];
+export function reorderNodeKeys(nodeKeys: string[], activeKey: string, overKey: string): string[] {
+  const oldIndex = nodeKeys.findIndex((nodeKey) => nodeKey === activeKey);
+  const newIndex = nodeKeys.findIndex((nodeKey) => nodeKey === overKey);
 
-  const flush = (end: number) => {
-    if (start === null || chunk.length === 0) {
-      return;
-    }
-    const paragraphText = chunk.join('\n').trimEnd();
-    if (paragraphText.trim().length > 0) {
-      ranges.push({ text: paragraphText, start, end });
-    }
-    start = null;
-    chunk = [];
-  };
-
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    const isBlank = line.trim().length === 0;
-
-    if (isBlank) {
-      flush(offset);
-    } else {
-      if (start === null) {
-        start = offset;
-      }
-      chunk.push(line);
-    }
-
-    offset += line.length + 1;
+  if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
+    return nodeKeys;
   }
 
-  flush(normalized.length);
-  return ranges;
+  const next = [...nodeKeys];
+  const [moved] = next.splice(oldIndex, 1);
+  next.splice(newIndex, 0, moved);
+  return next;
+}
+
+export function mapParagraphIdsByNodeKeys(
+  currentNodeKeys: string[],
+  nextNodeKeys: string[],
+  paragraphIds: string[],
+): string[] | null {
+  if (currentNodeKeys.length !== paragraphIds.length) {
+    return null;
+  }
+
+  const keyToId = new Map<string, string>();
+  currentNodeKeys.forEach((nodeKey, index) => {
+    const paragraphId = paragraphIds[index];
+    if (paragraphId) {
+      keyToId.set(nodeKey, paragraphId);
+    }
+  });
+
+  const orderedIds: string[] = [];
+  for (const nodeKey of nextNodeKeys) {
+    const paragraphId = keyToId.get(nodeKey);
+    if (!paragraphId) {
+      return null;
+    }
+    orderedIds.push(paragraphId);
+  }
+
+  return orderedIds;
+}
+
+function ParagraphStatePlugin({
+  onSnapshot,
+  onActiveNodeKey,
+}: {
+  onSnapshot: (texts: string[], nodeKeys: string[]) => void;
+  onActiveNodeKey: (nodeKey: string | null) => void;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    return editor.registerUpdateListener(({ editorState }) => {
+      editorState.read(() => {
+        const root = $getRoot();
+        const paragraphs = root.getChildren().filter((node) => $isParagraphNode(node));
+        const texts = paragraphs.map((node) => node.getTextContent());
+        const nodeKeys = paragraphs.map((node) => node.getKey());
+        onSnapshot(texts.length > 0 ? texts : [''], nodeKeys);
+
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection)) {
+          onActiveNodeKey(null);
+          return;
+        }
+
+        const topLevel = selection.anchor.getNode().getTopLevelElement();
+        onActiveNodeKey(topLevel && $isParagraphNode(topLevel) ? topLevel.getKey() : null);
+      });
+    });
+  }, [editor, onActiveNodeKey, onSnapshot]);
+
+  return null;
+}
+
+function ParagraphChromePlugin({
+  paragraphNodeKeys,
+  activeNodeKey,
+  onDropReorder,
+}: {
+  paragraphNodeKeys: string[];
+  activeNodeKey: string | null;
+  onDropReorder: (activeKey: string, overKey: string) => void;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    paragraphNodeKeys.forEach((nodeKey, index) => {
+      const element = editor.getElementByKey(nodeKey);
+      if (!element) {
+        return;
+      }
+
+      element.classList.add('editor-paragraph-row');
+      element.classList.toggle('editor-paragraph-row-active', nodeKey === activeNodeKey);
+      element.setAttribute('data-node-key', nodeKey);
+      element.setAttribute('data-paragraph-index', String(index + 1));
+      element.setAttribute('data-testid', `editor-paragraph-row-${index + 1}`);
+      element.setAttribute('draggable', 'true');
+      element.ondragstart = (event) => {
+        const rect = element.getBoundingClientRect();
+        const dragHandleWidth = 56;
+        if (event.clientX > rect.left + dragHandleWidth) {
+          event.preventDefault();
+          return;
+        }
+        event.dataTransfer?.setData('text/plain', nodeKey);
+        event.dataTransfer?.setData('application/x-litelizard-node-key', nodeKey);
+        event.dataTransfer?.setDragImage(element, 24, 12);
+        element.classList.add('editor-paragraph-row-dragging');
+      };
+
+      element.ondragend = () => {
+        element.classList.remove('editor-paragraph-row-dragging');
+      };
+
+      element.ondragover = (event) => {
+        event.preventDefault();
+        if (event.dataTransfer) {
+          event.dataTransfer.dropEffect = 'move';
+        }
+      };
+
+      element.ondrop = (event) => {
+        event.preventDefault();
+        const draggedNodeKey =
+          event.dataTransfer?.getData('application/x-litelizard-node-key') ?? event.dataTransfer?.getData('text/plain') ?? '';
+        if (!draggedNodeKey || draggedNodeKey === nodeKey) {
+          element.classList.remove('editor-paragraph-row-dragging');
+          return;
+        }
+        onDropReorder(draggedNodeKey, nodeKey);
+        element.classList.remove('editor-paragraph-row-dragging');
+      };
+    });
+  }, [activeNodeKey, editor, onDropReorder, paragraphNodeKeys]);
+
+  return null;
+}
+
+function reorderParagraphNodes(editor: LexicalEditor, currentKeys: string[], activeKey: string, overKey: string): string[] {
+  const nextKeys = reorderNodeKeys(currentKeys, activeKey, overKey);
+  if (nextKeys === currentKeys) {
+    return currentKeys;
+  }
+
+  editor.update(() => {
+    const root = $getRoot();
+    const paragraphNodes = nextKeys
+      .map((nodeKey) => $getNodeByKey(nodeKey))
+      .filter((node): node is ReturnType<typeof $createParagraphNode> => Boolean(node) && $isParagraphNode(node));
+
+    paragraphNodes.forEach((node) => {
+      root.append(node);
+    });
+  });
+
+  return nextKeys;
 }
 
 export function EditorPane({
@@ -71,74 +206,91 @@ export function EditorPane({
   activeParagraphId,
   setActiveParagraphId,
   onSyncParagraphs,
+  onReorderParagraphs,
   onCreateEssay,
   onOpenFolder,
 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [editorText, setEditorText] = useState(() => toEditorText(document));
-  const [lastSyncedText, setLastSyncedText] = useState(() => toEditorText(document));
+  const [paragraphTexts, setParagraphTexts] = useState(() => getInitialParagraphTexts(document));
+  const [paragraphNodeKeys, setParagraphNodeKeys] = useState<string[]>([]);
+  const [activeParagraphNodeKey, setActiveParagraphNodeKey] = useState<string | null>(null);
+  const [lastSyncedSignature, setLastSyncedSignature] = useState(() => toTextSyncSignature(getInitialParagraphTexts(document)));
+  const editorRef = useRef<LexicalEditor | null>(null);
+  const paragraphNodeKeysRef = useRef<string[]>([]);
 
   useEffect(() => {
-    const next = toEditorText(document);
-    setEditorText(next);
-    setLastSyncedText(next);
-  }, [document?.documentId]);
+    paragraphNodeKeysRef.current = paragraphNodeKeys;
+  }, [paragraphNodeKeys]);
 
-  const ranges = useMemo(() => parseParagraphRanges(editorText), [editorText]);
+  useEffect(() => {
+    const nextTexts = getInitialParagraphTexts(document);
+    setParagraphTexts(nextTexts);
+    setParagraphNodeKeys([]);
+    setActiveParagraphNodeKey(null);
+    setLastSyncedSignature(toTextSyncSignature(nextTexts));
+  }, [document?.documentId]);
 
   useEffect(() => {
     if (!document) {
       return;
     }
-    if (editorText === lastSyncedText) {
+
+    const nextSignature = toTextSyncSignature(paragraphTexts);
+    if (nextSignature === lastSyncedSignature) {
       return;
     }
 
     const handle = window.setTimeout(() => {
-      const nextParagraphs = ranges.map((range) => range.text);
-      onSyncParagraphs(nextParagraphs.length > 0 ? nextParagraphs : [' ']);
-      setLastSyncedText(editorText);
+      onSyncParagraphs(paragraphTexts.length > 0 ? paragraphTexts : [' ']);
+      setLastSyncedSignature(nextSignature);
     }, 120);
 
     return () => {
       window.clearTimeout(handle);
     };
-  }, [document, editorText, lastSyncedText, ranges, onSyncParagraphs]);
+  }, [document, lastSyncedSignature, onSyncParagraphs, paragraphTexts]);
 
-  const updateActiveParagraphByCursor = (cursor: number) => {
-    if (!document || document.paragraphs.length === 0) {
-      setActiveParagraphId(null);
+  useEffect(() => {
+    if (!document || !activeParagraphNodeKey) {
       return;
     }
 
-    if (ranges.length === 0) {
-      setActiveParagraphId(document.paragraphs[0]?.id ?? null);
+    const activeIndex = paragraphNodeKeys.findIndex((nodeKey) => nodeKey === activeParagraphNodeKey);
+    if (activeIndex < 0 || activeIndex >= document.paragraphs.length) {
       return;
     }
 
-    const index = ranges.findIndex((range) => cursor >= range.start && cursor <= range.end);
-    if (index < 0) {
-      if (cursor < ranges[0].start) {
-        setActiveParagraphId(document.paragraphs[0]?.id ?? null);
-      } else {
-        const last = Math.min(ranges.length - 1, document.paragraphs.length - 1);
-        setActiveParagraphId(document.paragraphs[last]?.id ?? null);
-      }
-      return;
+    const paragraphId = document.paragraphs[activeIndex]?.id ?? null;
+    if (paragraphId && paragraphId !== activeParagraphId) {
+      setActiveParagraphId(paragraphId);
     }
+  }, [activeParagraphId, activeParagraphNodeKey, document, paragraphNodeKeys, setActiveParagraphId]);
 
-    const safeIndex = Math.min(index, document.paragraphs.length - 1);
-    setActiveParagraphId(document.paragraphs[safeIndex]?.id ?? null);
-  };
+  const initialConfig = useMemo(
+    () => ({
+      namespace: `litelizard-editor-${document?.documentId ?? 'empty'}`,
+      onError(error: Error) {
+        throw error;
+      },
+      nodes: [],
+      theme: {
+        paragraph: 'editor-paragraph-row',
+      },
+      editorState: () => {
+        const root = $getRoot();
+        root.clear();
 
-  const onChangeText = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditorText(event.target.value);
-  };
-
-  const onMoveCursor = () => {
-    const cursor = textareaRef.current?.selectionStart ?? 0;
-    updateActiveParagraphByCursor(cursor);
-  };
+        const initialTexts = getInitialParagraphTexts(document);
+        for (const text of initialTexts) {
+          const paragraph = $createParagraphNode();
+          if (text.length > 0) {
+            paragraph.append($createTextNode(text));
+          }
+          root.append(paragraph);
+        }
+      },
+    }),
+    [document],
+  );
 
   if (!document) {
     return (
@@ -159,8 +311,33 @@ export function EditorPane({
     );
   }
 
-  const activeParagraphIndex = document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId);
-  const paragraphCount = ranges.length;
+  const onDropReorder = (activeKey: string, overKey: string) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+
+    const currentKeys = paragraphNodeKeysRef.current;
+    const nextKeys = reorderParagraphNodes(editor, currentKeys, activeKey, overKey);
+    if (nextKeys === currentKeys) {
+      return;
+    }
+
+    const orderedIds = mapParagraphIdsByNodeKeys(
+      currentKeys,
+      nextKeys,
+      document.paragraphs.map((paragraph) => paragraph.id),
+    );
+    if (orderedIds) {
+      onReorderParagraphs?.(orderedIds);
+    }
+  };
+
+  const activeParagraphIndex = activeParagraphId
+    ? document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId)
+    : -1;
+  const paragraphCount = paragraphTexts.length;
+  const charCount = paragraphTexts.reduce((sum, text) => sum + text.length, 0);
 
   return (
     <section className="editor-shell">
@@ -177,21 +354,40 @@ export function EditorPane({
         </header>
 
         <div className="editor-body">
-          <textarea
-            ref={textareaRef}
-            className="editor-textarea"
-            value={editorText}
-            onChange={onChangeText}
-            onClick={onMoveCursor}
-            onKeyUp={onMoveCursor}
-            onSelect={onMoveCursor}
-            placeholder={'ここに本文を入力してください。\n\n空行で段落を区切ると、段落単位で構造を扱えます。'}
-          />
+          <div className="editor-paragraph-list">
+            <LexicalComposer key={document.documentId} initialConfig={initialConfig}>
+              <LexicalEditorRefPlugin onReady={(editor) => (editorRef.current = editor)} />
+
+              <ParagraphStatePlugin
+                onSnapshot={(texts, nodeKeys) => {
+                  setParagraphTexts(texts);
+                  setParagraphNodeKeys(nodeKeys);
+                }}
+                onActiveNodeKey={(nodeKey) => {
+                  setActiveParagraphNodeKey(nodeKey);
+                }}
+              />
+
+              <ParagraphChromePlugin
+                paragraphNodeKeys={paragraphNodeKeys}
+                activeNodeKey={activeParagraphNodeKey}
+                onDropReorder={onDropReorder}
+              />
+
+              <HistoryPlugin />
+
+              <RichTextPlugin
+                contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
+                placeholder={<div className="editor-paragraph-placeholder">ここに本文を入力してください。</div>}
+                ErrorBoundary={LexicalErrorBoundary}
+              />
+            </LexicalComposer>
+          </div>
         </div>
 
         <footer className="editor-footer">
           <div className="editor-footer-left">
-            <span>{editorText.length} 文字</span>
+            <span>{charCount} 文字</span>
           </div>
           <div className="editor-footer-right">
             <span>{dirty ? '未保存' : '保存済み'}</span>
@@ -201,4 +397,14 @@ export function EditorPane({
       </div>
     </section>
   );
+}
+
+function LexicalEditorRefPlugin({ onReady }: { onReady: (editor: LexicalEditor) => void }) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    onReady(editor);
+  }, [editor, onReady]);
+
+  return null;
 }
