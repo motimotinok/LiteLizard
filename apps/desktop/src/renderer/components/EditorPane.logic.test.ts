@@ -33,4 +33,21 @@ describe('EditorPane lexical helpers', () => {
 
     expect(orderedIds).toBeNull();
   });
+
+  it('keeps previous key/id mapping when node count is temporarily unsynced', () => {
+    const previousKeyToId = new Map([
+      ['k_a', 'p_01'],
+      ['k_b', 'p_02'],
+      ['k_c', 'p_03'],
+    ]);
+
+    const orderedIds = mapParagraphIdsByNodeKeys(
+      ['k_a', 'k_new', 'k_b', 'k_c'],
+      ['k_c', 'k_a', 'k_new', 'k_b'],
+      ['p_01', 'p_02', 'p_03'],
+      previousKeyToId,
+    );
+
+    expect(orderedIds).toEqual(['p_03', 'p_01', 'p_02']);
+  });
 });
