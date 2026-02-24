@@ -18,6 +18,7 @@ import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 
 interface Props {
+  isExpanded: boolean;
   document: LiteLizardDocument | null;
   dirty: boolean;
   activeParagraphId: string | null;
@@ -210,6 +211,7 @@ function reorderParagraphNodes(editor: LexicalEditor, currentKeys: string[], act
 }
 
 export function EditorPane({
+  isExpanded,
   document,
   dirty,
   activeParagraphId,
@@ -324,7 +326,7 @@ export function EditorPane({
 
   if (!document) {
     return (
-      <section className="editor-shell">
+      <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
         <div className="editor-empty-state">
           <h2 className="editor-empty-title">構造を設計するための執筆エリア</h2>
           <p className="editor-empty-description">段落単位で思考できるように、まずは作品ファイルを用意してください。</p>
@@ -371,7 +373,7 @@ export function EditorPane({
   const charCount = paragraphTexts.reduce((sum, text) => sum + text.length, 0);
 
   return (
-    <section className="editor-shell">
+    <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
       <div className="editor-frame">
         <header className="editor-header">
           <div className="editor-title-wrap">

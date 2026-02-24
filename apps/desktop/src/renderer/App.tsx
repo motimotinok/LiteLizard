@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { EditorPane } from './components/EditorPane.js';
-import { AnalysisPane } from './components/AnalysisPane.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
 import { useAppStore } from './store/useAppStore.js';
 
@@ -14,7 +13,6 @@ export function App() {
     dirty,
     statusMessage,
     editorMode,
-    analysisLayerOpen,
     openFolder,
     createDocument,
     createEntry,
@@ -24,12 +22,11 @@ export function App() {
     reorderParagraphs,
     replaceParagraphs,
     saveNow,
-    setEditorMode,
     cycleEditorMode,
-    toggleAnalysisLayer,
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -76,7 +73,7 @@ export function App() {
 
       if (event.shiftKey && key === 'a') {
         event.preventDefault();
-        toggleAnalysisLayer();
+        setChatPanelOpen((current) => !current);
         return;
       }
 
@@ -90,10 +87,7 @@ export function App() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [cycleEditorMode, saveNow, toggleAnalysisLayer]);
-
-  const canOpenAnalysis = editorMode !== 'writing';
-  const showAnalysis = canOpenAnalysis && analysisLayerOpen;
+  }, [cycleEditorMode, saveNow]);
 
   const modeLabel = useMemo(() => {
     if (editorMode === 'writing') {
@@ -131,43 +125,19 @@ export function App() {
           </div>
 
           <div className="workspace-toolbar-right">
-            <div className="mode-switcher" role="tablist" aria-label="editor-mode">
-              <button
-                className={editorMode === 'writing' ? 'mode-pill active' : 'mode-pill'}
-                onClick={() => setEditorMode('writing')}
-              >
-                執筆
-              </button>
-              <button
-                className={editorMode === 'structure' ? 'mode-pill active' : 'mode-pill'}
-                onClick={() => setEditorMode('structure')}
-              >
-                構造推敲
-              </button>
-              <button
-                className={editorMode === 'reader' ? 'mode-pill active' : 'mode-pill'}
-                onClick={() => setEditorMode('reader')}
-              >
-                読み手視点
-              </button>
-            </div>
-
             <button
-              className={showAnalysis ? 'action-button action-button-primary' : 'action-button'}
-              onClick={toggleAnalysisLayer}
+              className={chatPanelOpen ? 'action-button action-button-primary' : 'action-button'}
+              onClick={() => setChatPanelOpen((current) => !current)}
               title="Cmd/Ctrl+Shift+A"
             >
-              推敲モード {showAnalysis ? 'ON' : 'OFF'}
-            </button>
-
-            <button className="action-button" onClick={() => void saveNow()} disabled={!currentDocument} title="Cmd/Ctrl+S">
-              保存
+              チャット {chatPanelOpen ? 'ON' : 'OFF'}
             </button>
           </div>
         </div>
 
-        <div className={showAnalysis ? 'workspace-content with-analysis' : 'workspace-content'}>
+        <div className={chatPanelOpen ? 'workspace-content with-chat' : 'workspace-content no-chat'}>
           <EditorPane
+            isExpanded={!chatPanelOpen}
             document={currentDocument}
             dirty={dirty}
             activeParagraphId={activeParagraphId}
@@ -184,12 +154,10 @@ export function App() {
             onOpenFolder={() => void openFolder()}
           />
 
-          {showAnalysis ? (
-            <AnalysisPane
-              document={currentDocument}
-              activeParagraphId={activeParagraphId}
-              mode={editorMode === 'reader' ? 'reader' : 'structure'}
-            />
+          {chatPanelOpen ? (
+            <aside className="chat-shell" aria-label="chat-panel">
+              <div className="chat-body" />
+            </aside>
           ) : null}
         </div>
 
