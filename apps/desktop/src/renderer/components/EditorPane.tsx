@@ -57,29 +57,38 @@ export function mapParagraphIdsByNodeKeys(
   currentNodeKeys: string[],
   nextNodeKeys: string[],
   paragraphIds: string[],
+  previousKeyToId: ReadonlyMap<string, string> = new Map(),
 ): string[] | null {
-  if (currentNodeKeys.length !== paragraphIds.length) {
-    return null;
+  const keyToId = new Map(previousKeyToId);
+  if (currentNodeKeys.length === paragraphIds.length) {
+    keyToId.clear();
+    currentNodeKeys.forEach((nodeKey, index) => {
+      const paragraphId = paragraphIds[index];
+      if (paragraphId) {
+        keyToId.set(nodeKey, paragraphId);
+      }
+    });
   }
 
-  const keyToId = new Map<string, string>();
-  currentNodeKeys.forEach((nodeKey, index) => {
-    const paragraphId = paragraphIds[index];
-    if (paragraphId) {
-      keyToId.set(nodeKey, paragraphId);
+  const rankById = new Map<string, number>();
+  nextNodeKeys.forEach((nodeKey, index) => {
+    const paragraphId = keyToId.get(nodeKey);
+    if (paragraphId && !rankById.has(paragraphId)) {
+      rankById.set(paragraphId, index);
     }
   });
 
-  const orderedIds: string[] = [];
-  for (const nodeKey of nextNodeKeys) {
-    const paragraphId = keyToId.get(nodeKey);
-    if (!paragraphId) {
-      return null;
-    }
-    orderedIds.push(paragraphId);
+  if (rankById.size === 0) {
+    return null;
   }
 
-  return orderedIds;
+  return [...paragraphIds]
+    .map((paragraphId, index) => ({
+      paragraphId,
+      sortRank: rankById.get(paragraphId) ?? nextNodeKeys.length + index,
+    }))
+    .sort((left, right) => left.sortRank - right.sortRank)
+    .map((item) => item.paragraphId);
 }
 
 function ParagraphStatePlugin({
@@ -216,10 +225,31 @@ export function EditorPane({
   const [lastSyncedSignature, setLastSyncedSignature] = useState(() => toTextSyncSignature(getInitialParagraphTexts(document)));
   const editorRef = useRef<LexicalEditor | null>(null);
   const paragraphNodeKeysRef = useRef<string[]>([]);
+  const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     paragraphNodeKeysRef.current = paragraphNodeKeys;
   }, [paragraphNodeKeys]);
+
+  useEffect(() => {
+    if (!document) {
+      paragraphIdByNodeKeyRef.current = new Map();
+      return;
+    }
+
+    if (paragraphNodeKeys.length !== document.paragraphs.length) {
+      return;
+    }
+
+    paragraphIdByNodeKeyRef.current = new Map(
+      paragraphNodeKeys
+        .map((nodeKey, index) => {
+          const paragraphId = document.paragraphs[index]?.id;
+          return paragraphId ? ([nodeKey, paragraphId] as const) : null;
+        })
+        .filter((entry): entry is readonly [string, string] => Boolean(entry)),
+    );
+  }, [document, paragraphNodeKeys]);
 
   useEffect(() => {
     const nextTexts = getInitialParagraphTexts(document);
@@ -327,6 +357,7 @@ export function EditorPane({
       currentKeys,
       nextKeys,
       document.paragraphs.map((paragraph) => paragraph.id),
+      paragraphIdByNodeKeyRef.current,
     );
     if (orderedIds) {
       onReorderParagraphs?.(orderedIds);
