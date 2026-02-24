@@ -18,6 +18,7 @@ import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 
 interface Props {
+  isExpanded: boolean;
   document: LiteLizardDocument | null;
   dirty: boolean;
   activeParagraphId: string | null;
@@ -57,29 +58,38 @@ export function mapParagraphIdsByNodeKeys(
   currentNodeKeys: string[],
   nextNodeKeys: string[],
   paragraphIds: string[],
+  previousKeyToId: ReadonlyMap<string, string> = new Map(),
 ): string[] | null {
-  if (currentNodeKeys.length !== paragraphIds.length) {
-    return null;
+  const keyToId = new Map(previousKeyToId);
+  if (currentNodeKeys.length === paragraphIds.length) {
+    keyToId.clear();
+    currentNodeKeys.forEach((nodeKey, index) => {
+      const paragraphId = paragraphIds[index];
+      if (paragraphId) {
+        keyToId.set(nodeKey, paragraphId);
+      }
+    });
   }
 
-  const keyToId = new Map<string, string>();
-  currentNodeKeys.forEach((nodeKey, index) => {
-    const paragraphId = paragraphIds[index];
-    if (paragraphId) {
-      keyToId.set(nodeKey, paragraphId);
+  const rankById = new Map<string, number>();
+  nextNodeKeys.forEach((nodeKey, index) => {
+    const paragraphId = keyToId.get(nodeKey);
+    if (paragraphId && !rankById.has(paragraphId)) {
+      rankById.set(paragraphId, index);
     }
   });
 
-  const orderedIds: string[] = [];
-  for (const nodeKey of nextNodeKeys) {
-    const paragraphId = keyToId.get(nodeKey);
-    if (!paragraphId) {
-      return null;
-    }
-    orderedIds.push(paragraphId);
+  if (rankById.size === 0) {
+    return null;
   }
 
-  return orderedIds;
+  return [...paragraphIds]
+    .map((paragraphId, index) => ({
+      paragraphId,
+      sortRank: rankById.get(paragraphId) ?? nextNodeKeys.length + index,
+    }))
+    .sort((left, right) => left.sortRank - right.sortRank)
+    .map((item) => item.paragraphId);
 }
 
 function ParagraphStatePlugin({
@@ -201,6 +211,7 @@ function reorderParagraphNodes(editor: LexicalEditor, currentKeys: string[], act
 }
 
 export function EditorPane({
+  isExpanded,
   document,
   dirty,
   activeParagraphId,
@@ -216,10 +227,31 @@ export function EditorPane({
   const [lastSyncedSignature, setLastSyncedSignature] = useState(() => toTextSyncSignature(getInitialParagraphTexts(document)));
   const editorRef = useRef<LexicalEditor | null>(null);
   const paragraphNodeKeysRef = useRef<string[]>([]);
+  const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     paragraphNodeKeysRef.current = paragraphNodeKeys;
   }, [paragraphNodeKeys]);
+
+  useEffect(() => {
+    if (!document) {
+      paragraphIdByNodeKeyRef.current = new Map();
+      return;
+    }
+
+    if (paragraphNodeKeys.length !== document.paragraphs.length) {
+      return;
+    }
+
+    paragraphIdByNodeKeyRef.current = new Map(
+      paragraphNodeKeys
+        .map((nodeKey, index) => {
+          const paragraphId = document.paragraphs[index]?.id;
+          return paragraphId ? ([nodeKey, paragraphId] as const) : null;
+        })
+        .filter((entry): entry is readonly [string, string] => Boolean(entry)),
+    );
+  }, [document, paragraphNodeKeys]);
 
   useEffect(() => {
     const nextTexts = getInitialParagraphTexts(document);
@@ -294,7 +326,7 @@ export function EditorPane({
 
   if (!document) {
     return (
-      <section className="editor-shell">
+      <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
         <div className="editor-empty-state">
           <h2 className="editor-empty-title">構造を設計するための執筆エリア</h2>
           <p className="editor-empty-description">段落単位で思考できるように、まずは作品ファイルを用意してください。</p>
@@ -327,6 +359,7 @@ export function EditorPane({
       currentKeys,
       nextKeys,
       document.paragraphs.map((paragraph) => paragraph.id),
+      paragraphIdByNodeKeyRef.current,
     );
     if (orderedIds) {
       onReorderParagraphs?.(orderedIds);
@@ -340,7 +373,7 @@ export function EditorPane({
   const charCount = paragraphTexts.reduce((sum, text) => sum + text.length, 0);
 
   return (
-    <section className="editor-shell">
+    <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
       <div className="editor-frame">
         <header className="editor-header">
           <div className="editor-title-wrap">
