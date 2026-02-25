@@ -95,6 +95,34 @@ export function mapParagraphIdsByNodeKeys(
     .map((item) => item.paragraphId);
 }
 
+export function mergeParagraphIdByNodeKey(
+  previousKeyToId: ReadonlyMap<string, string>,
+  currentNodeKeys: string[],
+  paragraphIds: string[],
+): Map<string, string> {
+  if (currentNodeKeys.length !== paragraphIds.length) {
+    return new Map(previousKeyToId);
+  }
+
+  const paragraphIdSet = new Set(paragraphIds);
+  const next = new Map<string, string>();
+
+  currentNodeKeys.forEach((nodeKey, index) => {
+    const previousParagraphId = previousKeyToId.get(nodeKey);
+    if (previousParagraphId && paragraphIdSet.has(previousParagraphId)) {
+      next.set(nodeKey, previousParagraphId);
+      return;
+    }
+
+    const paragraphId = paragraphIds[index];
+    if (paragraphId) {
+      next.set(nodeKey, paragraphId);
+    }
+  });
+
+  return next;
+}
+
 function ParagraphStatePlugin({
   onSnapshot,
   onActiveNodeKey,
@@ -262,13 +290,10 @@ export function EditorPane({
       return;
     }
 
-    paragraphIdByNodeKeyRef.current = new Map(
-      paragraphNodeKeys
-        .map((nodeKey, index) => {
-          const paragraphId = document.paragraphs[index]?.id;
-          return paragraphId ? ([nodeKey, paragraphId] as const) : null;
-        })
-        .filter((entry): entry is readonly [string, string] => Boolean(entry)),
+    paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
+      paragraphIdByNodeKeyRef.current,
+      paragraphNodeKeys,
+      document.paragraphs.map((paragraph) => paragraph.id),
     );
   }, [document, paragraphNodeKeys]);
 
@@ -278,6 +303,7 @@ export function EditorPane({
     setParagraphNodeKeys([]);
     setActiveParagraphNodeKey(null);
     setLastSyncedSignature(toTextSyncSignature(nextTexts));
+    paragraphIdByNodeKeyRef.current = new Map();
   }, [document?.documentId]);
 
   useEffect(() => {
