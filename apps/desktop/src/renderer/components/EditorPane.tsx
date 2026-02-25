@@ -14,14 +14,17 @@ import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
-import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary';
+import { LexicalErrorBoundary, type LexicalErrorBoundaryProps } from '@lexical/react/LexicalErrorBoundary';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+
+const RichTextErrorBoundary: React.ComponentType<LexicalErrorBoundaryProps> = LexicalErrorBoundary;
 
 interface Props {
   isExpanded: boolean;
   document: LiteLizardDocument | null;
   dirty: boolean;
   activeParagraphId: string | null;
+  scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (paragraphId: string | null) => void;
   onSyncParagraphs: (paragraphTexts: string[]) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
@@ -90,6 +93,34 @@ export function mapParagraphIdsByNodeKeys(
     }))
     .sort((left, right) => left.sortRank - right.sortRank)
     .map((item) => item.paragraphId);
+}
+
+export function mergeParagraphIdByNodeKey(
+  previousKeyToId: ReadonlyMap<string, string>,
+  currentNodeKeys: string[],
+  paragraphIds: string[],
+): Map<string, string> {
+  if (currentNodeKeys.length !== paragraphIds.length) {
+    return new Map(previousKeyToId);
+  }
+
+  const paragraphIdSet = new Set(paragraphIds);
+  const next = new Map<string, string>();
+
+  currentNodeKeys.forEach((nodeKey, index) => {
+    const previousParagraphId = previousKeyToId.get(nodeKey);
+    if (previousParagraphId && paragraphIdSet.has(previousParagraphId)) {
+      next.set(nodeKey, previousParagraphId);
+      return;
+    }
+
+    const paragraphId = paragraphIds[index];
+    if (paragraphId) {
+      next.set(nodeKey, paragraphId);
+    }
+  });
+
+  return next;
 }
 
 function ParagraphStatePlugin({
@@ -210,11 +241,27 @@ function reorderParagraphNodes(editor: LexicalEditor, currentKeys: string[], act
   return nextKeys;
 }
 
+function reorderParagraphNodesByOrder(editor: LexicalEditor, nextKeys: string[]): string[] {
+  editor.update(() => {
+    const root = $getRoot();
+    const paragraphNodes = nextKeys
+      .map((nodeKey) => $getNodeByKey(nodeKey))
+      .filter((node): node is ReturnType<typeof $createParagraphNode> => Boolean(node) && $isParagraphNode(node));
+
+    paragraphNodes.forEach((node) => {
+      root.append(node);
+    });
+  });
+
+  return nextKeys;
+}
+
 export function EditorPane({
   isExpanded,
   document,
   dirty,
   activeParagraphId,
+  scrollRequest,
   setActiveParagraphId,
   onSyncParagraphs,
   onReorderParagraphs,
@@ -228,6 +275,7 @@ export function EditorPane({
   const editorRef = useRef<LexicalEditor | null>(null);
   const paragraphNodeKeysRef = useRef<string[]>([]);
   const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
+  const consumedScrollRequestNonceRef = useRef<number | null>(null);
 
   useEffect(() => {
     paragraphNodeKeysRef.current = paragraphNodeKeys;
@@ -243,13 +291,10 @@ export function EditorPane({
       return;
     }
 
-    paragraphIdByNodeKeyRef.current = new Map(
-      paragraphNodeKeys
-        .map((nodeKey, index) => {
-          const paragraphId = document.paragraphs[index]?.id;
-          return paragraphId ? ([nodeKey, paragraphId] as const) : null;
-        })
-        .filter((entry): entry is readonly [string, string] => Boolean(entry)),
+    paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
+      paragraphIdByNodeKeyRef.current,
+      paragraphNodeKeys,
+      document.paragraphs.map((paragraph) => paragraph.id),
     );
   }, [document, paragraphNodeKeys]);
 
@@ -259,6 +304,8 @@ export function EditorPane({
     setParagraphNodeKeys([]);
     setActiveParagraphNodeKey(null);
     setLastSyncedSignature(toTextSyncSignature(nextTexts));
+    paragraphIdByNodeKeyRef.current = new Map();
+    consumedScrollRequestNonceRef.current = null;
   }, [document?.documentId]);
 
   useEffect(() => {
@@ -296,6 +343,78 @@ export function EditorPane({
       setActiveParagraphId(paragraphId);
     }
   }, [activeParagraphId, activeParagraphNodeKey, document, paragraphNodeKeys, setActiveParagraphId]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !document) {
+      return;
+    }
+
+    const currentKeys = paragraphNodeKeysRef.current;
+    if (currentKeys.length === 0 || currentKeys.length !== document.paragraphs.length) {
+      return;
+    }
+
+    const idByKey = paragraphIdByNodeKeyRef.current;
+    if (idByKey.size !== document.paragraphs.length) {
+      return;
+    }
+
+    const keyById = new Map<string, string>();
+    idByKey.forEach((paragraphId, nodeKey) => {
+      keyById.set(paragraphId, nodeKey);
+    });
+
+    const desiredKeys = document.paragraphs.map((paragraph) => keyById.get(paragraph.id)).filter((key): key is string => Boolean(key));
+    if (desiredKeys.length !== currentKeys.length) {
+      return;
+    }
+
+    const alreadySynced = desiredKeys.every((nodeKey, index) => nodeKey === currentKeys[index]);
+    if (alreadySynced) {
+      return;
+    }
+
+    const nextKeys = reorderParagraphNodesByOrder(editor, desiredKeys);
+    paragraphNodeKeysRef.current = nextKeys;
+    setParagraphNodeKeys(nextKeys);
+  }, [document, paragraphNodeKeys]);
+
+  useEffect(() => {
+    if (!scrollRequest || !document) {
+      return;
+    }
+
+    if (consumedScrollRequestNonceRef.current === scrollRequest.nonce) {
+      return;
+    }
+
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+
+    const paragraphIdByNodeKey = paragraphIdByNodeKeyRef.current;
+    let targetNodeKey: string | null = null;
+
+    paragraphIdByNodeKey.forEach((paragraphId, nodeKey) => {
+      if (!targetNodeKey && paragraphId === scrollRequest.paragraphId) {
+        targetNodeKey = nodeKey;
+      }
+    });
+
+    if (!targetNodeKey) {
+      return;
+    }
+
+    const element = editor.getElementByKey(targetNodeKey);
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    consumedScrollRequestNonceRef.current = scrollRequest.nonce;
+  }, [document, scrollRequest, paragraphNodeKeys]);
 
   const initialConfig = useMemo(
     () => ({
@@ -412,7 +531,7 @@ export function EditorPane({
               <RichTextPlugin
                 contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
                 placeholder={<div className="editor-paragraph-placeholder">ここに本文を入力してください。</div>}
-                ErrorBoundary={LexicalErrorBoundary}
+                ErrorBoundary={RichTextErrorBoundary}
               />
             </LexicalComposer>
           </div>

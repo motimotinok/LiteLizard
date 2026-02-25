@@ -278,7 +278,7 @@ textarea {
 }
 
 .workspace-toolbar {
-  min-height: 58px;
+  height: 55px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -377,7 +377,7 @@ textarea {
 }
 
 .editor-frame {
-  width: min(100%, 760px);
+  width: 100%;
   height: 100%;
   border: 1px solid var(--border);
   background: var(--center);
@@ -618,7 +618,6 @@ textarea {
   width: 340px;
   min-width: 320px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
   background: #ffffff;
   min-height: 0;
   overflow: hidden;
@@ -627,6 +626,7 @@ textarea {
 .chat-body {
   width: 100%;
   height: 100%;
+  overflow: auto;
 }
 
 .analysis-header {
@@ -774,6 +774,149 @@ textarea {
   gap: 4px;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.analysis-shell-chat {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+}
+
+.analysis-shell-chat .analysis-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.analysis-shell-chat .analysis-scroll {
+  flex: none;
+  min-height: auto;
+  overflow: visible;
+  padding: 10px;
+}
+
+.analysis-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.analysis-card:hover {
+  border-color: #cfd6de;
+  background: #fbfcfd;
+}
+
+.analysis-card-active {
+  border-color: #111;
+  box-shadow: 0 0 0 1px rgba(17, 17, 17, 0.08);
+}
+
+.analysis-card-dragging {
+  opacity: 0.75;
+}
+
+.analysis-card-drop-target {
+  border-color: #111;
+  background: #f7f8fa;
+}
+
+.analysis-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.analysis-card-index {
+  font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.analysis-card-role {
+  font-size: 12px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.analysis-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.analysis-card-toggle,
+.analysis-card-drag-handle {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  font-size: 11px;
+  line-height: 1;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+
+.analysis-card-toggle:hover,
+.analysis-card-drag-handle:hover {
+  border-color: #a3a3a3;
+}
+
+.analysis-card-drag-handle {
+  letter-spacing: 1px;
+  cursor: grab;
+}
+
+.analysis-card-drag-handle:active {
+  cursor: grabbing;
+}
+
+.analysis-card-meta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.analysis-card-body {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #111827;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.analysis-card-body-expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .workspace-statusline {

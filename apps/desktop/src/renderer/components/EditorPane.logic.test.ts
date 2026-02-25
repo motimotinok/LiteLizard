@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapParagraphIdsByNodeKeys, reorderNodeKeys } from './EditorPane.js';
+import { mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
@@ -32,6 +32,37 @@ describe('EditorPane lexical helpers', () => {
     const orderedIds = mapParagraphIdsByNodeKeys(['k_a', 'k_b'], ['k_b', 'k_a'], ['p_01']);
 
     expect(orderedIds).toBeNull();
+  });
+
+  it('keeps prior node key/id mapping when paragraph order changes first', () => {
+    const nextMap = mergeParagraphIdByNodeKey(
+      new Map([
+        ['k_a', 'p_01'],
+        ['k_b', 'p_02'],
+        ['k_c', 'p_03'],
+      ]),
+      ['k_a', 'k_b', 'k_c'],
+      ['p_03', 'p_01', 'p_02'],
+    );
+
+    expect(nextMap).toEqual(
+      new Map([
+        ['k_a', 'p_01'],
+        ['k_b', 'p_02'],
+        ['k_c', 'p_03'],
+      ]),
+    );
+  });
+
+  it('maps new node keys by index when no prior mapping exists', () => {
+    const nextMap = mergeParagraphIdByNodeKey(new Map(), ['k_a', 'k_b'], ['p_01', 'p_02']);
+
+    expect(nextMap).toEqual(
+      new Map([
+        ['k_a', 'p_01'],
+        ['k_b', 'p_02'],
+      ]),
+    );
   });
 
   it('keeps previous key/id mapping when node count is temporarily unsynced', () => {
