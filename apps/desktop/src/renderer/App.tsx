@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
+import { AnalysisPane } from './components/AnalysisPane.js';
 import { EditorPane } from './components/EditorPane.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
 import { useAppStore } from './store/useAppStore.js';
@@ -27,6 +28,7 @@ export function App() {
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
+  const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -141,6 +143,7 @@ export function App() {
             document={currentDocument}
             dirty={dirty}
             activeParagraphId={activeParagraphId}
+            scrollRequest={scrollRequest}
             setActiveParagraphId={setActiveParagraphId}
             onSyncParagraphs={(texts) => replaceParagraphs(texts)}
             onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
@@ -156,7 +159,18 @@ export function App() {
 
           {chatPanelOpen ? (
             <aside className="chat-shell" aria-label="chat-panel">
-              <div className="chat-body" />
+              <div className="chat-body">
+                <AnalysisPane
+                  document={currentDocument}
+                  activeParagraphId={activeParagraphId}
+                  mode="structure"
+                  onSetActiveParagraphId={setActiveParagraphId}
+                  onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
+                  onRequestScrollToParagraph={(paragraphId) => {
+                    setScrollRequest({ paragraphId, nonce: Date.now() });
+                  }}
+                />
+              </div>
             </aside>
           ) : null}
         </div>
