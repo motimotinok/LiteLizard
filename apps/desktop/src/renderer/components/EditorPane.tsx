@@ -275,6 +275,7 @@ export function EditorPane({
   const editorRef = useRef<LexicalEditor | null>(null);
   const paragraphNodeKeysRef = useRef<string[]>([]);
   const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
+  const consumedScrollRequestNonceRef = useRef<number | null>(null);
 
   useEffect(() => {
     paragraphNodeKeysRef.current = paragraphNodeKeys;
@@ -304,6 +305,7 @@ export function EditorPane({
     setActiveParagraphNodeKey(null);
     setLastSyncedSignature(toTextSyncSignature(nextTexts));
     paragraphIdByNodeKeyRef.current = new Map();
+    consumedScrollRequestNonceRef.current = null;
   }, [document?.documentId]);
 
   useEffect(() => {
@@ -383,6 +385,10 @@ export function EditorPane({
       return;
     }
 
+    if (consumedScrollRequestNonceRef.current === scrollRequest.nonce) {
+      return;
+    }
+
     const editor = editorRef.current;
     if (!editor) {
       return;
@@ -407,6 +413,7 @@ export function EditorPane({
     }
 
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    consumedScrollRequestNonceRef.current = scrollRequest.nonce;
   }, [document, scrollRequest, paragraphNodeKeys]);
 
   const initialConfig = useMemo(
