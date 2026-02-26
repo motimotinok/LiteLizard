@@ -50,7 +50,11 @@ describe('fileService markdown + analysis', () => {
       const filePath = path.join(dir, 'draft.md');
       const analysisPath = path.join(dir, 'draft.litelizard.analysis.json');
 
-      await fs.writeFile(filePath, '<!-- ll:id=p_keep -->\n最初の段落\n\n次の段落', 'utf8');
+      await fs.writeFile(
+        filePath,
+        '<!-- ll:chapter=c_test01 -->\n## 第一章\n\n<!-- ll:id=p_keep -->\n最初の段落\n\n<!-- ll:id=p_next01 -->\n次の段落',
+        'utf8',
+      );
       await fs.writeFile(
         analysisPath,
         JSON.stringify(
@@ -68,7 +72,7 @@ describe('fileService markdown + analysis', () => {
                 lizard: { status: 'complete', deepMeaning: 'ok' },
               },
               {
-                paragraphId: 'p_order',
+                paragraphId: 'p_next01',
                 order: 2,
                 lizard: { status: 'failed', error: { code: 'X', message: 'bad' } },
               },
@@ -83,12 +87,29 @@ describe('fileService markdown + analysis', () => {
       const service = createFileService();
       const document = await service.load(filePath);
 
+      expect(document.version).toBe(2);
       expect(document.documentId).toBe('doc_test');
+      expect(document.chapters).toHaveLength(1);
       expect(document.paragraphs).toHaveLength(2);
       expect(document.paragraphs[0].id).toBe('p_keep');
       expect(document.paragraphs[0].lizard.status).toBe('complete');
-      expect(document.paragraphs[1].id).toBe('p_order');
+      expect(document.paragraphs[0].chapterId).toBe(document.chapters[0].id);
+      expect(document.paragraphs[1].id).toBe('p_next01');
       expect(document.paragraphs[1].lizard.status).toBe('failed');
+    });
+  });
+
+  it('maps legacy markdown without headings into one chapter', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'legacy.md');
+      await fs.writeFile(filePath, '<!-- ll:id=p_legacy1 -->\n段落A\n\n段落B', 'utf8');
+
+      const service = createFileService();
+      const document = await service.load(filePath);
+
+      expect(document.chapters).toHaveLength(1);
+      expect(document.paragraphs).toHaveLength(2);
+      expect(document.paragraphs.every((paragraph) => paragraph.chapterId === document.chapters[0].id)).toBe(true);
     });
   });
 
@@ -98,21 +119,30 @@ describe('fileService markdown + analysis', () => {
       const service = createFileService();
 
       const document: LiteLizardDocument = {
-        version: 1,
+        version: 2,
         documentId: 'doc_saved',
         title: 'essay',
         personaMode: 'general-reader',
         createdAt: '2026-02-17T00:00:00.000Z',
         updatedAt: '2026-02-17T00:00:00.000Z',
+        chapters: [
+          {
+            id: 'c_save01',
+            order: 1,
+            title: '章1',
+          },
+        ],
         paragraphs: [
           {
-            id: 'p_a',
+            id: 'p_save01',
+            chapterId: 'c_save01',
             order: 1,
             light: { text: '段落A' },
             lizard: { status: 'stale' },
           },
           {
-            id: 'p_b',
+            id: 'p_save02',
+            chapterId: 'c_save01',
             order: 2,
             light: { text: '段落B' },
             lizard: { status: 'complete', confidence: 0.7 },
@@ -130,9 +160,10 @@ describe('fileService markdown + analysis', () => {
         paragraphs: Array<{ paragraphId: string; order: number }>;
       };
 
-      expect(markdown).toContain('<!-- ll:id=p_a -->');
-      expect(markdown).toContain('段落A');
-      expect(analysis.paragraphs.map((item) => item.paragraphId)).toEqual(['p_a', 'p_b']);
+      expect(markdown).toContain('<!-- ll:chapter=c_save01 -->');
+      expect(markdown).toContain('## 章1');
+      expect(markdown).toContain('<!-- ll:id=p_save01 -->');
+      expect(analysis.paragraphs.map((item) => item.paragraphId)).toEqual(['p_save01', 'p_save02']);
     });
   });
 

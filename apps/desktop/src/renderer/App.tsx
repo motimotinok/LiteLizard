@@ -14,6 +14,7 @@ export function App() {
     dirty,
     statusMessage,
     editorMode,
+    viewScale,
     openFolder,
     createDocument,
     createEntry,
@@ -21,9 +22,10 @@ export function App() {
     deleteEntry,
     loadDocument,
     reorderParagraphs,
-    replaceParagraphs,
+    syncDocumentStructure,
     saveNow,
     cycleEditorMode,
+    setViewScale,
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
@@ -145,7 +147,9 @@ export function App() {
             activeParagraphId={activeParagraphId}
             scrollRequest={scrollRequest}
             setActiveParagraphId={setActiveParagraphId}
-            onSyncParagraphs={(texts) => replaceParagraphs(texts)}
+            viewScale={viewScale}
+            onSetViewScale={setViewScale}
+            onSyncStructure={(input) => syncDocumentStructure(input)}
             onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
             onCreateEssay={() => {
               if (!rootPath) {
@@ -177,6 +181,7 @@ export function App() {
 
         <div className="workspace-statusline">
           <span>モード: {modeLabel}</span>
+          <span>視点: {viewScale === 'micro' ? 'ミクロ' : 'マクロ'}</span>
           <span>Cmd/Ctrl+Shift+M でモード切替</span>
         </div>
       </main>

@@ -1,4 +1,20 @@
-import type { LiteLizardDocument } from '@litelizard/shared';
+import type { Chapter, LiteLizardDocument } from '@litelizard/shared';
+
+export interface ChapterInput {
+  id?: string;
+  title: string;
+}
+
+export interface ParagraphInput {
+  id?: string;
+  chapterId?: string;
+  text: string;
+}
+
+export interface DocumentStructureInput {
+  chapters: ChapterInput[];
+  paragraphs: ParagraphInput[];
+}
 
 export function updateParagraphInDocument(
   document: LiteLizardDocument,
@@ -55,44 +71,84 @@ function createParagraphId() {
   return `p_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function createChapterId() {
+  return `c_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeChapters(chapters: ChapterInput[]): Chapter[] {
+  const filtered = chapters
+    .map((chapter) => ({ id: chapter.id, title: chapter.title.trim() }))
+    .filter((chapter) => chapter.title.length > 0);
+
+  if (filtered.length === 0) {
+    return [
+      {
+        id: createChapterId(),
+        order: 1,
+        title: '章1',
+      },
+    ];
+  }
+
+  return filtered.map((chapter, index) => ({
+    id: chapter.id ?? createChapterId(),
+    order: index + 1,
+    title: chapter.title,
+  }));
+}
+
+export function replaceDocumentStructureInDocument(
+  document: LiteLizardDocument,
+  input: DocumentStructureInput,
+): LiteLizardDocument {
+  const chapters = normalizeChapters(input.chapters);
+  const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
+  const fallbackChapterId = chapters[0].id;
+
+  const previousById = new Map(document.paragraphs.map((paragraph) => [paragraph.id, paragraph]));
+
+  const normalizedParagraphs = (input.paragraphs.length > 0 ? input.paragraphs : [{ text: ' ', chapterId: fallbackChapterId }]).map(
+    (paragraph, index) => {
+      const nextText = paragraph.text.length > 0 ? paragraph.text : ' ';
+      const paragraphId = paragraph.id ?? createParagraphId();
+      const chapterId = paragraph.chapterId && chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId;
+      const previous = previousById.get(paragraphId);
+      const changed = !previous || previous.light.text !== nextText || previous.chapterId !== chapterId;
+
+      return {
+        id: paragraphId,
+        chapterId,
+        order: index + 1,
+        light: {
+          text: nextText,
+          charCount: nextText.length,
+        },
+        lizard: changed ? { status: 'stale' as const } : previous.lizard,
+      };
+    },
+  );
+
+  return {
+    ...document,
+    version: 2,
+    updatedAt: new Date().toISOString(),
+    chapters,
+    paragraphs: normalizedParagraphs,
+  };
+}
+
 export function replaceParagraphsInDocument(
   document: LiteLizardDocument,
   nextParagraphTexts: string[],
 ): LiteLizardDocument {
-  const safeTexts = nextParagraphTexts.length > 0 ? nextParagraphTexts : [' '];
+  const chapterId = document.chapters[0]?.id ?? createChapterId();
 
-  const paragraphs = safeTexts.map((text, index) => {
-    const existing = document.paragraphs[index];
-    if (!existing) {
-      return {
-        id: createParagraphId(),
-        order: index + 1,
-        light: {
-          text,
-          charCount: text.length,
-        },
-        lizard: {
-          status: 'stale' as const,
-        },
-      };
-    }
-
-    const changed = existing.light.text !== text;
-    return {
-      ...existing,
-      order: index + 1,
-      light: {
-        ...existing.light,
-        text,
-        charCount: text.length,
-      },
-      lizard: changed ? { status: 'stale' as const } : existing.lizard,
-    };
+  return replaceDocumentStructureInDocument(document, {
+    chapters: document.chapters.length > 0 ? document.chapters : [{ id: chapterId, title: '章1' }],
+    paragraphs: (nextParagraphTexts.length > 0 ? nextParagraphTexts : [' ']).map((text, index) => ({
+      id: document.paragraphs[index]?.id,
+      chapterId: document.paragraphs[index]?.chapterId ?? chapterId,
+      text,
+    })),
   });
-
-  return {
-    ...document,
-    updatedAt: new Date().toISOString(),
-    paragraphs,
-  };
 }

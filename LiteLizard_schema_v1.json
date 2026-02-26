@@ -15,7 +15,7 @@
   ],
   "properties": {
     "version": {
-      "const": 1
+      "enum": [1, 2]
     },
     "documentId": {
       "type": "string",
@@ -45,7 +45,7 @@
       "properties": {
         "format": {
           "type": "string",
-          "enum": ["litelizard-json"]
+          "enum": ["litelizard-json", "markdown-md"]
         },
         "originPath": {
           "type": "string",
@@ -59,6 +59,14 @@
       "maxItems": 2000,
       "items": {
         "$ref": "#/$defs/paragraph"
+      }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {
+        "$ref": "#/$defs/chapter"
       }
     },
     "meta": {
@@ -76,7 +84,67 @@
       }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "version": { "const": 2 }
+        },
+        "required": ["version"]
+      },
+      "then": {
+        "required": ["chapters"],
+        "properties": {
+          "chapters": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "$ref": "#/$defs/chapter"
+            }
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                { "$ref": "#/$defs/paragraph" },
+                {
+                  "type": "object",
+                  "required": ["chapterId"],
+                  "properties": {
+                    "chapterId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "order", "title"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^c_[a-zA-Z0-9]{6,32}$"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      }
+    },
     "paragraph": {
       "type": "object",
       "additionalProperties": false,
@@ -94,6 +162,10 @@
         "order": {
           "type": "integer",
           "minimum": 1
+        },
+        "chapterId": {
+          "type": "string",
+          "pattern": "^c_[a-zA-Z0-9]{6,32}$"
         },
         "light": {
           "$ref": "#/$defs/light"

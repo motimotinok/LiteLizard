@@ -2,15 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { isLiteLizardDocument, validateLiteLizardDocument } from './schema.js';
 
 const validDocument = {
-  version: 1,
+  version: 2,
   documentId: 'doc_abcd12',
   title: 'Test Document',
   personaMode: 'general-reader',
   createdAt: '2026-02-12T00:00:00.000Z',
   updatedAt: '2026-02-12T00:00:00.000Z',
+  chapters: [
+    {
+      id: 'c_abc123',
+      order: 1,
+      title: '章1',
+    },
+  ],
   paragraphs: [
     {
       id: 'p_abc123',
+      chapterId: 'c_abc123',
       order: 1,
       light: {
         text: '本文',
@@ -24,8 +32,18 @@ const validDocument = {
 };
 
 describe('LiteLizard schema validation', () => {
-  it('accepts valid schema document', () => {
+  it('accepts valid v2 schema document', () => {
     expect(isLiteLizardDocument(validDocument)).toBe(true);
+  });
+
+  it('accepts v1 legacy schema document without chapters', () => {
+    const legacy = {
+      ...validDocument,
+      version: 1 as const,
+      paragraphs: validDocument.paragraphs.map(({ chapterId: _chapterId, ...paragraph }) => paragraph),
+    };
+    const result = isLiteLizardDocument(legacy);
+    expect(result).toBe(true);
   });
 
   it('rejects invalid schema document', () => {
