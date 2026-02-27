@@ -113,6 +113,36 @@ describe('fileService markdown + analysis', () => {
     });
   });
 
+  it('keeps chapters that only contain whitespace paragraphs', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'empty-chapter.md');
+      await fs.writeFile(
+        filePath,
+        [
+          '<!-- ll:chapter=c_intro -->',
+          '## Intro',
+          '',
+          '<!-- ll:id=p_intro -->',
+          '本文',
+          '',
+          '<!-- ll:chapter=c_empty -->',
+          '## Empty',
+          '',
+          '<!-- ll:id=p_empty -->',
+          ' ',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const service = createFileService();
+      const document = await service.load(filePath);
+
+      expect(document.chapters.map((chapter) => chapter.id)).toEqual(['c_intro', 'c_empty']);
+      expect(document.paragraphs).toHaveLength(1);
+      expect(document.paragraphs[0]?.chapterId).toBe('c_intro');
+    });
+  });
+
   it('saves markdown and analysis json together', async () => {
     await withTempDir(async (dir) => {
       const filePath = path.join(dir, 'essay.md');

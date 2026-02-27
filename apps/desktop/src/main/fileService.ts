@@ -376,18 +376,17 @@ export function createFileService() {
 
       const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
       const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
-      const chapterIdSet = new Set(paragraphs.map((paragraph) => paragraph.chapterId));
-
       const chapters = (parsedMarkdown.chapters.length > 0
         ? parsedMarkdown.chapters
         : [{ id: defaultChapterId, order: 1, title: '章1' }]
       )
-        .filter((chapter) => chapterIdSet.has(chapter.id))
         .map((chapter, index) => ({
           ...chapter,
           title: chapter.title.trim() || `章${index + 1}`,
           order: index + 1,
         }));
+
+      const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
 
       const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
 
