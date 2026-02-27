@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://litelizard.app/schema/document-v1.json",
-  "title": "LiteLizard Document v1",
+  "$id": "https://litelizard.app/schema/document-v2.json",
+  "title": "LiteLizard Document v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,11 +11,12 @@
     "personaMode",
     "createdAt",
     "updatedAt",
-    "paragraphs"
+    "paragraphs",
+    "chapters"
   ],
   "properties": {
     "version": {
-      "enum": [1, 2]
+      "const": 2
     },
     "documentId": {
       "type": "string",
@@ -58,7 +59,21 @@
       "minItems": 1,
       "maxItems": 2000,
       "items": {
-        "$ref": "#/$defs/paragraph"
+        "allOf": [
+          {
+            "$ref": "#/$defs/paragraph"
+          },
+          {
+            "type": "object",
+            "required": ["chapterId"],
+            "properties": {
+              "chapterId": {
+                "type": "string",
+                "pattern": "^c_[a-zA-Z0-9]{6,32}$"
+              }
+            }
+          }
+        ]
       }
     },
     "chapters": {
@@ -84,46 +99,6 @@
       }
     }
   },
-  "allOf": [
-    {
-      "if": {
-        "properties": {
-          "version": { "const": 2 }
-        },
-        "required": ["version"]
-      },
-      "then": {
-        "required": ["chapters"],
-        "properties": {
-          "chapters": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 500,
-            "items": {
-              "$ref": "#/$defs/chapter"
-            }
-          },
-          "paragraphs": {
-            "type": "array",
-            "items": {
-              "allOf": [
-                { "$ref": "#/$defs/paragraph" },
-                {
-                  "type": "object",
-                  "required": ["chapterId"],
-                  "properties": {
-                    "chapterId": {
-                      "type": "string"
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        }
-      }
-    }
-  ],
   "$defs": {
     "chapter": {
       "type": "object",

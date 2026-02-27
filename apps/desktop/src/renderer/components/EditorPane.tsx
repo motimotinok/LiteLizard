@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
+import type { DocumentStructureInput, ParagraphStructureInput } from '../types/documentStructure.js';
 import {
   COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_NORMAL,
@@ -38,10 +39,7 @@ interface Props {
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (paragraphId: string | null) => void;
   onSetViewScale: (viewScale: 'micro' | 'macro') => void;
-  onSyncStructure: (input: {
-    chapters: Array<{ id?: string; title: string }>;
-    paragraphs: Array<{ id?: string; chapterId?: string; text: string }>;
-  }) => void;
+  onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
@@ -166,6 +164,10 @@ function createChapterId() {
   return `c_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function createParagraphId() {
+  return `p_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function buildChapterInputs(
   snapshotChapters: StructureSnapshot['chapters'],
   chapterIdByNodeKey: ReadonlyMap<string, string>,
@@ -187,6 +189,34 @@ export function buildChapterInputs(
     return {
       id: chapterId,
       title: chapter.title.trim() || `章${index + 1}`,
+    };
+  });
+}
+
+export function buildParagraphInputs(
+  snapshotParagraphs: StructureSnapshot['paragraphs'],
+  paragraphIdByNodeKey: ReadonlyMap<string, string>,
+  chapterIdByNodeKey: ReadonlyMap<string, string>,
+  fallbackChapterId: string | undefined,
+): Array<ParagraphStructureInput & { id: string }> {
+  const nextMap = new Map(paragraphIdByNodeKey);
+  const usedIds = new Set<string>(paragraphIdByNodeKey.values());
+
+  return snapshotParagraphs.map((paragraph) => {
+    let paragraphId = nextMap.get(paragraph.nodeKey);
+    if (!paragraphId) {
+      do {
+        paragraphId = createParagraphId();
+      } while (usedIds.has(paragraphId));
+    }
+
+    usedIds.add(paragraphId);
+    nextMap.set(paragraph.nodeKey, paragraphId);
+
+    return {
+      id: paragraphId,
+      chapterId: paragraph.chapterNodeKey ? chapterIdByNodeKey.get(paragraph.chapterNodeKey) ?? fallbackChapterId : fallbackChapterId,
+      text: paragraph.text.length > 0 ? paragraph.text : ' ',
     };
   });
 }
@@ -690,11 +720,17 @@ export function EditorPane({
 
       const fallbackChapterId = chapterInputs[0]?.id;
 
-      const paragraphInputs = structureSnapshot.paragraphs.map((paragraph, index) => ({
-        id: paragraphIdByNodeKeyRef.current.get(paragraph.nodeKey) ?? document.paragraphs[index]?.id,
-        chapterId: paragraph.chapterNodeKey ? chapterIdByNodeKey.get(paragraph.chapterNodeKey) ?? fallbackChapterId : fallbackChapterId,
-        text: paragraph.text.length > 0 ? paragraph.text : ' ',
-      }));
+      const paragraphInputs = buildParagraphInputs(
+        structureSnapshot.paragraphs,
+        paragraphIdByNodeKeyRef.current,
+        chapterIdByNodeKey,
+        fallbackChapterId,
+      );
+      paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
+        paragraphIdByNodeKeyRef.current,
+        structureSnapshot.paragraphs.map((paragraph) => paragraph.nodeKey),
+        paragraphInputs.map((paragraph) => paragraph.id),
+      );
 
       onSyncStructure({
         chapters: chapterInputs,

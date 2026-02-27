@@ -36,14 +36,14 @@ describe('LiteLizard schema validation', () => {
     expect(isLiteLizardDocument(validDocument)).toBe(true);
   });
 
-  it('accepts v1 legacy schema document without chapters', () => {
+  it('rejects legacy v1 schema document without chapters', () => {
     const legacy = {
       ...validDocument,
       version: 1 as const,
       paragraphs: validDocument.paragraphs.map(({ chapterId: _chapterId, ...paragraph }) => paragraph),
     };
     const result = isLiteLizardDocument(legacy);
-    expect(result).toBe(true);
+    expect(result).toBe(false);
   });
 
   it('rejects invalid schema document', () => {

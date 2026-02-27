@@ -37,7 +37,7 @@ export interface Chapter {
 }
 
 export interface LiteLizardDocument {
-  version: 1 | 2;
+  version: 2;
   documentId: string;
   title: string;
   personaMode: PersonaMode;

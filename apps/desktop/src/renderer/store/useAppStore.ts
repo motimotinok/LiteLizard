@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
   collectStaleParagraphs,
   reorderParagraphsInDocument,
@@ -32,7 +33,7 @@ interface AppState {
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
   replaceParagraphs: (paragraphTexts: string[]) => void;
-  syncDocumentStructure: (input: { chapters: Array<{ id?: string; title: string }>; paragraphs: Array<{ id?: string; chapterId?: string; text: string }> }) => void;
+  syncDocumentStructure: (input: DocumentStructureInput) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
   setEditorMode: (mode: EditorMode) => void;

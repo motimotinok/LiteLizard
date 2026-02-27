@@ -1,20 +1,5 @@
 import type { Chapter, LiteLizardDocument } from '@litelizard/shared';
-
-export interface ChapterInput {
-  id?: string;
-  title: string;
-}
-
-export interface ParagraphInput {
-  id?: string;
-  chapterId?: string;
-  text: string;
-}
-
-export interface DocumentStructureInput {
-  chapters: ChapterInput[];
-  paragraphs: ParagraphInput[];
-}
+import type { ChapterStructureInput, DocumentStructureInput } from '../types/documentStructure.js';
 
 export function updateParagraphInDocument(
   document: LiteLizardDocument,
@@ -75,7 +60,7 @@ function createChapterId() {
   return `c_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function normalizeChapters(chapters: ChapterInput[]): Chapter[] {
+function normalizeChapters(chapters: ChapterStructureInput[]): Chapter[] {
   const filtered = chapters
     .map((chapter) => ({ id: chapter.id, title: chapter.title.trim() }))
     .filter((chapter) => chapter.title.length > 0);

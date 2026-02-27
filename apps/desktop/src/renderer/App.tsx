@@ -167,7 +167,6 @@ export function App() {
                 <AnalysisPane
                   document={currentDocument}
                   activeParagraphId={activeParagraphId}
-                  mode="structure"
                   onSetActiveParagraphId={setActiveParagraphId}
                   onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
                   onRequestScrollToParagraph={(paragraphId) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildChapterInputs, mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
+import { buildChapterInputs, buildParagraphInputs, mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
@@ -94,5 +94,22 @@ describe('EditorPane lexical helpers', () => {
     expect(chapterInputs[0].id).toMatch(/^c_/);
     expect(chapterInputs[0].id).not.toBe('c_existing');
     expect(chapterInputs[1].id).toBe('c_existing');
+  });
+
+  it('creates a fresh paragraph id for unknown paragraph node keys', () => {
+    const paragraphInputs = buildParagraphInputs(
+      [
+        { nodeKey: 'k_new', chapterNodeKey: 'c_a_key', text: 'Inserted paragraph' },
+        { nodeKey: 'k_existing', chapterNodeKey: 'c_a_key', text: 'Existing paragraph' },
+      ],
+      new Map([['k_existing', 'p_existing']]),
+      new Map([['c_a_key', 'c_a']]),
+      'c_a',
+    );
+
+    expect(paragraphInputs[0].id).toMatch(/^p_/);
+    expect(paragraphInputs[0].id).not.toBe('p_existing');
+    expect(paragraphInputs[1].id).toBe('p_existing');
+    expect(paragraphInputs[0].chapterId).toBe('c_a');
   });
 });
