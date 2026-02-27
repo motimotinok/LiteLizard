@@ -143,6 +143,64 @@ describe('fileService markdown + analysis', () => {
     });
   });
 
+  it('treats markdown-like syntax as paragraph text when inside ll:id blocks', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'syntax-literal.md');
+      await fs.writeFile(
+        filePath,
+        [
+          '<!-- ll:chapter=c_intro -->',
+          '## Intro',
+          '',
+          '<!-- ll:id=p_literal -->',
+          '## heading-like',
+          '- list-item',
+          '* emphasis-like',
+          '```code',
+          'plain text',
+          '```',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const service = createFileService();
+      const document = await service.load(filePath);
+
+      expect(document.chapters).toHaveLength(1);
+      expect(document.paragraphs).toHaveLength(1);
+      expect(document.paragraphs[0]?.id).toBe('p_literal');
+      expect(document.paragraphs[0]?.light.text).toBe('## heading-like\n- list-item\n* emphasis-like\n```code\nplain text\n```');
+    });
+  });
+
+  it('keeps markdown-like paragraph text through load-save-load roundtrip', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'roundtrip-literal.md');
+      await fs.writeFile(
+        filePath,
+        [
+          '<!-- ll:chapter=c_rt01 -->',
+          '## Roundtrip',
+          '',
+          '<!-- ll:id=p_rt01 -->',
+          '## not-a-heading',
+          '- stays literal',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const service = createFileService();
+      const loaded = await service.load(filePath);
+      const saved = await service.save(filePath, loaded, 0);
+
+      expect(saved.ok).toBe(true);
+
+      const reloaded = await service.load(filePath);
+      expect(reloaded.paragraphs[0]?.light.text).toBe('## not-a-heading\n- stays literal');
+      expect(reloaded.paragraphs[0]?.id).toBe('p_rt01');
+    });
+  });
+
   it('saves markdown and analysis json together', async () => {
     await withTempDir(async (dir) => {
       const filePath = path.join(dir, 'essay.md');

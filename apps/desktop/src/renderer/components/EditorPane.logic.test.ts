@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildChapterInputs, buildParagraphInputs, mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
+import {
+  buildChapterInputs,
+  buildParagraphInputs,
+  mapParagraphIdsByNodeKeys,
+  mergeParagraphIdByNodeKey,
+  reorderNodeKeys,
+  shouldSyncStructure,
+} from './EditorPane.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
@@ -111,5 +118,22 @@ describe('EditorPane lexical helpers', () => {
     expect(paragraphInputs[0].id).not.toBe('p_existing');
     expect(paragraphInputs[1].id).toBe('p_existing');
     expect(paragraphInputs[0].chapterId).toBe('c_a');
+  });
+
+  it('skips sync for initial baseline snapshot', () => {
+    const decision = shouldSyncStructure('sig_next', 'sig_prev', false);
+
+    expect(decision).toEqual({
+      shouldSync: false,
+      nextBaselineCaptured: true,
+    });
+  });
+
+  it('syncs only when signature changed after baseline captured', () => {
+    const same = shouldSyncStructure('sig_1', 'sig_1', true);
+    const changed = shouldSyncStructure('sig_2', 'sig_1', true);
+
+    expect(same.shouldSync).toBe(false);
+    expect(changed.shouldSync).toBe(true);
   });
 });

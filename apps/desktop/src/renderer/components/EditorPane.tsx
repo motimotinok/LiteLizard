@@ -52,6 +52,24 @@ function toStructureSignature(snapshot: StructureSnapshot) {
   });
 }
 
+export function shouldSyncStructure(
+  nextSignature: string,
+  lastSyncedSignature: string,
+  initialBaselineCaptured: boolean,
+): { shouldSync: boolean; nextBaselineCaptured: boolean } {
+  if (!initialBaselineCaptured) {
+    return {
+      shouldSync: false,
+      nextBaselineCaptured: true,
+    };
+  }
+
+  return {
+    shouldSync: nextSignature !== lastSyncedSignature,
+    nextBaselineCaptured: true,
+  };
+}
+
 export function reorderNodeKeys(nodeKeys: string[], activeKey: string, overKey: string): string[] {
   const oldIndex = nodeKeys.findIndex((nodeKey) => nodeKey === activeKey);
   const newIndex = nodeKeys.findIndex((nodeKey) => nodeKey === overKey);
@@ -654,6 +672,8 @@ export function EditorPane({
   const chapterIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
   const chapterNodeKeySetRef = useRef<Set<string>>(new Set());
   const consumedScrollRequestNonceRef = useRef<number | null>(null);
+  const editorBodyRef = useRef<HTMLDivElement | null>(null);
+  const initialBaselineCapturedRef = useRef(false);
 
   useEffect(() => {
     if (!document) {
@@ -691,6 +711,7 @@ export function EditorPane({
     chapterIdByNodeKeyRef.current = new Map();
     chapterNodeKeySetRef.current = new Set();
     consumedScrollRequestNonceRef.current = null;
+    initialBaselineCapturedRef.current = false;
   }, [document?.documentId]);
 
   useEffect(() => {
@@ -699,7 +720,14 @@ export function EditorPane({
     }
 
     const nextSignature = toStructureSignature(structureSnapshot);
-    if (nextSignature === lastSyncedSignature) {
+    const { shouldSync, nextBaselineCaptured } = shouldSyncStructure(
+      nextSignature,
+      lastSyncedSignature,
+      initialBaselineCapturedRef.current,
+    );
+    initialBaselineCapturedRef.current = nextBaselineCaptured;
+    if (!shouldSync) {
+      setLastSyncedSignature(nextSignature);
       return;
     }
 
@@ -795,6 +823,26 @@ export function EditorPane({
     element.scrollIntoView({ behavior: 'smooth', block: 'center' });
     consumedScrollRequestNonceRef.current = scrollRequest.nonce;
   }, [document, scrollRequest, paragraphNodeKeys]);
+
+  useEffect(() => {
+    const element = editorBodyRef.current;
+    if (!element) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      event.preventDefault();
+      onSetViewScale(event.deltaY > 0 ? 'macro' : 'micro');
+    };
+
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      element.removeEventListener('wheel', onWheel);
+    };
+  }, [onSetViewScale]);
 
   const initialConfig = useMemo(
     () => ({
@@ -899,16 +947,7 @@ export function EditorPane({
           </div>
         </header>
 
-        <div
-          className="editor-body"
-          onWheel={(event) => {
-            if (!(event.ctrlKey || event.metaKey)) {
-              return;
-            }
-            event.preventDefault();
-            onSetViewScale(event.deltaY > 0 ? 'macro' : 'micro');
-          }}
-        >
+        <div className="editor-body" ref={editorBodyRef}>
           {viewScale === 'macro' ? (
             <div className="editor-macro-list">
               {macroSummary.map((chapter, index) => (

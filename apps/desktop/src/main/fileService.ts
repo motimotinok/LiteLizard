@@ -65,6 +65,7 @@ function parseMarkdownStructure(markdown: string): ParsedMarkdown {
 
   let currentChapterId = defaultChapterId;
   let pendingChapterId: string | null = null;
+  let pendingChapterTitleIndex: number | null = null;
   let currentParagraphId: string | undefined;
   let buffer: string[] = [];
 
@@ -86,7 +87,7 @@ function parseMarkdownStructure(markdown: string): ParsedMarkdown {
     buffer = [];
   };
 
-  const appendChapter = (title: string) => {
+  const appendChapter = (title: string): number => {
     const trimmedTitle = title.trim();
     const nextTitle = trimmedTitle.length > 0 ? trimmedTitle : `章${chapters.length + 1}`;
     const nextId = pendingChapterId ?? createChapterId();
@@ -96,15 +97,34 @@ function parseMarkdownStructure(markdown: string): ParsedMarkdown {
       chapters[0] = { id: nextId, order: 1, title: nextTitle };
       currentChapterId = nextId;
       pendingChapterId = null;
-      return;
+      return 0;
     }
 
     chapters.push({ id: nextId, order: chapters.length + 1, title: nextTitle });
     currentChapterId = nextId;
     pendingChapterId = null;
+    return chapters.length - 1;
   };
 
   for (const line of lines) {
+    if (pendingChapterTitleIndex !== null) {
+      const headingMatch = line.match(/^\s*##\s+(.+)\s*$/);
+      if (headingMatch) {
+        const title = headingMatch[1]?.trim();
+        if (title) {
+          chapters[pendingChapterTitleIndex].title = title;
+        }
+        pendingChapterTitleIndex = null;
+        continue;
+      }
+
+      if (line.trim().length === 0) {
+        continue;
+      }
+
+      pendingChapterTitleIndex = null;
+    }
+
     const paragraphId = parseParagraphMarker(line);
     if (paragraphId) {
       flushParagraph();
@@ -116,13 +136,7 @@ function parseMarkdownStructure(markdown: string): ParsedMarkdown {
     if (chapterId) {
       flushParagraph();
       pendingChapterId = chapterId;
-      continue;
-    }
-
-    const headingMatch = line.match(/^\s*##\s+(.+)\s*$/);
-    if (headingMatch) {
-      flushParagraph();
-      appendChapter(headingMatch[1] ?? '');
+      pendingChapterTitleIndex = appendChapter('');
       continue;
     }
 
