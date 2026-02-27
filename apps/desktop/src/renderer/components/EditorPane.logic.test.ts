@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
+import { buildChapterInputs, mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
@@ -80,5 +80,19 @@ describe('EditorPane lexical helpers', () => {
     );
 
     expect(orderedIds).toEqual(['p_03', 'p_01', 'p_02']);
+  });
+
+  it('creates a fresh chapter id for unknown chapter node keys', () => {
+    const chapterInputs = buildChapterInputs(
+      [
+        { nodeKey: 'k_new', title: 'Inserted chapter' },
+        { nodeKey: 'k_existing', title: 'Existing chapter' },
+      ],
+      new Map([['k_existing', 'c_existing']]),
+    );
+
+    expect(chapterInputs[0].id).toMatch(/^c_/);
+    expect(chapterInputs[0].id).not.toBe('c_existing');
+    expect(chapterInputs[1].id).toBe('c_existing');
   });
 });

@@ -162,6 +162,35 @@ function mergeChapterIdByNodeKey(
   return next;
 }
 
+function createChapterId() {
+  return `c_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function buildChapterInputs(
+  snapshotChapters: StructureSnapshot['chapters'],
+  chapterIdByNodeKey: ReadonlyMap<string, string>,
+): Array<{ id: string; title: string }> {
+  const nextMap = new Map(chapterIdByNodeKey);
+  const usedIds = new Set<string>(chapterIdByNodeKey.values());
+
+  return snapshotChapters.map((chapter, index) => {
+    let chapterId = nextMap.get(chapter.nodeKey);
+    if (!chapterId) {
+      do {
+        chapterId = createChapterId();
+      } while (usedIds.has(chapterId));
+    }
+
+    usedIds.add(chapterId);
+    nextMap.set(chapter.nodeKey, chapterId);
+
+    return {
+      id: chapterId,
+      title: chapter.title.trim() || `章${index + 1}`,
+    };
+  });
+}
+
 function findCurrentChapterNode(topLevel: ParagraphNode | null, chapterNodeKeySet: Set<string>): ParagraphNode | null {
   if (!topLevel) {
     return null;
@@ -645,10 +674,12 @@ export function EditorPane({
     }
 
     const handle = window.setTimeout(() => {
-      const chapterInputs = structureSnapshot.chapters.map((chapter, index) => ({
-        id: chapterIdByNodeKeyRef.current.get(chapter.nodeKey) ?? document.chapters[index]?.id,
-        title: chapter.title.trim() || `章${index + 1}`,
-      }));
+      const chapterInputs = buildChapterInputs(structureSnapshot.chapters, chapterIdByNodeKeyRef.current);
+      chapterIdByNodeKeyRef.current = mergeChapterIdByNodeKey(
+        chapterIdByNodeKeyRef.current,
+        structureSnapshot.chapters.map((chapter) => chapter.nodeKey),
+        chapterInputs.map((chapter) => chapter.id),
+      );
 
       const chapterIdByNodeKey = new Map<string, string>();
       chapterInputs.forEach((chapter, index) => {
