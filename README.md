@@ -2,6 +2,8 @@
 
 LiteLizard is an Electron desktop editor that keeps `light` (text) and `lizard` (AI analysis) side-by-side per paragraph.
 
+詳細仕様: docs/LiteLizard_spec_v003.md
+
 ## Workspaces
 - `apps/api`: Legacy Fastify relay API (kept for compatibility/testing).
 - `apps/desktop`: Electron + React editor, file tree, DnD paragraph cards, stale-only analysis, autosave, direct OpenAI calls.
