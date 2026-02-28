@@ -1,11 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { FileNode, LiteLizardAnalysisFile, LiteLizardDocument, Paragraph } from '@litelizard/shared';
+import type { Chapter, FileNode, LiteLizardAnalysisFile, LiteLizardDocument, Paragraph } from '@litelizard/shared';
 import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
   id?: string;
+  chapterId: string;
   text: string;
+}
+
+interface ParsedMarkdown {
+  chapters: Chapter[];
+  paragraphs: ParsedParagraph[];
 }
 
 function createDocumentId() {
@@ -14,6 +20,10 @@ function createDocumentId() {
 
 function createParagraphId() {
   return `p_${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function createChapterId() {
+  return `c_${Math.random().toString(36).slice(2, 12)}`;
 }
 
 function toAnalysisPath(markdownPath: string) {
@@ -31,85 +41,126 @@ function paragraphMarker(id: string) {
   return `<!-- ll:id=${id} -->`;
 }
 
+function chapterMarker(id: string) {
+  return `<!-- ll:chapter=${id} -->`;
+}
+
 function parseParagraphMarker(line: string) {
   const match = line.match(/^\s*<!--\s*ll:id=(p_[A-Za-z0-9_-]+)\s*-->\s*$/);
   return match?.[1] ?? null;
 }
 
-function parseMarkdownParagraphs(markdown: string): ParsedParagraph[] {
+function parseChapterMarker(line: string) {
+  const match = line.match(/^\s*<!--\s*ll:chapter=(c_[A-Za-z0-9_-]+)\s*-->\s*$/);
+  return match?.[1] ?? null;
+}
+
+function parseMarkdownStructure(markdown: string): ParsedMarkdown {
   const normalized = markdown.replace(/\r\n/g, '\n');
   const lines = normalized.split('\n');
-  const parsed: ParsedParagraph[] = [];
 
-  let currentId: string | undefined;
+  const defaultChapterId = createChapterId();
+  const chapters: Chapter[] = [{ id: defaultChapterId, order: 1, title: '章1' }];
+  const paragraphs: ParsedParagraph[] = [];
+
+  let currentChapterId = defaultChapterId;
+  let pendingChapterId: string | null = null;
+  let pendingChapterTitleIndex: number | null = null;
+  let currentParagraphId: string | undefined;
   let buffer: string[] = [];
 
-  const flush = () => {
+  const flushParagraph = () => {
     if (buffer.length === 0) {
       return;
     }
 
     const text = buffer.join('\n').trimEnd();
     if (text.trim().length > 0) {
-      parsed.push({ id: currentId, text });
+      paragraphs.push({
+        id: currentParagraphId,
+        chapterId: currentChapterId,
+        text,
+      });
     }
 
-    currentId = undefined;
+    currentParagraphId = undefined;
     buffer = [];
   };
 
+  const appendChapter = (title: string): number => {
+    const trimmedTitle = title.trim();
+    const nextTitle = trimmedTitle.length > 0 ? trimmedTitle : `章${chapters.length + 1}`;
+    const nextId = pendingChapterId ?? createChapterId();
+
+    // Replace temporary default chapter if no paragraph was added yet.
+    if (chapters.length === 1 && chapters[0].id === defaultChapterId && paragraphs.length === 0) {
+      chapters[0] = { id: nextId, order: 1, title: nextTitle };
+      currentChapterId = nextId;
+      pendingChapterId = null;
+      return 0;
+    }
+
+    chapters.push({ id: nextId, order: chapters.length + 1, title: nextTitle });
+    currentChapterId = nextId;
+    pendingChapterId = null;
+    return chapters.length - 1;
+  };
+
   for (const line of lines) {
-    const markerId = parseParagraphMarker(line);
-    if (markerId) {
-      flush();
-      currentId = markerId;
+    if (pendingChapterTitleIndex !== null) {
+      const headingMatch = line.match(/^\s*##\s+(.+)\s*$/);
+      if (headingMatch) {
+        const title = headingMatch[1]?.trim();
+        if (title) {
+          chapters[pendingChapterTitleIndex].title = title;
+        }
+        pendingChapterTitleIndex = null;
+        continue;
+      }
+
+      if (line.trim().length === 0) {
+        continue;
+      }
+
+      pendingChapterTitleIndex = null;
+    }
+
+    const paragraphId = parseParagraphMarker(line);
+    if (paragraphId) {
+      flushParagraph();
+      currentParagraphId = paragraphId;
+      continue;
+    }
+
+    const chapterId = parseChapterMarker(line);
+    if (chapterId) {
+      flushParagraph();
+      pendingChapterId = chapterId;
+      pendingChapterTitleIndex = appendChapter('');
       continue;
     }
 
     if (line.trim().length === 0) {
-      flush();
+      flushParagraph();
       continue;
     }
 
     buffer.push(line);
   }
 
-  flush();
+  flushParagraph();
 
-  return parsed;
-}
-
-function markdownFromDocument(document: LiteLizardDocument) {
-  if (document.paragraphs.length === 0) {
-    return '';
-  }
-
-  return document.paragraphs
-    .map((paragraph) => {
-      const text = paragraph.light.text.trimEnd();
-      const safeText = text.length > 0 ? text : ' ';
-      return `${paragraphMarker(paragraph.id)}\n${safeText}`;
-    })
-    .join('\n\n');
-}
-
-function analysisFromDocument(document: LiteLizardDocument): LiteLizardAnalysisFile {
   return {
-    version: 1,
-    documentId: document.documentId,
-    title: document.title,
-    personaMode: document.personaMode,
-    createdAt: document.createdAt,
-    updatedAt: document.updatedAt,
-    paragraphs: document.paragraphs.map((paragraph) => ({
-      paragraphId: paragraph.id,
-      order: paragraph.order,
-      lizard: paragraph.lizard,
-    })),
+    chapters: chapters.map((chapter, index) => ({ ...chapter, order: index + 1 })),
+    paragraphs,
   };
 }
 
-function toParagraphs(parsed: ParsedParagraph[], analysis: LiteLizardAnalysisFile | null): Paragraph[] {
+function toParagraphs(
+  parsed: ParsedParagraph[],
+  analysis: LiteLizardAnalysisFile | null,
+  defaultChapterId: string,
+): Paragraph[] {
   const byId = new Map<string, LiteLizardAnalysisFile['paragraphs'][number]>();
   const byOrder = new Map<number, LiteLizardAnalysisFile['paragraphs'][number]>();
   const usedIds = new Set<string>();
@@ -139,6 +190,7 @@ function toParagraphs(parsed: ParsedParagraph[], analysis: LiteLizardAnalysisFil
 
     return {
       id,
+      chapterId: chunk.chapterId,
       order,
       light: {
         text: chunk.text,
@@ -156,6 +208,7 @@ function toParagraphs(parsed: ParsedParagraph[], analysis: LiteLizardAnalysisFil
   return [
     {
       id: createParagraphId(),
+      chapterId: defaultChapterId,
       order: 1,
       light: {
         text: emptyText,
@@ -164,6 +217,90 @@ function toParagraphs(parsed: ParsedParagraph[], analysis: LiteLizardAnalysisFil
       lizard: { status: 'stale' },
     },
   ];
+}
+
+function ensureDocumentChapters(document: LiteLizardDocument): LiteLizardDocument {
+  const currentChapters = document.chapters ?? [];
+  if (currentChapters.length > 0 && document.paragraphs.every((paragraph) => Boolean(paragraph.chapterId))) {
+    const chapterIdSet = new Set(currentChapters.map((chapter) => chapter.id));
+    const fallbackChapterId = currentChapters[0].id;
+    return {
+      ...document,
+      version: 2,
+      chapters: currentChapters.map((chapter, index) => ({ ...chapter, order: index + 1 })),
+      paragraphs: document.paragraphs.map((paragraph, index) => ({
+        ...paragraph,
+        chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
+        order: index + 1,
+      })),
+    };
+  }
+
+  const chapterId = createChapterId();
+  return {
+    ...document,
+    version: 2,
+    chapters: [
+      {
+        id: chapterId,
+        order: 1,
+        title: '章1',
+      },
+    ],
+    paragraphs: document.paragraphs.map((paragraph, index) => ({
+      ...paragraph,
+      chapterId,
+      order: index + 1,
+    })),
+  };
+}
+
+function markdownFromDocument(rawDocument: LiteLizardDocument) {
+  const document = ensureDocumentChapters(rawDocument);
+  if (document.paragraphs.length === 0) {
+    return '';
+  }
+
+  const paragraphsByChapterId = new Map<string, Paragraph[]>();
+  document.paragraphs.forEach((paragraph) => {
+    const list = paragraphsByChapterId.get(paragraph.chapterId) ?? [];
+    list.push(paragraph);
+    paragraphsByChapterId.set(paragraph.chapterId, list);
+  });
+
+  const chapterBlocks = document.chapters
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map((chapter) => {
+      const chapterParagraphs = (paragraphsByChapterId.get(chapter.id) ?? []).slice().sort((left, right) => left.order - right.order);
+      const paragraphBlocks = chapterParagraphs.map((paragraph) => {
+        const text = paragraph.light.text.trimEnd();
+        const safeText = text.length > 0 ? text : ' ';
+        return `${paragraphMarker(paragraph.id)}\n${safeText}`;
+      });
+
+      const chapterHeader = `${chapterMarker(chapter.id)}\n## ${chapter.title}`;
+      return paragraphBlocks.length > 0 ? `${chapterHeader}\n\n${paragraphBlocks.join('\n\n')}` : chapterHeader;
+    });
+
+  return chapterBlocks.join('\n\n');
+}
+
+function analysisFromDocument(rawDocument: LiteLizardDocument): LiteLizardAnalysisFile {
+  const document = ensureDocumentChapters(rawDocument);
+  return {
+    version: 1,
+    documentId: document.documentId,
+    title: document.title,
+    personaMode: document.personaMode,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+    paragraphs: document.paragraphs.map((paragraph) => ({
+      paragraphId: paragraph.id,
+      order: paragraph.order,
+      lizard: paragraph.lizard,
+    })),
+  };
 }
 
 async function readAnalysisFile(markdownPath: string): Promise<LiteLizardAnalysisFile | null> {
@@ -183,7 +320,8 @@ async function readAnalysisFile(markdownPath: string): Promise<LiteLizardAnalysi
   }
 }
 
-async function writeDocumentFiles(markdownPath: string, document: LiteLizardDocument) {
+async function writeDocumentFiles(markdownPath: string, rawDocument: LiteLizardDocument) {
+  const document = ensureDocumentChapters(rawDocument);
   const markdown = markdownFromDocument(document);
   const analysis = analysisFromDocument(document);
   const analysisPath = toAnalysisPath(markdownPath);
@@ -246,12 +384,28 @@ export function createFileService() {
 
     async load(filePath: string): Promise<LiteLizardDocument> {
       const markdownRaw = await fs.readFile(filePath, 'utf8');
-      const parsedParagraphs = parseMarkdownParagraphs(markdownRaw);
+      const parsedMarkdown = parseMarkdownStructure(markdownRaw);
       const analysis = await readAnalysisFile(filePath);
       const now = new Date().toISOString();
 
+      const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
+      const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
+      const chapters = (parsedMarkdown.chapters.length > 0
+        ? parsedMarkdown.chapters
+        : [{ id: defaultChapterId, order: 1, title: '章1' }]
+      )
+        .map((chapter, index) => ({
+          ...chapter,
+          title: chapter.title.trim() || `章${index + 1}`,
+          order: index + 1,
+        }));
+
+      const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
+
+      const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
+
       const document: LiteLizardDocument = {
-        version: 1,
+        version: 2,
         documentId: analysis?.documentId ?? createDocumentId(),
         title: analysis?.title ?? toDocumentTitle(filePath),
         personaMode: analysis?.personaMode ?? 'general-reader',
@@ -261,7 +415,12 @@ export function createFileService() {
           format: 'markdown-md',
           originPath: filePath,
         },
-        paragraphs: toParagraphs(parsedParagraphs, analysis),
+        chapters: chapters.length > 0 ? chapters : [{ id: fallbackChapterId, order: 1, title: '章1' }],
+        paragraphs: paragraphs.map((paragraph, index) => ({
+          ...paragraph,
+          chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
+          order: index + 1,
+        })),
       };
 
       if (!revisionMap.has(filePath)) {
@@ -281,7 +440,8 @@ export function createFileService() {
         };
       }
 
-      await writeDocumentFiles(filePath, document);
+      const normalized = ensureDocumentChapters(document);
+      await writeDocumentFiles(filePath, normalized);
       const next = current + 1;
       revisionMap.set(filePath, next);
 
@@ -292,7 +452,8 @@ export function createFileService() {
     },
 
     async createDocument(filePath: string, document: LiteLizardDocument) {
-      await writeDocumentFiles(filePath, document);
+      const normalized = ensureDocumentChapters(document);
+      await writeDocumentFiles(filePath, normalized);
       revisionMap.set(filePath, 0);
     },
 

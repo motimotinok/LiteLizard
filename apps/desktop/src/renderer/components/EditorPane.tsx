@@ -1,14 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
+import type { DocumentStructureInput, ParagraphStructureInput } from '../types/documentStructure.js';
 import {
+  COMMAND_PRIORITY_HIGH,
+  COMMAND_PRIORITY_NORMAL,
+  KEY_BACKSPACE_COMMAND,
+  KEY_ENTER_COMMAND,
+  KEY_TAB_COMMAND,
   $createParagraphNode,
   $createTextNode,
-  $getNodeByKey,
   $getRoot,
   $getSelection,
   $isParagraphNode,
   $isRangeSelection,
   type LexicalEditor,
+  type ParagraphNode,
 } from 'lexical';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
@@ -19,28 +25,49 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 
 const RichTextErrorBoundary: React.ComponentType<LexicalErrorBoundaryProps> = LexicalErrorBoundary;
 
+interface StructureSnapshot {
+  chapters: Array<{ nodeKey: string; title: string }>;
+  paragraphs: Array<{ nodeKey: string; chapterNodeKey: string | null; text: string }>;
+}
+
 interface Props {
   isExpanded: boolean;
   document: LiteLizardDocument | null;
   dirty: boolean;
+  viewScale: 'micro' | 'macro';
   activeParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (paragraphId: string | null) => void;
-  onSyncParagraphs: (paragraphTexts: string[]) => void;
+  onSetViewScale: (viewScale: 'micro' | 'macro') => void;
+  onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
 }
 
-function getInitialParagraphTexts(document: LiteLizardDocument | null): string[] {
-  if (!document || document.paragraphs.length === 0) {
-    return [''];
-  }
-  return document.paragraphs.map((paragraph) => paragraph.light.text);
+function toStructureSignature(snapshot: StructureSnapshot) {
+  return JSON.stringify({
+    chapters: snapshot.chapters.map((chapter) => chapter.title),
+    paragraphs: snapshot.paragraphs.map((paragraph) => [paragraph.chapterNodeKey, paragraph.text]),
+  });
 }
 
-function toTextSyncSignature(paragraphTexts: string[]) {
-  return JSON.stringify(paragraphTexts);
+export function shouldSyncStructure(
+  nextSignature: string,
+  lastSyncedSignature: string,
+  initialBaselineCaptured: boolean,
+): { shouldSync: boolean; nextBaselineCaptured: boolean } {
+  if (!initialBaselineCaptured) {
+    return {
+      shouldSync: false,
+      nextBaselineCaptured: true,
+    };
+  }
+
+  return {
+    shouldSync: nextSignature !== lastSyncedSignature,
+    nextBaselineCaptured: true,
+  };
 }
 
 export function reorderNodeKeys(nodeKeys: string[], activeKey: string, overKey: string): string[] {
@@ -123,12 +150,125 @@ export function mergeParagraphIdByNodeKey(
   return next;
 }
 
-function ParagraphStatePlugin({
+function mergeChapterIdByNodeKey(
+  previousKeyToId: ReadonlyMap<string, string>,
+  currentNodeKeys: string[],
+  chapterIds: string[],
+): Map<string, string> {
+  if (currentNodeKeys.length !== chapterIds.length) {
+    return new Map(previousKeyToId);
+  }
+
+  const chapterIdSet = new Set(chapterIds);
+  const next = new Map<string, string>();
+
+  currentNodeKeys.forEach((nodeKey, index) => {
+    const previousChapterId = previousKeyToId.get(nodeKey);
+    if (previousChapterId && chapterIdSet.has(previousChapterId)) {
+      next.set(nodeKey, previousChapterId);
+      return;
+    }
+
+    const chapterId = chapterIds[index];
+    if (chapterId) {
+      next.set(nodeKey, chapterId);
+    }
+  });
+
+  return next;
+}
+
+function createChapterId() {
+  return `c_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createParagraphId() {
+  return `p_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function buildChapterInputs(
+  snapshotChapters: StructureSnapshot['chapters'],
+  chapterIdByNodeKey: ReadonlyMap<string, string>,
+): Array<{ id: string; title: string }> {
+  const nextMap = new Map(chapterIdByNodeKey);
+  const usedIds = new Set<string>(chapterIdByNodeKey.values());
+
+  return snapshotChapters.map((chapter, index) => {
+    let chapterId = nextMap.get(chapter.nodeKey);
+    if (!chapterId) {
+      do {
+        chapterId = createChapterId();
+      } while (usedIds.has(chapterId));
+    }
+
+    usedIds.add(chapterId);
+    nextMap.set(chapter.nodeKey, chapterId);
+
+    return {
+      id: chapterId,
+      title: chapter.title.trim() || `章${index + 1}`,
+    };
+  });
+}
+
+export function buildParagraphInputs(
+  snapshotParagraphs: StructureSnapshot['paragraphs'],
+  paragraphIdByNodeKey: ReadonlyMap<string, string>,
+  chapterIdByNodeKey: ReadonlyMap<string, string>,
+  fallbackChapterId: string | undefined,
+): Array<ParagraphStructureInput & { id: string }> {
+  const nextMap = new Map(paragraphIdByNodeKey);
+  const usedIds = new Set<string>(paragraphIdByNodeKey.values());
+
+  return snapshotParagraphs.map((paragraph) => {
+    let paragraphId = nextMap.get(paragraph.nodeKey);
+    if (!paragraphId) {
+      do {
+        paragraphId = createParagraphId();
+      } while (usedIds.has(paragraphId));
+    }
+
+    usedIds.add(paragraphId);
+    nextMap.set(paragraph.nodeKey, paragraphId);
+
+    return {
+      id: paragraphId,
+      chapterId: paragraph.chapterNodeKey ? chapterIdByNodeKey.get(paragraph.chapterNodeKey) ?? fallbackChapterId : fallbackChapterId,
+      text: paragraph.text.length > 0 ? paragraph.text : ' ',
+    };
+  });
+}
+
+function findCurrentChapterNode(topLevel: ParagraphNode | null, chapterNodeKeySet: Set<string>): ParagraphNode | null {
+  if (!topLevel) {
+    return null;
+  }
+
+  if (chapterNodeKeySet.has(topLevel.getKey())) {
+    return topLevel;
+  }
+
+  let current = topLevel.getPreviousSibling();
+  while (current) {
+    if ($isParagraphNode(current) && chapterNodeKeySet.has(current.getKey())) {
+      return current;
+    }
+    current = current.getPreviousSibling();
+  }
+
+  return null;
+}
+
+function StructureStatePlugin({
+  chapterNodeKeySetRef,
+  fallbackChapterNodeIndexes,
   onSnapshot,
-  onActiveNodeKey,
+  onActiveElement,
 }: {
-  onSnapshot: (texts: string[], nodeKeys: string[]) => void;
-  onActiveNodeKey: (nodeKey: string | null) => void;
+  chapterNodeKeySetRef: React.MutableRefObject<Set<string>>;
+  fallbackChapterNodeIndexes: number[];
+  onSnapshot: (snapshot: StructureSnapshot, emptyParagraphNodeKeys: Set<string>) => void;
+  onActiveElement: (active: { nodeKey: string | null; type: 'chapter' | 'paragraph' | null }) => void;
 }) {
   const [editor] = useLexicalComposerContext();
 
@@ -136,38 +276,293 @@ function ParagraphStatePlugin({
     return editor.registerUpdateListener(({ editorState }) => {
       editorState.read(() => {
         const root = $getRoot();
-        const paragraphs = root.getChildren().filter((node) => $isParagraphNode(node));
-        const texts = paragraphs.map((node) => node.getTextContent());
-        const nodeKeys = paragraphs.map((node) => node.getKey());
-        onSnapshot(texts.length > 0 ? texts : [''], nodeKeys);
+        const topLevelParagraphs = root.getChildren().filter((node): node is ParagraphNode => $isParagraphNode(node));
+
+        const nextChapterSet = new Set<string>();
+        const existingSet = chapterNodeKeySetRef.current;
+        topLevelParagraphs.forEach((node) => {
+          if (existingSet.has(node.getKey())) {
+            nextChapterSet.add(node.getKey());
+          }
+        });
+
+        // On editor remount (e.g. macro -> micro), node keys are regenerated.
+        // Recover chapter nodes by deterministic top-level positions from the current document snapshot.
+        if (nextChapterSet.size === 0 && topLevelParagraphs.length > 0) {
+          fallbackChapterNodeIndexes.forEach((index) => {
+            const node = topLevelParagraphs[index];
+            if (node) {
+              nextChapterSet.add(node.getKey());
+            }
+          });
+
+          if (nextChapterSet.size === 0) {
+            nextChapterSet.add(topLevelParagraphs[0].getKey());
+          }
+        }
+
+        const chapters: StructureSnapshot['chapters'] = [];
+        const paragraphs: StructureSnapshot['paragraphs'] = [];
+        const emptyParagraphNodeKeys = new Set<string>();
+
+        let currentChapterNodeKey: string | null = null;
+
+        topLevelParagraphs.forEach((node) => {
+          const text = node.getTextContent();
+          const isChapter = nextChapterSet.has(node.getKey()) || currentChapterNodeKey === null;
+          if (isChapter) {
+            nextChapterSet.add(node.getKey());
+            currentChapterNodeKey = node.getKey();
+            chapters.push({
+              nodeKey: node.getKey(),
+              title: text.trim() || `章${chapters.length + 1}`,
+            });
+            return;
+          }
+
+          if (text.trim().length === 0) {
+            emptyParagraphNodeKeys.add(node.getKey());
+          }
+
+          paragraphs.push({
+            nodeKey: node.getKey(),
+            chapterNodeKey: currentChapterNodeKey,
+            text,
+          });
+        });
+
+        chapterNodeKeySetRef.current = nextChapterSet;
+        onSnapshot({ chapters, paragraphs }, emptyParagraphNodeKeys);
 
         const selection = $getSelection();
         if (!$isRangeSelection(selection)) {
-          onActiveNodeKey(null);
+          onActiveElement({ nodeKey: null, type: null });
           return;
         }
 
         const topLevel = selection.anchor.getNode().getTopLevelElement();
-        onActiveNodeKey(topLevel && $isParagraphNode(topLevel) ? topLevel.getKey() : null);
+        if (!topLevel || !$isParagraphNode(topLevel)) {
+          onActiveElement({ nodeKey: null, type: null });
+          return;
+        }
+
+        if (nextChapterSet.has(topLevel.getKey())) {
+          onActiveElement({ nodeKey: topLevel.getKey(), type: 'chapter' });
+          return;
+        }
+
+        onActiveElement({ nodeKey: topLevel.getKey(), type: 'paragraph' });
       });
     });
-  }, [editor, onActiveNodeKey, onSnapshot]);
+  }, [chapterNodeKeySetRef, editor, fallbackChapterNodeIndexes, onActiveElement, onSnapshot]);
 
   return null;
 }
 
-function ParagraphChromePlugin({
+function ChapterCommandPlugin({ chapterNodeKeySetRef }: { chapterNodeKeySetRef: React.MutableRefObject<Set<string>> }) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    const unregisterEnter = editor.registerCommand(
+      KEY_ENTER_COMMAND,
+      (event) => {
+        if (!event) {
+          return false;
+        }
+
+        const hasModifier = event.metaKey || event.ctrlKey;
+
+        if (hasModifier) {
+          event.preventDefault();
+          editor.update(() => {
+            const selection = $getSelection();
+            if (!$isRangeSelection(selection)) {
+              return;
+            }
+
+            const topLevel = selection.anchor.getNode().getTopLevelElement();
+            if (!topLevel || !$isParagraphNode(topLevel)) {
+              return;
+            }
+
+            const chapterNode = findCurrentChapterNode(topLevel, chapterNodeKeySetRef.current);
+            let insertAfter: ParagraphNode = topLevel;
+
+            if (chapterNode) {
+              insertAfter = chapterNode;
+              let walker = chapterNode.getNextSibling();
+              while (walker && !($isParagraphNode(walker) && chapterNodeKeySetRef.current.has(walker.getKey()))) {
+                if ($isParagraphNode(walker)) {
+                  insertAfter = walker;
+                }
+                walker = walker.getNextSibling();
+              }
+            }
+
+            const chapterParagraph = $createParagraphNode();
+            chapterParagraph.append($createTextNode(`章${chapterNodeKeySetRef.current.size + 1}`));
+            const bodyParagraph = $createParagraphNode();
+
+            insertAfter.insertAfter(chapterParagraph);
+            chapterParagraph.insertAfter(bodyParagraph);
+            chapterNodeKeySetRef.current.add(chapterParagraph.getKey());
+            chapterParagraph.selectStart();
+          });
+          return true;
+        }
+
+        let handled = false;
+        editor.update(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection)) {
+            return;
+          }
+
+          const topLevel = selection.anchor.getNode().getTopLevelElement();
+          if (!topLevel || !$isParagraphNode(topLevel)) {
+            return;
+          }
+
+          if (!chapterNodeKeySetRef.current.has(topLevel.getKey())) {
+            return;
+          }
+
+          handled = true;
+          event.preventDefault();
+
+          const nextSibling = topLevel.getNextSibling();
+          if (nextSibling && $isParagraphNode(nextSibling) && !chapterNodeKeySetRef.current.has(nextSibling.getKey())) {
+            nextSibling.selectStart();
+            return;
+          }
+
+          const paragraph = $createParagraphNode();
+          topLevel.insertAfter(paragraph);
+          paragraph.selectStart();
+        });
+
+        return handled;
+      },
+      COMMAND_PRIORITY_HIGH,
+    );
+
+    const unregisterTab = editor.registerCommand(
+      KEY_TAB_COMMAND,
+      (event) => {
+        event?.preventDefault();
+        return true;
+      },
+      COMMAND_PRIORITY_NORMAL,
+    );
+
+    const unregisterBackspace = editor.registerCommand(
+      KEY_BACKSPACE_COMMAND,
+      (event) => {
+        let handled = false;
+
+        editor.update(() => {
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
+            return;
+          }
+
+          const topLevel = selection.anchor.getNode().getTopLevelElement();
+          if (!topLevel || !$isParagraphNode(topLevel)) {
+            return;
+          }
+
+          if (!chapterNodeKeySetRef.current.has(topLevel.getKey())) {
+            return;
+          }
+
+          const isAtStart = selection.anchor.offset === 0;
+          if (!isAtStart || topLevel.getTextContent().trim().length > 0) {
+            return;
+          }
+
+          handled = true;
+          event?.preventDefault();
+
+          const paragraphsInChapter: ParagraphNode[] = [];
+          let walker = topLevel.getNextSibling();
+          while (walker && !($isParagraphNode(walker) && chapterNodeKeySetRef.current.has(walker.getKey()))) {
+            if ($isParagraphNode(walker)) {
+              paragraphsInChapter.push(walker);
+            }
+            walker = walker.getNextSibling();
+          }
+
+          const hasContent = paragraphsInChapter.some((node) => node.getTextContent().trim().length > 0);
+          if (hasContent) {
+            return;
+          }
+
+          const previous = topLevel.getPreviousSibling();
+          paragraphsInChapter.forEach((node) => node.remove());
+          chapterNodeKeySetRef.current.delete(topLevel.getKey());
+          topLevel.remove();
+
+          const root = $getRoot();
+          const topParagraphs = root.getChildren().filter((node): node is ParagraphNode => $isParagraphNode(node));
+
+          if (topParagraphs.length === 0) {
+            const chapter = $createParagraphNode();
+            chapter.append($createTextNode('章1'));
+            const paragraph = $createParagraphNode();
+            root.append(chapter, paragraph);
+            chapterNodeKeySetRef.current = new Set([chapter.getKey()]);
+            chapter.selectStart();
+            return;
+          }
+
+          if (previous && $isParagraphNode(previous)) {
+            previous.selectEnd();
+          } else {
+            topParagraphs[0].selectStart();
+          }
+        });
+
+        return handled;
+      },
+      COMMAND_PRIORITY_HIGH,
+    );
+
+    return () => {
+      unregisterEnter();
+      unregisterTab();
+      unregisterBackspace();
+    };
+  }, [chapterNodeKeySetRef, editor]);
+
+  return null;
+}
+
+function StructureChromePlugin({
+  chapterNodeKeys,
   paragraphNodeKeys,
-  activeNodeKey,
-  onDropReorder,
+  active,
+  emptyParagraphNodeKeys,
 }: {
+  chapterNodeKeys: string[];
   paragraphNodeKeys: string[];
-  activeNodeKey: string | null;
-  onDropReorder: (activeKey: string, overKey: string) => void;
+  active: { nodeKey: string | null; type: 'chapter' | 'paragraph' | null };
+  emptyParagraphNodeKeys: Set<string>;
 }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
+    chapterNodeKeys.forEach((nodeKey, index) => {
+      const element = editor.getElementByKey(nodeKey);
+      if (!element) {
+        return;
+      }
+
+      element.classList.add('editor-chapter-row');
+      element.classList.toggle('editor-chapter-row-active', active.type === 'chapter' && active.nodeKey === nodeKey);
+      element.setAttribute('data-chapter-index', `Chapter ${index + 1}`);
+      element.setAttribute('data-testid', `editor-chapter-row-${index + 1}`);
+    });
+
     paragraphNodeKeys.forEach((nodeKey, index) => {
       const element = editor.getElementByKey(nodeKey);
       if (!element) {
@@ -175,165 +570,214 @@ function ParagraphChromePlugin({
       }
 
       element.classList.add('editor-paragraph-row');
-      element.classList.toggle('editor-paragraph-row-active', nodeKey === activeNodeKey);
-      element.setAttribute('data-node-key', nodeKey);
+      element.classList.toggle('editor-paragraph-row-active', active.type === 'paragraph' && active.nodeKey === nodeKey);
       element.setAttribute('data-paragraph-index', String(index + 1));
       element.setAttribute('data-testid', `editor-paragraph-row-${index + 1}`);
-      element.setAttribute('draggable', 'true');
-      element.ondragstart = (event) => {
-        const rect = element.getBoundingClientRect();
-        const dragHandleWidth = 56;
-        if (event.clientX > rect.left + dragHandleWidth) {
-          event.preventDefault();
-          return;
-        }
-        event.dataTransfer?.setData('text/plain', nodeKey);
-        event.dataTransfer?.setData('application/x-litelizard-node-key', nodeKey);
-        event.dataTransfer?.setDragImage(element, 24, 12);
-        element.classList.add('editor-paragraph-row-dragging');
-      };
 
-      element.ondragend = () => {
-        element.classList.remove('editor-paragraph-row-dragging');
-      };
-
-      element.ondragover = (event) => {
-        event.preventDefault();
-        if (event.dataTransfer) {
-          event.dataTransfer.dropEffect = 'move';
-        }
-      };
-
-      element.ondrop = (event) => {
-        event.preventDefault();
-        const draggedNodeKey =
-          event.dataTransfer?.getData('application/x-litelizard-node-key') ?? event.dataTransfer?.getData('text/plain') ?? '';
-        if (!draggedNodeKey || draggedNodeKey === nodeKey) {
-          element.classList.remove('editor-paragraph-row-dragging');
-          return;
-        }
-        onDropReorder(draggedNodeKey, nodeKey);
-        element.classList.remove('editor-paragraph-row-dragging');
-      };
+      const showHint = active.type === 'paragraph' && active.nodeKey === nodeKey && emptyParagraphNodeKeys.has(nodeKey);
+      element.classList.toggle('editor-paragraph-row-show-hint', showHint);
+      if (showHint) {
+        element.setAttribute('data-command-hint', 'Enterで段落 / Ctrl+Enterで次の章');
+      } else {
+        element.removeAttribute('data-command-hint');
+      }
     });
-  }, [activeNodeKey, editor, onDropReorder, paragraphNodeKeys]);
+  }, [active.nodeKey, active.type, chapterNodeKeys, editor, emptyParagraphNodeKeys, paragraphNodeKeys]);
 
   return null;
 }
 
-function reorderParagraphNodes(editor: LexicalEditor, currentKeys: string[], activeKey: string, overKey: string): string[] {
-  const nextKeys = reorderNodeKeys(currentKeys, activeKey, overKey);
-  if (nextKeys === currentKeys) {
-    return currentKeys;
-  }
+function LexicalEditorRefPlugin({ onReady }: { onReady: (editor: LexicalEditor) => void }) {
+  const [editor] = useLexicalComposerContext();
 
-  editor.update(() => {
-    const root = $getRoot();
-    const paragraphNodes = nextKeys
-      .map((nodeKey) => $getNodeByKey(nodeKey))
-      .filter((node): node is ReturnType<typeof $createParagraphNode> => Boolean(node) && $isParagraphNode(node));
+  useEffect(() => {
+    onReady(editor);
+  }, [editor, onReady]);
 
-    paragraphNodes.forEach((node) => {
-      root.append(node);
-    });
-  });
-
-  return nextKeys;
+  return null;
 }
 
-function reorderParagraphNodesByOrder(editor: LexicalEditor, nextKeys: string[]): string[] {
-  editor.update(() => {
-    const root = $getRoot();
-    const paragraphNodes = nextKeys
-      .map((nodeKey) => $getNodeByKey(nodeKey))
-      .filter((node): node is ReturnType<typeof $createParagraphNode> => Boolean(node) && $isParagraphNode(node));
+function buildMacroSummary(document: LiteLizardDocument) {
+  const grouped = new Map<string, typeof document.paragraphs>();
 
-    paragraphNodes.forEach((node) => {
-      root.append(node);
+  document.paragraphs
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .forEach((paragraph) => {
+      const list = grouped.get(paragraph.chapterId) ?? [];
+      list.push(paragraph);
+      grouped.set(paragraph.chapterId, list);
     });
+
+  return document.chapters
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map((chapter) => {
+      const paragraphs = grouped.get(chapter.id) ?? [];
+      const preview = paragraphs[0]?.light.text.trim() ?? '';
+      return {
+        id: chapter.id,
+        title: chapter.title,
+        paragraphCount: paragraphs.length,
+        preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview || '（空の章）',
+      };
+    });
+}
+
+function buildFallbackChapterNodeIndexes(document: LiteLizardDocument): number[] {
+  const countsByChapterId = new Map<string, number>();
+  document.paragraphs.forEach((paragraph) => {
+    countsByChapterId.set(paragraph.chapterId, (countsByChapterId.get(paragraph.chapterId) ?? 0) + 1);
   });
 
-  return nextKeys;
+  const indexes: number[] = [];
+  let cursor = 0;
+  document.chapters
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .forEach((chapter) => {
+      indexes.push(cursor);
+      const paragraphCount = Math.max(1, countsByChapterId.get(chapter.id) ?? 0);
+      cursor += 1 + paragraphCount;
+    });
+
+  return indexes;
 }
 
 export function EditorPane({
   isExpanded,
   document,
   dirty,
+  viewScale,
   activeParagraphId,
   scrollRequest,
   setActiveParagraphId,
-  onSyncParagraphs,
-  onReorderParagraphs,
+  onSetViewScale,
+  onSyncStructure,
   onCreateEssay,
   onOpenFolder,
 }: Props) {
-  const [paragraphTexts, setParagraphTexts] = useState(() => getInitialParagraphTexts(document));
+  const [structureSnapshot, setStructureSnapshot] = useState<StructureSnapshot>({ chapters: [], paragraphs: [] });
+  const [chapterNodeKeys, setChapterNodeKeys] = useState<string[]>([]);
   const [paragraphNodeKeys, setParagraphNodeKeys] = useState<string[]>([]);
-  const [activeParagraphNodeKey, setActiveParagraphNodeKey] = useState<string | null>(null);
-  const [lastSyncedSignature, setLastSyncedSignature] = useState(() => toTextSyncSignature(getInitialParagraphTexts(document)));
-  const editorRef = useRef<LexicalEditor | null>(null);
-  const paragraphNodeKeysRef = useRef<string[]>([]);
-  const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
-  const consumedScrollRequestNonceRef = useRef<number | null>(null);
+  const [activeElement, setActiveElement] = useState<{ nodeKey: string | null; type: 'chapter' | 'paragraph' | null }>({
+    nodeKey: null,
+    type: null,
+  });
+  const [emptyParagraphNodeKeys, setEmptyParagraphNodeKeys] = useState<Set<string>>(new Set());
+  const [lastSyncedSignature, setLastSyncedSignature] = useState(() => toStructureSignature({ chapters: [], paragraphs: [] }));
 
-  useEffect(() => {
-    paragraphNodeKeysRef.current = paragraphNodeKeys;
-  }, [paragraphNodeKeys]);
+  const editorRef = useRef<LexicalEditor | null>(null);
+  const paragraphIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
+  const chapterIdByNodeKeyRef = useRef<Map<string, string>>(new Map());
+  const chapterNodeKeySetRef = useRef<Set<string>>(new Set());
+  const consumedScrollRequestNonceRef = useRef<number | null>(null);
+  const editorBodyRef = useRef<HTMLDivElement | null>(null);
+  const initialBaselineCapturedRef = useRef(false);
 
   useEffect(() => {
     if (!document) {
       paragraphIdByNodeKeyRef.current = new Map();
+      chapterIdByNodeKeyRef.current = new Map();
+      chapterNodeKeySetRef.current = new Set();
       return;
     }
 
-    if (paragraphNodeKeys.length !== document.paragraphs.length) {
-      return;
+    if (chapterNodeKeys.length === document.chapters.length) {
+      chapterIdByNodeKeyRef.current = mergeChapterIdByNodeKey(
+        chapterIdByNodeKeyRef.current,
+        chapterNodeKeys,
+        document.chapters.map((chapter) => chapter.id),
+      );
     }
 
-    paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
-      paragraphIdByNodeKeyRef.current,
-      paragraphNodeKeys,
-      document.paragraphs.map((paragraph) => paragraph.id),
-    );
-  }, [document, paragraphNodeKeys]);
+    if (paragraphNodeKeys.length === document.paragraphs.length) {
+      paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
+        paragraphIdByNodeKeyRef.current,
+        paragraphNodeKeys,
+        document.paragraphs.map((paragraph) => paragraph.id),
+      );
+    }
+  }, [chapterNodeKeys, document, paragraphNodeKeys]);
 
   useEffect(() => {
-    const nextTexts = getInitialParagraphTexts(document);
-    setParagraphTexts(nextTexts);
+    setStructureSnapshot({ chapters: [], paragraphs: [] });
+    setChapterNodeKeys([]);
     setParagraphNodeKeys([]);
-    setActiveParagraphNodeKey(null);
-    setLastSyncedSignature(toTextSyncSignature(nextTexts));
+    setActiveElement({ nodeKey: null, type: null });
+    setEmptyParagraphNodeKeys(new Set());
+    setLastSyncedSignature(toStructureSignature({ chapters: [], paragraphs: [] }));
     paragraphIdByNodeKeyRef.current = new Map();
+    chapterIdByNodeKeyRef.current = new Map();
+    chapterNodeKeySetRef.current = new Set();
     consumedScrollRequestNonceRef.current = null;
+    initialBaselineCapturedRef.current = false;
   }, [document?.documentId]);
 
   useEffect(() => {
-    if (!document) {
+    if (!document || structureSnapshot.chapters.length === 0) {
       return;
     }
 
-    const nextSignature = toTextSyncSignature(paragraphTexts);
-    if (nextSignature === lastSyncedSignature) {
+    const nextSignature = toStructureSignature(structureSnapshot);
+    const { shouldSync, nextBaselineCaptured } = shouldSyncStructure(
+      nextSignature,
+      lastSyncedSignature,
+      initialBaselineCapturedRef.current,
+    );
+    initialBaselineCapturedRef.current = nextBaselineCaptured;
+    if (!shouldSync) {
+      setLastSyncedSignature(nextSignature);
       return;
     }
 
     const handle = window.setTimeout(() => {
-      onSyncParagraphs(paragraphTexts.length > 0 ? paragraphTexts : [' ']);
+      const chapterInputs = buildChapterInputs(structureSnapshot.chapters, chapterIdByNodeKeyRef.current);
+      chapterIdByNodeKeyRef.current = mergeChapterIdByNodeKey(
+        chapterIdByNodeKeyRef.current,
+        structureSnapshot.chapters.map((chapter) => chapter.nodeKey),
+        chapterInputs.map((chapter) => chapter.id),
+      );
+
+      const chapterIdByNodeKey = new Map<string, string>();
+      chapterInputs.forEach((chapter, index) => {
+        if (chapter.id) {
+          chapterIdByNodeKey.set(structureSnapshot.chapters[index].nodeKey, chapter.id);
+        }
+      });
+
+      const fallbackChapterId = chapterInputs[0]?.id;
+
+      const paragraphInputs = buildParagraphInputs(
+        structureSnapshot.paragraphs,
+        paragraphIdByNodeKeyRef.current,
+        chapterIdByNodeKey,
+        fallbackChapterId,
+      );
+      paragraphIdByNodeKeyRef.current = mergeParagraphIdByNodeKey(
+        paragraphIdByNodeKeyRef.current,
+        structureSnapshot.paragraphs.map((paragraph) => paragraph.nodeKey),
+        paragraphInputs.map((paragraph) => paragraph.id),
+      );
+
+      onSyncStructure({
+        chapters: chapterInputs,
+        paragraphs: paragraphInputs,
+      });
       setLastSyncedSignature(nextSignature);
     }, 120);
 
     return () => {
       window.clearTimeout(handle);
     };
-  }, [document, lastSyncedSignature, onSyncParagraphs, paragraphTexts]);
+  }, [document, lastSyncedSignature, onSyncStructure, structureSnapshot]);
 
   useEffect(() => {
-    if (!document || !activeParagraphNodeKey) {
+    if (!document || activeElement.type !== 'paragraph' || !activeElement.nodeKey) {
       return;
     }
 
-    const activeIndex = paragraphNodeKeys.findIndex((nodeKey) => nodeKey === activeParagraphNodeKey);
+    const activeIndex = paragraphNodeKeys.findIndex((nodeKey) => nodeKey === activeElement.nodeKey);
     if (activeIndex < 0 || activeIndex >= document.paragraphs.length) {
       return;
     }
@@ -342,43 +786,7 @@ export function EditorPane({
     if (paragraphId && paragraphId !== activeParagraphId) {
       setActiveParagraphId(paragraphId);
     }
-  }, [activeParagraphId, activeParagraphNodeKey, document, paragraphNodeKeys, setActiveParagraphId]);
-
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor || !document) {
-      return;
-    }
-
-    const currentKeys = paragraphNodeKeysRef.current;
-    if (currentKeys.length === 0 || currentKeys.length !== document.paragraphs.length) {
-      return;
-    }
-
-    const idByKey = paragraphIdByNodeKeyRef.current;
-    if (idByKey.size !== document.paragraphs.length) {
-      return;
-    }
-
-    const keyById = new Map<string, string>();
-    idByKey.forEach((paragraphId, nodeKey) => {
-      keyById.set(paragraphId, nodeKey);
-    });
-
-    const desiredKeys = document.paragraphs.map((paragraph) => keyById.get(paragraph.id)).filter((key): key is string => Boolean(key));
-    if (desiredKeys.length !== currentKeys.length) {
-      return;
-    }
-
-    const alreadySynced = desiredKeys.every((nodeKey, index) => nodeKey === currentKeys[index]);
-    if (alreadySynced) {
-      return;
-    }
-
-    const nextKeys = reorderParagraphNodesByOrder(editor, desiredKeys);
-    paragraphNodeKeysRef.current = nextKeys;
-    setParagraphNodeKeys(nextKeys);
-  }, [document, paragraphNodeKeys]);
+  }, [activeElement, activeParagraphId, document, paragraphNodeKeys, setActiveParagraphId]);
 
   useEffect(() => {
     if (!scrollRequest || !document) {
@@ -416,6 +824,26 @@ export function EditorPane({
     consumedScrollRequestNonceRef.current = scrollRequest.nonce;
   }, [document, scrollRequest, paragraphNodeKeys]);
 
+  useEffect(() => {
+    const element = editorBodyRef.current;
+    if (!element) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (!(event.ctrlKey || event.metaKey)) {
+        return;
+      }
+      event.preventDefault();
+      onSetViewScale(event.deltaY > 0 ? 'macro' : 'micro');
+    };
+
+    element.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      element.removeEventListener('wheel', onWheel);
+    };
+  }, [onSetViewScale]);
+
   const initialConfig = useMemo(
     () => ({
       namespace: `litelizard-editor-${document?.documentId ?? 'empty'}`,
@@ -430,14 +858,50 @@ export function EditorPane({
         const root = $getRoot();
         root.clear();
 
-        const initialTexts = getInitialParagraphTexts(document);
-        for (const text of initialTexts) {
-          const paragraph = $createParagraphNode();
-          if (text.length > 0) {
-            paragraph.append($createTextNode(text));
-          }
-          root.append(paragraph);
+        if (!document || document.chapters.length === 0) {
+          const chapter = $createParagraphNode();
+          chapter.append($createTextNode('章1'));
+          root.append(chapter);
+          root.append($createParagraphNode());
+          chapterNodeKeySetRef.current = new Set([chapter.getKey()]);
+          return;
         }
+
+        const chapterSet = new Set<string>();
+        const chapterList = document.chapters.slice().sort((left, right) => left.order - right.order);
+        const paragraphsByChapterId = new Map<string, Array<{ text: string }>>();
+
+        document.paragraphs
+          .slice()
+          .sort((left, right) => left.order - right.order)
+          .forEach((paragraph) => {
+            const list = paragraphsByChapterId.get(paragraph.chapterId) ?? [];
+            list.push({ text: paragraph.light.text });
+            paragraphsByChapterId.set(paragraph.chapterId, list);
+          });
+
+        chapterList.forEach((chapter) => {
+          const chapterNode = $createParagraphNode();
+          chapterNode.append($createTextNode(chapter.title));
+          root.append(chapterNode);
+          chapterSet.add(chapterNode.getKey());
+
+          const chapterParagraphs = paragraphsByChapterId.get(chapter.id) ?? [];
+          if (chapterParagraphs.length === 0) {
+            root.append($createParagraphNode());
+            return;
+          }
+
+          chapterParagraphs.forEach((paragraph) => {
+            const paragraphNode = $createParagraphNode();
+            if (paragraph.text.length > 0) {
+              paragraphNode.append($createTextNode(paragraph.text));
+            }
+            root.append(paragraphNode);
+          });
+        });
+
+        chapterNodeKeySetRef.current = chapterSet;
       },
     }),
     [document],
@@ -462,34 +926,11 @@ export function EditorPane({
     );
   }
 
-  const onDropReorder = (activeKey: string, overKey: string) => {
-    const editor = editorRef.current;
-    if (!editor) {
-      return;
-    }
-
-    const currentKeys = paragraphNodeKeysRef.current;
-    const nextKeys = reorderParagraphNodes(editor, currentKeys, activeKey, overKey);
-    if (nextKeys === currentKeys) {
-      return;
-    }
-
-    const orderedIds = mapParagraphIdsByNodeKeys(
-      currentKeys,
-      nextKeys,
-      document.paragraphs.map((paragraph) => paragraph.id),
-      paragraphIdByNodeKeyRef.current,
-    );
-    if (orderedIds) {
-      onReorderParagraphs?.(orderedIds);
-    }
-  };
-
-  const activeParagraphIndex = activeParagraphId
-    ? document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId)
-    : -1;
-  const paragraphCount = paragraphTexts.length;
-  const charCount = paragraphTexts.reduce((sum, text) => sum + text.length, 0);
+  const activeParagraphIndex = activeParagraphId ? document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId) : -1;
+  const paragraphCount = document.paragraphs.length;
+  const charCount = document.paragraphs.reduce((sum, paragraph) => sum + paragraph.light.text.length, 0);
+  const macroSummary = buildMacroSummary(document);
+  const fallbackChapterNodeIndexes = buildFallbackChapterNodeIndexes(document);
 
   return (
     <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
@@ -500,41 +941,63 @@ export function EditorPane({
             <h1 className="editor-title">{document.title}</h1>
           </div>
           <div className="editor-meta">
+            <span>{document.chapters.length} 章</span>
             <span>{paragraphCount} 段落</span>
             {activeParagraphIndex >= 0 ? <span>注目 {activeParagraphIndex + 1}</span> : null}
           </div>
         </header>
 
-        <div className="editor-body">
-          <div className="editor-paragraph-list">
-            <LexicalComposer key={document.documentId} initialConfig={initialConfig}>
-              <LexicalEditorRefPlugin onReady={(editor) => (editorRef.current = editor)} />
+        <div className="editor-body" ref={editorBodyRef}>
+          {viewScale === 'macro' ? (
+            <div className="editor-macro-list">
+              {macroSummary.map((chapter, index) => (
+                <article key={chapter.id} className="editor-macro-card">
+                  <header className="editor-macro-card-header">
+                    <span className="editor-macro-card-index">C{String(index + 1).padStart(2, '0')}</span>
+                    <h3 className="editor-macro-card-title">{chapter.title}</h3>
+                  </header>
+                  <p className="editor-macro-card-preview">{chapter.preview}</p>
+                  <footer className="editor-macro-card-footer">{chapter.paragraphCount} 段落</footer>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="editor-paragraph-list">
+              <LexicalComposer key={document.documentId} initialConfig={initialConfig}>
+                <LexicalEditorRefPlugin onReady={(editor) => (editorRef.current = editor)} />
 
-              <ParagraphStatePlugin
-                onSnapshot={(texts, nodeKeys) => {
-                  setParagraphTexts(texts);
-                  setParagraphNodeKeys(nodeKeys);
-                }}
-                onActiveNodeKey={(nodeKey) => {
-                  setActiveParagraphNodeKey(nodeKey);
-                }}
-              />
+                <StructureStatePlugin
+                  chapterNodeKeySetRef={chapterNodeKeySetRef}
+                  fallbackChapterNodeIndexes={fallbackChapterNodeIndexes}
+                  onSnapshot={(snapshot, emptyKeys) => {
+                    setStructureSnapshot(snapshot);
+                    setChapterNodeKeys(snapshot.chapters.map((chapter) => chapter.nodeKey));
+                    setParagraphNodeKeys(snapshot.paragraphs.map((paragraph) => paragraph.nodeKey));
+                    setEmptyParagraphNodeKeys(emptyKeys);
+                  }}
+                  onActiveElement={(active) => {
+                    setActiveElement(active);
+                  }}
+                />
 
-              <ParagraphChromePlugin
-                paragraphNodeKeys={paragraphNodeKeys}
-                activeNodeKey={activeParagraphNodeKey}
-                onDropReorder={onDropReorder}
-              />
+                <StructureChromePlugin
+                  chapterNodeKeys={chapterNodeKeys}
+                  paragraphNodeKeys={paragraphNodeKeys}
+                  active={activeElement}
+                  emptyParagraphNodeKeys={emptyParagraphNodeKeys}
+                />
 
-              <HistoryPlugin />
+                <ChapterCommandPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
+                <HistoryPlugin />
 
-              <RichTextPlugin
-                contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
-                placeholder={<div className="editor-paragraph-placeholder">ここに本文を入力してください。</div>}
-                ErrorBoundary={RichTextErrorBoundary}
-              />
-            </LexicalComposer>
-          </div>
+                <RichTextPlugin
+                  contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
+                  placeholder={<div className="editor-paragraph-placeholder" />}
+                  ErrorBoundary={RichTextErrorBoundary}
+                />
+              </LexicalComposer>
+            </div>
+          )}
         </div>
 
         <footer className="editor-footer">
@@ -549,14 +1012,4 @@ export function EditorPane({
       </div>
     </section>
   );
-}
-
-function LexicalEditorRefPlugin({ onReady }: { onReady: (editor: LexicalEditor) => void }) {
-  const [editor] = useLexicalComposerContext();
-
-  useEffect(() => {
-    onReady(editor);
-  }, [editor, onReady]);
-
-  return null;
 }

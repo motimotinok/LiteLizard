@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
   collectStaleParagraphs,
   reorderParagraphsInDocument,
+  replaceDocumentStructureInDocument,
   replaceParagraphsInDocument,
   updateParagraphInDocument,
 } from './documentOps.js';
 
 export type EditorMode = 'writing' | 'structure' | 'reader';
+export type ViewScale = 'micro' | 'macro';
 
 interface AppState {
   rootPath: string | null;
@@ -18,6 +21,7 @@ interface AppState {
   dirty: boolean;
   apiKeyConfigured: boolean;
   editorMode: EditorMode;
+  viewScale: ViewScale;
   analysisLayerOpen: boolean;
   statusMessage: string;
   openFolder: () => Promise<void>;
@@ -29,9 +33,12 @@ interface AppState {
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
   replaceParagraphs: (paragraphTexts: string[]) => void;
+  syncDocumentStructure: (input: DocumentStructureInput) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
   setEditorMode: (mode: EditorMode) => void;
+  setViewScale: (viewScale: ViewScale) => void;
+  toggleViewScale: () => void;
   cycleEditorMode: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
@@ -72,6 +79,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   dirty: false,
   apiKeyConfigured: false,
   editorMode: 'writing',
+  viewScale: 'micro',
   analysisLayerOpen: false,
   statusMessage: '準備完了',
 
@@ -284,6 +292,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
+  syncDocumentStructure: (input) => {
+    const document = get().document;
+    if (!document) {
+      return;
+    }
+
+    set({
+      document: replaceDocumentStructureInDocument(document, input),
+      dirty: true,
+      statusMessage: '編集中',
+    });
+  },
+
   saveNow: async () => {
     const { currentFilePath, document, revision } = get();
     if (!currentFilePath || !document) {
@@ -413,6 +434,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       editorMode: mode,
       analysisLayerOpen: mode === 'writing' ? false : get().analysisLayerOpen,
     });
+  },
+
+  setViewScale: (viewScale: ViewScale) => {
+    set({ viewScale });
+  },
+
+  toggleViewScale: () => {
+    const viewScale = get().viewScale;
+    set({ viewScale: viewScale === 'micro' ? 'macro' : 'micro' });
   },
 
   cycleEditorMode: () => {

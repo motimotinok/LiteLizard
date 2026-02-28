@@ -86,6 +86,10 @@ function createParagraphId() {
   return `p_mock_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function createChapterId() {
+  return `c_mock_${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function isSameOrNestedPath(value: string, base: string) {
   const normalizedValue = normalizePath(value);
   const normalizedBase = normalizePath(base);
@@ -103,9 +107,10 @@ function toTitle(filePath: string) {
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
   const now = new Date().toISOString();
   const paragraphText = '新しい段落';
+  const chapterId = createChapterId();
 
   return {
-    version: 1,
+    version: 2,
     documentId: createDocumentId(),
     title,
     personaMode: 'general-reader',
@@ -115,9 +120,17 @@ function buildInitialDocument(filePath: string, title: string): LiteLizardDocume
       format: 'litelizard-json',
       originPath: filePath,
     },
+    chapters: [
+      {
+        id: chapterId,
+        order: 1,
+        title: '章1',
+      },
+    ],
     paragraphs: [
       {
         id: createParagraphId(),
+        chapterId,
         order: 1,
         light: {
           text: paragraphText,

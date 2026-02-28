@@ -443,8 +443,49 @@ textarea {
   gap: 12px;
 }
 
+.editor-macro-list {
+  width: min(75%, calc(80ch + 76px));
+  margin: 0 auto;
+  padding: 24px 20px 28px;
+  display: grid;
+  gap: 14px;
+}
+
 .editor-shell:not(.editor-shell-expanded) .editor-paragraph-list {
   width: min(92%, calc(80ch + 76px));
+}
+
+.editor-shell:not(.editor-shell-expanded) .editor-macro-list {
+  width: min(92%, calc(80ch + 76px));
+}
+
+.editor-chapter-row {
+  position: relative;
+  margin: 0;
+  padding: 12px 8px 6px 56px;
+  font-size: 24px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 800;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #111827;
+}
+
+.editor-chapter-row::before {
+  content: attr(data-chapter-index);
+  position: absolute;
+  left: 12px;
+  top: 17px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.editor-chapter-row-active {
+  background: #f7f9fc;
 }
 
 .editor-paragraph-row {
@@ -479,21 +520,6 @@ textarea {
   pointer-events: none;
 }
 
-.editor-paragraph-row::after {
-  content: '';
-  position: absolute;
-  left: 34px;
-  top: 15px;
-  width: 10px;
-  height: 16px;
-  border-radius: 2px;
-  opacity: 0;
-  background-image: radial-gradient(circle, #9ca3af 1.5px, transparent 1.6px);
-  background-size: 6px 6px;
-  background-position: 0 0;
-  cursor: grab;
-}
-
 .editor-paragraph-row:hover {
   background: #f8f9fb;
 }
@@ -508,11 +534,6 @@ textarea {
   background: #f2f4f8;
   border-color: #d9dde6;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
-}
-
-.editor-paragraph-row:hover::after,
-.editor-paragraph-row-dragging::after {
-  opacity: 1;
 }
 
 .editor-paragraph-textarea {
@@ -532,11 +553,59 @@ textarea {
 }
 
 .editor-paragraph-placeholder {
-  color: #98a2b3;
+  display: none;
+}
+
+.editor-paragraph-row-show-hint::after {
+  content: attr(data-command-hint);
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.2;
   pointer-events: none;
-  padding: 8px 8px 8px 56px;
-  line-height: 1.8;
-  font-size: 17px;
+  white-space: nowrap;
+}
+
+.editor-macro-card {
+  border: 1px solid #e6e9ef;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.editor-macro-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.editor-macro-card-index {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.06em;
+}
+
+.editor-macro-card-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.editor-macro-card-preview {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #475569;
+}
+
+.editor-macro-card-footer {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .editor-footer {
@@ -663,8 +732,7 @@ textarea {
   font-size: 12px;
 }
 
-.analysis-empty,
-.analysis-reader-placeholder {
+.analysis-empty {
   margin: 12px;
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -674,17 +742,6 @@ textarea {
   font-size: 13px;
 }
 
-.analysis-reader-placeholder h3 {
-  margin: 0 0 6px;
-  color: var(--text);
-  font-size: 14px;
-}
-
-.analysis-reader-placeholder p {
-  margin: 0;
-  line-height: 1.6;
-}
-
 .analysis-scroll {
   flex: 1;
   min-height: 0;
@@ -692,88 +749,6 @@ textarea {
   padding: 12px;
   display: grid;
   gap: 10px;
-}
-
-.analysis-section-block {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #fff;
-  padding: 10px;
-}
-
-.analysis-section-heading {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 800;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
-
-.score-list {
-  display: grid;
-  gap: 8px;
-}
-
-.score-item {
-  display: grid;
-  gap: 4px;
-}
-
-.score-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
-.score-bar-track {
-  width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: #ececec;
-  overflow: hidden;
-}
-
-.score-bar-fill {
-  height: 100%;
-  background: #111;
-}
-
-.role-list {
-  display: grid;
-  gap: 6px;
-}
-
-.role-item {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  font-size: 12px;
-}
-
-.role-item-active {
-  border-color: #111;
-  background: #f5f5f5;
-}
-
-.role-index {
-  font-family: ui-monospace, Menlo, Monaco, 'Courier New', monospace;
-  color: #666;
-}
-
-.role-label {
-  font-weight: 700;
-}
-
-.analysis-findings {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .analysis-shell-chat {
@@ -854,12 +829,6 @@ textarea {
   color: #6b7280;
 }
 
-.analysis-card-role {
-  font-size: 12px;
-  font-weight: 700;
-  color: #374151;
-}
-
 .analysis-card-actions {
   display: flex;
   align-items: center;
@@ -902,6 +871,36 @@ textarea {
   color: #6b7280;
 }
 
+.analysis-tag-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.analysis-tag {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 2px 8px;
+  color: #374151;
+  background: #f8fafc;
+}
+
+.analysis-tag-theme {
+  background: #ecfeff;
+  border-color: #bae6fd;
+  color: #155e75;
+}
+
+.analysis-tag-emotion {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
 .analysis-card-body {
   margin: 8px 0 0;
   font-size: 12px;
@@ -917,6 +916,13 @@ textarea {
   display: block;
   -webkit-line-clamp: unset;
   overflow: visible;
+}
+
+.analysis-card-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .workspace-statusline {
@@ -1065,6 +1071,21 @@ textarea {
     gap: 8px;
   }
 
+  .editor-macro-list {
+    padding: 16px 10px 20px;
+    gap: 10px;
+  }
+
+  .editor-chapter-row {
+    font-size: 20px;
+    padding: 10px 6px 6px 46px;
+  }
+
+  .editor-chapter-row::before {
+    left: 8px;
+    top: 14px;
+  }
+
   .editor-paragraph-row {
     min-height: 36px;
     padding: 6px 6px 6px 46px;
@@ -1077,21 +1098,15 @@ textarea {
     width: 14px;
   }
 
-  .editor-paragraph-row::after {
-    left: 26px;
-    top: 12px;
-    width: 8px;
-    height: 14px;
-  }
-
   .editor-paragraph-textarea {
     font-size: 16px;
     min-height: 1.8em;
   }
 
-  .editor-paragraph-placeholder {
-    font-size: 16px;
-    padding: 6px 6px 6px 46px;
+  .editor-paragraph-row-show-hint::after {
+    right: 8px;
+    top: 8px;
+    font-size: 11px;
   }
 
   .workspace-statusline {

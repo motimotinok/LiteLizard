@@ -22,6 +22,7 @@ export interface LizardData {
 export interface Paragraph {
   id: string;
   order: number;
+  chapterId: string;
   light: {
     text: string;
     charCount?: number;
@@ -29,8 +30,14 @@ export interface Paragraph {
   lizard: LizardData;
 }
 
+export interface Chapter {
+  id: string;
+  order: number;
+  title: string;
+}
+
 export interface LiteLizardDocument {
-  version: 1;
+  version: 2;
   documentId: string;
   title: string;
   personaMode: PersonaMode;
@@ -40,6 +47,7 @@ export interface LiteLizardDocument {
     format: 'litelizard-json' | 'markdown-md';
     originPath?: string;
   };
+  chapters: Chapter[];
   paragraphs: Paragraph[];
   meta?: {
     tags?: string[];

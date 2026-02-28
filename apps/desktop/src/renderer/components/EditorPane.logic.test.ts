@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { mapParagraphIdsByNodeKeys, mergeParagraphIdByNodeKey, reorderNodeKeys } from './EditorPane.js';
+import {
+  buildChapterInputs,
+  buildParagraphInputs,
+  mapParagraphIdsByNodeKeys,
+  mergeParagraphIdByNodeKey,
+  reorderNodeKeys,
+  shouldSyncStructure,
+} from './EditorPane.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
@@ -80,5 +87,53 @@ describe('EditorPane lexical helpers', () => {
     );
 
     expect(orderedIds).toEqual(['p_03', 'p_01', 'p_02']);
+  });
+
+  it('creates a fresh chapter id for unknown chapter node keys', () => {
+    const chapterInputs = buildChapterInputs(
+      [
+        { nodeKey: 'k_new', title: 'Inserted chapter' },
+        { nodeKey: 'k_existing', title: 'Existing chapter' },
+      ],
+      new Map([['k_existing', 'c_existing']]),
+    );
+
+    expect(chapterInputs[0].id).toMatch(/^c_/);
+    expect(chapterInputs[0].id).not.toBe('c_existing');
+    expect(chapterInputs[1].id).toBe('c_existing');
+  });
+
+  it('creates a fresh paragraph id for unknown paragraph node keys', () => {
+    const paragraphInputs = buildParagraphInputs(
+      [
+        { nodeKey: 'k_new', chapterNodeKey: 'c_a_key', text: 'Inserted paragraph' },
+        { nodeKey: 'k_existing', chapterNodeKey: 'c_a_key', text: 'Existing paragraph' },
+      ],
+      new Map([['k_existing', 'p_existing']]),
+      new Map([['c_a_key', 'c_a']]),
+      'c_a',
+    );
+
+    expect(paragraphInputs[0].id).toMatch(/^p_/);
+    expect(paragraphInputs[0].id).not.toBe('p_existing');
+    expect(paragraphInputs[1].id).toBe('p_existing');
+    expect(paragraphInputs[0].chapterId).toBe('c_a');
+  });
+
+  it('skips sync for initial baseline snapshot', () => {
+    const decision = shouldSyncStructure('sig_next', 'sig_prev', false);
+
+    expect(decision).toEqual({
+      shouldSync: false,
+      nextBaselineCaptured: true,
+    });
+  });
+
+  it('syncs only when signature changed after baseline captured', () => {
+    const same = shouldSyncStructure('sig_1', 'sig_1', true);
+    const changed = shouldSyncStructure('sig_2', 'sig_1', true);
+
+    expect(same.shouldSync).toBe(false);
+    expect(changed.shouldSync).toBe(true);
   });
 });

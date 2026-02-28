@@ -26,7 +26,7 @@ export const initialMockTree: FileNode[] = [
 
 export const initialMockDocuments: Record<string, LiteLizardDocument> = {
   [`${mockRootPath}/welcome.md`]: {
-    version: 1,
+    version: 2,
     documentId: 'doc_mock_welcome',
     title: 'welcome',
     personaMode: 'general-reader',
@@ -36,9 +36,17 @@ export const initialMockDocuments: Record<string, LiteLizardDocument> = {
       format: 'litelizard-json',
       originPath: `${mockRootPath}/welcome.md`,
     },
+    chapters: [
+      {
+        id: 'c_welcome1',
+        order: 1,
+        title: '章1',
+      },
+    ],
     paragraphs: [
       {
-        id: 'p_mock_welcome_1',
+        id: 'p_welcome1',
+        chapterId: 'c_welcome1',
         order: 1,
         light: {
           text: 'LiteLizardのモック環境です。ここでUI操作を確認できます。',
@@ -49,7 +57,8 @@ export const initialMockDocuments: Record<string, LiteLizardDocument> = {
         },
       },
       {
-        id: 'p_mock_welcome_2',
+        id: 'p_welcome2',
+        chapterId: 'c_welcome1',
         order: 2,
         light: {
           text: 'このデータはpreload内メモリに保持され、再起動で初期化されます。',
@@ -69,7 +78,7 @@ export const initialMockDocuments: Record<string, LiteLizardDocument> = {
     ],
   },
   [`${mockRootPath}/notes/ideas.md`]: {
-    version: 1,
+    version: 2,
     documentId: 'doc_mock_ideas',
     title: 'ideas',
     personaMode: 'general-reader',
@@ -79,9 +88,17 @@ export const initialMockDocuments: Record<string, LiteLizardDocument> = {
       format: 'litelizard-json',
       originPath: `${mockRootPath}/notes/ideas.md`,
     },
+    chapters: [
+      {
+        id: 'c_ideas01',
+        order: 1,
+        title: '章1',
+      },
+    ],
     paragraphs: [
       {
-        id: 'p_mock_ideas_1',
+        id: 'p_ideas01',
+        chapterId: 'c_ideas01',
         order: 1,
         light: {
           text: '次の改善案を箇条書きで追記する。',
