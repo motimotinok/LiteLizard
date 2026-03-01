@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../../types/documentStructure.js';
 import { EditorEmptyState } from './EditorEmptyState.js';
@@ -36,11 +36,10 @@ export function EditorPane({
   onCreateEssay,
   onOpenFolder,
 }: Props) {
-  const editorBodyRef = useRef<HTMLDivElement | null>(null);
+  const [editorBodyEl, setEditorBodyEl] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const element = editorBodyRef.current;
-    if (!element) {
+    if (!editorBodyEl) {
       return;
     }
 
@@ -52,11 +51,11 @@ export function EditorPane({
       onSetViewScale(event.deltaY > 0 ? 'macro' : 'micro');
     };
 
-    element.addEventListener('wheel', onWheel, { passive: false });
+    editorBodyEl.addEventListener('wheel', onWheel, { passive: false });
     return () => {
-      element.removeEventListener('wheel', onWheel);
+      editorBodyEl.removeEventListener('wheel', onWheel);
     };
-  }, [onSetViewScale]);
+  }, [onSetViewScale, editorBodyEl]);
 
   if (!document) {
     return (
@@ -89,7 +88,7 @@ export function EditorPane({
           </div>
         </header>
 
-        <div className="editor-body" ref={editorBodyRef}>
+        <div className="editor-body" ref={setEditorBodyEl}>
           {viewScale === 'macro' ? (
             <MacroView document={document} onReorderChapters={onReorderChapters} />
           ) : (

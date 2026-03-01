@@ -1,32 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { $getRoot, $isParagraphNode } from 'lexical';
+import { $getRoot, $isParagraphNode, type LexicalEditor } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { useDndMonitor, useSortable } from '@dnd-kit/sortable';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 interface HandleProps {
   nodeKey: string;
   top: number;
+  editor: LexicalEditor;
 }
 
-function ParagraphHandle({ nodeKey, top }: HandleProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: nodeKey });
+// Lexical の段落 DOM 要素をソータブルアイテムとして登録し、
+// ハンドルボタンをドラッグ起点にする。
+// これにより dnd-kit の collision detection が行全体を基準に動作する。
+function ParagraphSortableHandle({ nodeKey, top, editor }: HandleProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: nodeKey });
+
+  // Lexical の段落要素を sortable アイテムとして登録
+  useEffect(() => {
+    const el = editor.getElementByKey(nodeKey);
+    if (!el) return;
+    setNodeRef(el as HTMLElement);
+  }, [nodeKey, editor, setNodeRef]);
+
+  // ドラッグ中のトランスフォームを Lexical 要素に直接適用
+  useEffect(() => {
+    const el = editor.getElementByKey(nodeKey);
+    if (!el) return;
+    const h = el as HTMLElement;
+    h.style.transform = CSS.Transform.toString(transform) ?? '';
+    h.style.transition = transition ?? '';
+    h.style.opacity = isDragging ? '0.4' : '';
+    h.style.zIndex = isDragging ? '100' : '';
+    h.style.position = isDragging ? 'relative' : '';
+    return () => {
+      h.style.transform = '';
+      h.style.transition = '';
+      h.style.opacity = '';
+      h.style.zIndex = '';
+      h.style.position = '';
+    };
+  }, [nodeKey, editor, transform, transition, isDragging]);
 
   const style: React.CSSProperties = {
     position: 'absolute',
     top,
     left: -28,
     width: 20,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 100 : 1,
   };
 
   return (
     <button
-      ref={setNodeRef}
+      ref={setActivatorNodeRef}
       style={style}
       className="paragraph-drag-handle"
       type="button"
@@ -78,7 +113,7 @@ export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
   }, [editor, paragraphNodeKeys, containerRef]);
 
   useDndMonitor({
-    onDragEnd({ active, over }) {
+    onDragEnd({ active, over }: DragEndEvent) {
       if (!over || active.id === over.id) return;
       const activeKey = String(active.id);
       const overKey = String(over.id);
@@ -109,7 +144,9 @@ export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
     <>
       {paragraphNodeKeys.map((key) => {
         const top = positions.get(key);
-        return top !== undefined ? <ParagraphHandle key={key} nodeKey={key} top={top} /> : null;
+        return top !== undefined ? (
+          <ParagraphSortableHandle key={key} nodeKey={key} top={top} editor={editor} />
+        ) : null;
       })}
     </>,
     container,

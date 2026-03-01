@@ -436,6 +436,7 @@ textarea {
 }
 
 .editor-paragraph-list {
+  position: relative;
   width: min(75%, calc(80ch + 76px));
   margin: 0 auto;
   padding: 24px 20px 28px;
