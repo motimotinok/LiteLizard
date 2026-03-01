@@ -3,6 +3,7 @@ import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
   collectStaleParagraphs,
+  reorderChaptersInDocument,
   reorderParagraphsInDocument,
   replaceDocumentStructureInDocument,
   replaceParagraphsInDocument,
@@ -32,6 +33,7 @@ interface AppState {
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
+  reorderChapters: (orderedIds: string[]) => void;
   replaceParagraphs: (paragraphTexts: string[]) => void;
   syncDocumentStructure: (input: DocumentStructureInput) => void;
   saveNow: () => Promise<void>;
@@ -276,6 +278,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       document: reorderParagraphsInDocument(document, orderedIds),
       dirty: true,
       statusMessage: '段落順を変更しました',
+    });
+  },
+
+  reorderChapters: (orderedIds: string[]) => {
+    const document = get().document;
+    if (!document) {
+      return;
+    }
+
+    set({
+      document: reorderChaptersInDocument(document, orderedIds),
+      dirty: true,
+      statusMessage: '章順を変更しました',
     });
   },
 

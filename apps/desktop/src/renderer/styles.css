@@ -603,6 +603,44 @@ textarea {
   color: #475569;
 }
 
+.macro-card-preview-dense {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #374151;
+  word-break: break-all;
+}
+
+.macro-card-drag-handle,
+.paragraph-drag-handle {
+  background: none;
+  border: none;
+  cursor: grab;
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.macro-card-drag-handle:hover,
+.paragraph-drag-handle:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.macro-card-drag-handle:active,
+.paragraph-drag-handle:active {
+  cursor: grabbing;
+}
+
+.editor-macro-card-dragging {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
 .editor-macro-card-footer {
   font-size: 12px;
   color: #64748b;

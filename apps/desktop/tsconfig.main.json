@@ -7,5 +7,8 @@
     "declaration": false
   },
   "include": ["src/main/**/*.ts"],
-  "exclude": ["src/main/**/*.test.ts"]
+  "exclude": ["src/main/**/*.test.ts"],
+  "references": [
+    { "path": "../../packages/shared" }
+  ]
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
-import { EditorPane } from './components/EditorPane.js';
+import { EditorPane } from './components/editor/index.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
 import { useAppStore } from './store/useAppStore.js';
 
@@ -22,6 +22,7 @@ export function App() {
     deleteEntry,
     loadDocument,
     reorderParagraphs,
+    reorderChapters,
     syncDocumentStructure,
     saveNow,
     cycleEditorMode,
@@ -151,6 +152,7 @@ export function App() {
             onSetViewScale={setViewScale}
             onSyncStructure={(input) => syncDocumentStructure(input)}
             onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
+            onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
             onCreateEssay={() => {
               if (!rootPath) {
                 void openFolder();
