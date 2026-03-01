@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   buildChapterInputs,
   buildParagraphInputs,
+  shouldSyncStructure,
+} from './editor/utils/structureBuilder.js';
+import {
   mapParagraphIdsByNodeKeys,
   mergeParagraphIdByNodeKey,
-  reorderNodeKeys,
-  shouldSyncStructure,
-} from './EditorPane.js';
+} from './editor/utils/nodeKeyMapping.js';
+import { reorderByKey } from '../utils/arrayUtils.js';
 
 describe('EditorPane lexical helpers', () => {
   it('reorders node keys', () => {
     const source = ['k_a', 'k_b', 'k_c'];
 
-    const result = reorderNodeKeys(source, 'k_c', 'k_a');
+    const result = reorderByKey(source, 'k_c', 'k_a');
 
     expect(result).toEqual(['k_c', 'k_a', 'k_b']);
   });
@@ -20,7 +22,7 @@ describe('EditorPane lexical helpers', () => {
   it('returns same array when reorder target is invalid', () => {
     const source = ['k_a', 'k_b'];
 
-    const result = reorderNodeKeys(source, 'k_x', 'k_b');
+    const result = reorderByKey(source, 'k_x', 'k_b');
 
     expect(result).toBe(source);
   });

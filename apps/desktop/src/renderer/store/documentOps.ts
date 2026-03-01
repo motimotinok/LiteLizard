@@ -122,6 +122,41 @@ export function replaceDocumentStructureInDocument(
   };
 }
 
+export function reorderChaptersInDocument(
+  document: LiteLizardDocument,
+  orderedIds: string[],
+): LiteLizardDocument {
+  const map = new Map(document.chapters.map((c) => [c.id, c]));
+  const chapters = orderedIds
+    .map((id) => map.get(id))
+    .filter((c): c is Chapter => Boolean(c))
+    .map((c, index) => ({ ...c, order: index + 1 }));
+
+  const grouped = new Map<string, typeof document.paragraphs>();
+  document.paragraphs.forEach((p) => {
+    const list = grouped.get(p.chapterId) ?? [];
+    list.push(p);
+    grouped.set(p.chapterId, list);
+  });
+
+  const paragraphs: typeof document.paragraphs = [];
+  chapters.forEach((chapter) => {
+    const chapterParagraphs = (grouped.get(chapter.id) ?? [])
+      .slice()
+      .sort((a, b) => a.order - b.order);
+    chapterParagraphs.forEach((p) => {
+      paragraphs.push({ ...p, order: paragraphs.length + 1 });
+    });
+  });
+
+  return {
+    ...document,
+    updatedAt: new Date().toISOString(),
+    chapters,
+    paragraphs,
+  };
+}
+
 export function replaceParagraphsInDocument(
   document: LiteLizardDocument,
   nextParagraphTexts: string[],

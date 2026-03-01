@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
-import { reorderNodeKeys } from './EditorPane.js';
+import { reorderByKey } from '../utils/arrayUtils.js';
 
 interface Props {
   document: LiteLizardDocument | null;
@@ -79,7 +79,7 @@ export function AnalysisPane({
     if (!document || !onReorderParagraphs) {
       return;
     }
-    const nextOrder = reorderNodeKeys(orderedParagraphIds, activeId, overId);
+    const nextOrder = reorderByKey(orderedParagraphIds, activeId, overId);
     if (nextOrder === orderedParagraphIds) {
       return;
     }
