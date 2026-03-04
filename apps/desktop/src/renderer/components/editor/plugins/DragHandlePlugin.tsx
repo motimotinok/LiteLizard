@@ -1,42 +1,103 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { $getRoot, $isParagraphNode } from 'lexical';
+import { $getRoot, $isParagraphNode, type LexicalEditor } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { useDndMonitor, useSortable } from '@dnd-kit/sortable';
+import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+interface Position {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
 
 interface HandleProps {
   nodeKey: string;
-  top: number;
+  position: Position;
+  editor: LexicalEditor;
 }
 
-function ParagraphHandle({ nodeKey, top }: HandleProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: nodeKey });
+// 段落と同じ位置・サイズの wrapper を `position: absolute` で重ねて配置する。
+// wrapper に dnd-kit の transform を適用することで、DnD 中にハンドルも段落と一緒に追従する。
+// wrapper は pointer-events: none で編集を妨げない。
+function ParagraphSortableHandle({ nodeKey, position, editor }: HandleProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: nodeKey });
 
-  const style: React.CSSProperties = {
+  // Lexical の段落要素を sortable アイテムとして登録
+  useEffect(() => {
+    const el = editor.getElementByKey(nodeKey);
+    if (!el) return;
+    setNodeRef(el as HTMLElement);
+  }, [nodeKey, editor, setNodeRef]);
+
+  // ドラッグ中のトランスフォームを Lexical 要素に直接適用
+  useEffect(() => {
+    const el = editor.getElementByKey(nodeKey);
+    if (!el) return;
+    const h = el as HTMLElement;
+    h.style.transform = CSS.Transform.toString(transform) ?? '';
+    h.style.transition = transition ?? '';
+    h.style.opacity = isDragging ? '0.4' : '';
+    h.style.zIndex = isDragging ? '100' : '';
+    h.style.position = isDragging ? 'relative' : '';
+    return () => {
+      h.style.transform = '';
+      h.style.transition = '';
+      h.style.opacity = '';
+      h.style.zIndex = '';
+      h.style.position = '';
+    };
+  }, [nodeKey, editor, transform, transition, isDragging]);
+
+  const { top, left, width, height } = position;
+
+  // 段落の左端から 28px 左側まで wrapper を伸ばし、
+  // フレックスで先頭に置いたハンドルを垂直中央揃えにする。
+  // wrapper は pointer-events: none で編集を妨げず、transform で DnD 追従。
+  const wrapperStyle: React.CSSProperties = {
     position: 'absolute',
     top,
-    left: -28,
+    left: left - 28,
+    width: width + 28,
+    height,
+    display: 'flex',
+    alignItems: 'center',
+    pointerEvents: 'none',
+    transform: CSS.Transform.toString(transform) ?? undefined,
+    transition: transition ?? undefined,
+  };
+
+  const handleStyle: React.CSSProperties = {
     width: 20,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-    zIndex: isDragging ? 100 : 1,
+    flexShrink: 0,
+    pointerEvents: 'auto',
   };
 
   return (
-    <button
-      ref={setNodeRef}
-      style={style}
-      className="paragraph-drag-handle"
-      type="button"
-      aria-label="段落をドラッグして並び替え"
-      title="ドラッグして並び替え"
-      {...attributes}
-      {...listeners}
-    >
-      ⋮⋮
-    </button>
+    <div style={wrapperStyle}>
+      <button
+        ref={setActivatorNodeRef}
+        style={handleStyle}
+        className="paragraph-drag-handle"
+        type="button"
+        aria-label="段落をドラッグして並び替え"
+        title="ドラッグして並び替え"
+        {...attributes}
+        {...listeners}
+      >
+        ⋮⋮
+      </button>
+    </div>
   );
 }
 
@@ -47,19 +108,25 @@ interface Props {
 
 export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
   const [editor] = useLexicalComposerContext();
-  const [positions, setPositions] = useState<Map<string, number>>(new Map());
+  const [positions, setPositions] = useState<Map<string, Position>>(new Map());
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const update = () => {
-      const containerTop = container.getBoundingClientRect().top;
-      const next = new Map<string, number>();
+      const containerRect = container.getBoundingClientRect();
+      const next = new Map<string, Position>();
       paragraphNodeKeys.forEach((key) => {
         const el = editor.getElementByKey(key);
         if (el) {
-          next.set(key, el.getBoundingClientRect().top - containerTop + container.scrollTop);
+          const rect = el.getBoundingClientRect();
+          next.set(key, {
+            top: rect.top - containerRect.top + container.scrollTop,
+            left: rect.left - containerRect.left + container.scrollLeft,
+            width: rect.width,
+            height: rect.height,
+          });
         }
       });
       setPositions(next);
@@ -78,7 +145,7 @@ export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
   }, [editor, paragraphNodeKeys, containerRef]);
 
   useDndMonitor({
-    onDragEnd({ active, over }) {
+    onDragEnd({ active, over }: DragEndEvent) {
       if (!over || active.id === over.id) return;
       const activeKey = String(active.id);
       const overKey = String(over.id);
@@ -108,8 +175,10 @@ export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
   return createPortal(
     <>
       {paragraphNodeKeys.map((key) => {
-        const top = positions.get(key);
-        return top !== undefined ? <ParagraphHandle key={key} nodeKey={key} top={top} /> : null;
+        const pos = positions.get(key);
+        return pos !== undefined ? (
+          <ParagraphSortableHandle key={key} nodeKey={key} position={pos} editor={editor} />
+        ) : null;
       })}
     </>,
     container,

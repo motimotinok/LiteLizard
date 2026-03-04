@@ -4,6 +4,20 @@ import { AnalysisPane } from './components/AnalysisPane.js';
 import { EditorPane } from './components/editor/index.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
 import { useAppStore } from './store/useAppStore.js';
+import { useResizablePanel } from './hooks/useResizablePanel.js';
+
+function DoorIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      {/* 外枠 */}
+      <rect x="2.5" y="1.5" width="13" height="15" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+      {/* ヒンジ側の縦線（左から1/3） */}
+      <line x1="7" y1="1.5" x2="7" y2="16.5" stroke="currentColor" strokeWidth="1.2" />
+      {/* ドアノブ */}
+      <circle cx="11.5" cy="9" r="1.1" fill="currentColor" />
+    </svg>
+  );
+}
 
 export function App() {
   const {
@@ -12,7 +26,6 @@ export function App() {
     currentFilePath,
     document: currentDocument,
     dirty,
-    statusMessage,
     editorMode,
     viewScale,
     openFolder,
@@ -30,8 +43,12 @@ export function App() {
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
+  const [explorerOpen, setExplorerOpen] = useState(true);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
+
+  const explorerPanel = useResizablePanel(260, 160, 480);
+  const chatPanel = useResizablePanel(340, 240, 600);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -106,86 +123,109 @@ export function App() {
 
   return (
     <div className="workspace-root">
-      <div className="workspace-left">
-        <LeftIconRail />
-        <ExplorerPane
-          rootPath={rootPath}
-          tree={tree}
-          currentFilePath={currentFilePath}
-          onOpenFolder={() => void openFolder()}
-          onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
-          onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
-          onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
-          onSelectFile={(path) => void loadDocument(path)}
-        />
-      </div>
-
-      <main className="workspace-main">
-        <div className="workspace-toolbar">
-          <div className="workspace-toolbar-left">
-            <span className={dirty ? 'toolbar-badge toolbar-badge-dirty' : 'toolbar-badge'}>
-              {dirty ? '未保存' : '保存済み'}
-            </span>
-            <span className="toolbar-text">{statusMessage}</span>
-          </div>
-
-          <div className="workspace-toolbar-right">
-            <button
-              className={chatPanelOpen ? 'action-button action-button-primary' : 'action-button'}
-              onClick={() => setChatPanelOpen((current) => !current)}
-              title="Cmd/Ctrl+Shift+A"
-            >
-              チャット {chatPanelOpen ? 'ON' : 'OFF'}
-            </button>
-          </div>
+      <header className="global-header">
+        <div className="global-header-left">
+          <button
+            className={explorerOpen ? 'panel-toggle is-active' : 'panel-toggle'}
+            onClick={() => setExplorerOpen((v) => !v)}
+            title="エクスプローラー"
+          >
+            <DoorIcon />
+          </button>
         </div>
 
-        <div className={chatPanelOpen ? 'workspace-content with-chat' : 'workspace-content no-chat'}>
-          <EditorPane
-            isExpanded={!chatPanelOpen}
-            document={currentDocument}
-            dirty={dirty}
-            activeParagraphId={activeParagraphId}
-            scrollRequest={scrollRequest}
-            setActiveParagraphId={setActiveParagraphId}
-            viewScale={viewScale}
-            onSetViewScale={setViewScale}
-            onSyncStructure={(input) => syncDocumentStructure(input)}
-            onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
-            onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
-            onCreateEssay={() => {
-              if (!rootPath) {
-                void openFolder();
-                return;
-              }
-              void createDocument('Untitled', rootPath);
-            }}
-            onOpenFolder={() => void openFolder()}
-          />
-
-          {chatPanelOpen ? (
-            <aside className="chat-shell" aria-label="chat-panel">
-              <div className="chat-body">
-                <AnalysisPane
-                  document={currentDocument}
-                  activeParagraphId={activeParagraphId}
-                  onSetActiveParagraphId={setActiveParagraphId}
-                  onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
-                  onRequestScrollToParagraph={(paragraphId) => {
-                    setScrollRequest({ paragraphId, nonce: Date.now() });
-                  }}
-                />
-              </div>
-            </aside>
+        <div className="global-header-center">
+          {currentDocument ? (
+            <div className="global-tab">{currentDocument.title}</div>
           ) : null}
         </div>
 
-        <div className="workspace-statusline">
-          <span>モード: {modeLabel}</span>
-          <span>視点: {viewScale === 'micro' ? 'ミクロ' : 'マクロ'}</span>
-          <span>Cmd/Ctrl+Shift+M でモード切替</span>
+        <div className="global-header-right">
+          <button
+            className={chatPanelOpen ? 'panel-toggle is-active' : 'panel-toggle'}
+            onClick={() => setChatPanelOpen((current) => !current)}
+            title="チャット (Cmd/Ctrl+Shift+A)"
+          >
+            <DoorIcon />
+          </button>
         </div>
-      </main>
+      </header>
+
+      <div className="workspace-body">
+        <div className="workspace-left">
+          <LeftIconRail />
+          {explorerOpen && (
+            <ExplorerPane
+              rootPath={rootPath}
+              tree={tree}
+              currentFilePath={currentFilePath}
+              style={{ width: explorerPanel.width }}
+              onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
+              onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
+              onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
+              onSelectFile={(path) => void loadDocument(path)}
+            />
+          )}
+          {explorerOpen && (
+            <div
+              className="panel-resizer"
+              onMouseDown={(e) => explorerPanel.onMouseDown(e, 1)}
+            />
+          )}
+        </div>
+
+        <main className="workspace-main">
+          <div className={chatPanelOpen ? 'workspace-content with-chat' : 'workspace-content no-chat'}>
+            <EditorPane
+              isExpanded={!chatPanelOpen}
+              document={currentDocument}
+              dirty={dirty}
+              activeParagraphId={activeParagraphId}
+              scrollRequest={scrollRequest}
+              setActiveParagraphId={setActiveParagraphId}
+              viewScale={viewScale}
+              onSetViewScale={setViewScale}
+              onSyncStructure={(input) => syncDocumentStructure(input)}
+              onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
+              onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
+              onCreateEssay={() => {
+                if (!rootPath) {
+                  void openFolder();
+                  return;
+                }
+                void createDocument('Untitled', rootPath);
+              }}
+              onOpenFolder={() => void openFolder()}
+            />
+
+            {chatPanelOpen ? (
+              <aside className="chat-shell" style={{ width: chatPanel.width }} aria-label="chat-panel">
+                <div
+                  className="panel-resizer panel-resizer-left"
+                  onMouseDown={(e) => chatPanel.onMouseDown(e, -1)}
+                />
+                <div className="chat-body">
+                  <AnalysisPane
+                    document={currentDocument}
+                    activeParagraphId={activeParagraphId}
+                    onSetActiveParagraphId={setActiveParagraphId}
+                    onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
+                    onRequestScrollToParagraph={(paragraphId) => {
+                      setScrollRequest({ paragraphId, nonce: Date.now() });
+                    }}
+                  />
+                </div>
+              </aside>
+            ) : null}
+          </div>
+
+          <div className="workspace-statusline">
+            <span>モード: {modeLabel}</span>
+            <span>視点: {viewScale === 'micro' ? 'ミクロ' : 'マクロ'}</span>
+            <span>Cmd/Ctrl+Shift+M でモード切替</span>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
