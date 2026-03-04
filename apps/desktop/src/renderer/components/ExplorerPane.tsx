@@ -5,7 +5,7 @@ interface Props {
   rootPath: string | null;
   tree: FileNode[];
   currentFilePath: string | null;
-  onOpenFolder: () => void;
+  style?: React.CSSProperties;
   onCreateEntry: (parentPath: string, type: 'file' | 'folder', name: string) => void;
   onRenameEntry: (targetPath: string, nextName: string) => void;
   onDeleteEntry: (targetPath: string) => void;
@@ -27,22 +27,6 @@ interface ContextMenuState {
   y: number;
   targetPath: string;
   targetType: 'file' | 'directory';
-}
-
-function DocumentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden>
-      <path
-        d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm6 1.5V9h4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M9 13.2h6M9 16.7h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function FolderIcon() {
@@ -172,7 +156,7 @@ export function ExplorerPane({
   rootPath,
   tree,
   currentFilePath,
-  onOpenFolder,
+  style,
   onCreateEntry,
   onRenameEntry,
   onDeleteEntry,
@@ -256,58 +240,45 @@ export function ExplorerPane({
   const canCreate = Boolean(rootPath);
 
   return (
-    <aside className="explorer-layout" data-testid="file-browser-pane">
+    <aside className="explorer-layout" style={style} data-testid="file-browser-pane">
       <div className="explorer-panel">
-        <div className="explorer-header">
-          <div className="explorer-title-row">
-            <div className="explorer-title-wrap" data-testid="explorer-brand">
-              <span className="explorer-brand-icon" aria-hidden>
-                <DocumentIcon />
-              </span>
-              <div className="explorer-title">LiteLizard</div>
-            </div>
-            <div className="explorer-header-actions">
-              <button className="icon-button" onClick={onOpenFolder} title="フォルダを開く">
-                <FolderIcon />
-              </button>
-              <div className="explorer-plus-wrap">
-                <button
-                  className="icon-button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setContextMenu(null);
-                    setQuickCreateOpen((value) => !value);
-                  }}
-                  disabled={!canCreate}
-                  title="新規作成"
-                >
-                  ＋
-                </button>
+        <div className="explorer-panel-toolbar">
+          <div className="explorer-plus-wrap">
+            <button
+              className="icon-button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setContextMenu(null);
+                setQuickCreateOpen((value) => !value);
+              }}
+              disabled={!canCreate}
+              title="新規作成"
+            >
+              ＋
+            </button>
 
-                {quickCreateOpen && rootPath ? (
-                  <div className="explorer-popover" onClick={(event) => event.stopPropagation()}>
-                    <button
-                      className="menu-item"
-                      onClick={() => {
-                        openCreatePrompt(rootPath, 'file');
-                        setQuickCreateOpen(false);
-                      }}
-                    >
-                      新規ファイル
-                    </button>
-                    <button
-                      className="menu-item"
-                      onClick={() => {
-                        openCreatePrompt(rootPath, 'folder');
-                        setQuickCreateOpen(false);
-                      }}
-                    >
-                      新規フォルダ
-                    </button>
-                  </div>
-                ) : null}
+            {quickCreateOpen && rootPath ? (
+              <div className="explorer-popover" onClick={(event) => event.stopPropagation()}>
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    openCreatePrompt(rootPath, 'file');
+                    setQuickCreateOpen(false);
+                  }}
+                >
+                  新規ファイル
+                </button>
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    openCreatePrompt(rootPath, 'folder');
+                    setQuickCreateOpen(false);
+                  }}
+                >
+                  新規フォルダ
+                </button>
               </div>
-            </div>
+            ) : null}
           </div>
         </div>
 

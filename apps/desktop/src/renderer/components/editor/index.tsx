@@ -67,27 +67,11 @@ export function EditorPane({
     );
   }
 
-  const activeParagraphIndex = activeParagraphId
-    ? document.paragraphs.findIndex((paragraph) => paragraph.id === activeParagraphId)
-    : -1;
-  const paragraphCount = document.paragraphs.length;
   const charCount = document.paragraphs.reduce((sum, paragraph) => sum + paragraph.light.text.length, 0);
 
   return (
     <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
       <div className="editor-frame">
-        <header className="editor-header">
-          <div className="editor-title-wrap">
-            <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
-            <h1 className="editor-title">{document.title}</h1>
-          </div>
-          <div className="editor-meta">
-            <span>{document.chapters.length} 章</span>
-            <span>{paragraphCount} 段落</span>
-            {activeParagraphIndex >= 0 ? <span>注目 {activeParagraphIndex + 1}</span> : null}
-          </div>
-        </header>
-
         <div className="editor-body" ref={setEditorBodyEl}>
           {viewScale === 'macro' ? (
             <MacroView document={document} onReorderChapters={onReorderChapters} />
@@ -106,10 +90,6 @@ export function EditorPane({
         <footer className="editor-footer">
           <div className="editor-footer-left">
             <span>{charCount} 文字</span>
-          </div>
-          <div className="editor-footer-right">
-            <span>{dirty ? '未保存' : '保存済み'}</span>
-            <span className={dirty ? 'save-dot save-dot-dirty' : 'save-dot'} />
           </div>
         </footer>
       </div>
