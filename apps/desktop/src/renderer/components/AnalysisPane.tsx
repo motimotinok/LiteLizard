@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
 import { reorderByKey } from '../utils/arrayUtils.js';
+import { useAppStore } from '../store/useAppStore.js';
 
 interface Props {
   document: LiteLizardDocument | null;
@@ -45,6 +46,14 @@ export function AnalysisPane({
   onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
+  const runAnalysis = useAppStore((s) => s.runAnalysis);
+  const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
+  const apiKeyConfigured = useAppStore((s) => s.apiKeyConfigured);
+
+  const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
+  const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
+  const generateAllDisabled = staleCount === 0 || hasPending || !apiKeyConfigured;
+
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
   const [draggingParagraphId, setDraggingParagraphId] = useState<string | null>(null);
   const [dropTargetParagraphId, setDropTargetParagraphId] = useState<string | null>(null);
@@ -98,6 +107,23 @@ export function AnalysisPane({
             <p className="analysis-subtitle">保存済みの生成内容のみ表示</p>
           </div>
         </div>
+        <button
+          type="button"
+          className="analysis-generate-btn"
+          onClick={runAnalysis}
+          disabled={generateAllDisabled}
+          title={
+            !apiKeyConfigured
+              ? 'APIキーが未設定です'
+              : hasPending
+                ? '解析実行中です'
+                : staleCount === 0
+                  ? '再解析が必要な段落はありません'
+                  : `${staleCount}件の段落を解析`
+          }
+        >
+          生成
+        </button>
       </header>
 
       {!document ? (
@@ -146,6 +172,20 @@ export function AnalysisPane({
                     </div>
 
                     <div className="analysis-card-actions">
+                      <button
+                        type="button"
+                        className="analysis-card-regen-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          runAnalysisFor(paragraph.id);
+                        }}
+                        disabled={paragraph.lizard.status === 'pending' || hasPending || !apiKeyConfigured}
+                        title="この段落だけ再解析"
+                        aria-label={`P${index + 1} を再解析`}
+                      >
+                        ↺
+                      </button>
+
                       <button
                         type="button"
                         className="analysis-card-toggle"

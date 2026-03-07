@@ -1,7 +1,7 @@
 # LiteLizard タスク管理
 
 > **目標**: GitHub Pages に MVP を公開する（`/liteLizard/` で動くデモ）
-> **最終更新**: 2026-03-05
+> **最終更新**: 2026-03-07
 
 ---
 
@@ -12,11 +12,11 @@
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[T1] ブラウザ起動時にモックAPIを自動注入する
-ファイル : apps/desktop/src/renderer/main.tsx
-内容     : window.litelizard 未定義時に createMockPreloadApi() をセット
+[T3] 起動時にサンプル文書を自動で開く
+ファイル : apps/desktop/src/renderer/store/useAppStore.ts or App.tsx
+内容     : 起動直後に loadDocument(mockRootPath + '/welcome.md') を自動実行
 工数     : 30分
-完了条件 : npm run dev 後にブラウザで白画面にならずアプリが起動する
+完了条件 : ページを開いた瞬間にエディターと文章が表示されている
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -31,22 +31,6 @@
 - 新規タスクはWORKSPACEから抽出後、優先度を判断して適切な位置に挿入する
 
 ---
-
-### [T1] ブラウザ起動時にモックAPIを自動注入する
-- **ファイル**: `apps/desktop/src/renderer/main.tsx`
-- **内容**: `window.litelizard` が未定義のとき `createMockPreloadApi()` をセット
-- **工数**: 30分
-- **完了条件**: `npm run dev` 後にブラウザで白画面にならずアプリが起動する
-- **状態**: ⬜ 未着手
-
-### [T2] AnalysisPane に「生成」ボタンを追加する
-- **ファイル**: `apps/desktop/src/renderer/components/AnalysisPane.tsx`
-- **内容**: ヘッダーに「生成」ボタン → `runAnalysis()` 呼び出し。stale=0件 or pending中は disabled
-- **工数**: 1時間
-- **完了条件**: ボタンを押すと段落カードに解析結果（emotion/theme）が表示される
-- **状態**: ⬜ 未着手
-
-> T1・T2 が完了するとブラウザでアプリが起動・解析デモができるようになる
 
 ### [T3] 起動時にサンプル文書を自動で開く
 - **ファイル**: `apps/desktop/src/renderer/store/useAppStore.ts` or `App.tsx`
@@ -133,3 +117,5 @@
 - [x] `createMockPreloadApi()` の完全実装（解析モック込み）
 - [x] MVP 公開計画ドキュメント作成（`docs/mvp_github_pages_readiness.md`）
 - [x] PROJECTMEMORY/ タスク管理システム構築（TASKS / WORKSPACE / DECISIONS / ARCHIVE）
+- [x] [T1] ブラウザ起動時にモックAPIを自動注入する（main.tsx + vite.config.ts）
+- [x] [T2] AnalysisPane に「生成」ボタン・カード個別「↺」ボタンを追加（runAnalysis / runAnalysisFor）
