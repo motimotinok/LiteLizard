@@ -40,6 +40,7 @@ export function App() {
     saveNow,
     cycleEditorMode,
     setViewScale,
+    bootstrapApiKeyStatus,
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
@@ -49,6 +50,10 @@ export function App() {
 
   const explorerPanel = useResizablePanel(260, 160, 480);
   const chatPanel = useResizablePanel(340, 240, 600);
+
+  useEffect(() => {
+    void bootstrapApiKeyStatus();
+  }, [bootstrapApiKeyStatus]);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {

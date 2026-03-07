@@ -38,6 +38,7 @@ interface AppState {
   syncDocumentStructure: (input: DocumentStructureInput) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
+  runAnalysisFor: (paragraphId: string) => Promise<void>;
   setEditorMode: (mode: EditorMode) => void;
   setViewScale: (viewScale: ViewScale) => void;
   toggleViewScale: () => void;
@@ -441,6 +442,81 @@ export const useAppStore = create<AppState>((set, get) => ({
         ),
       };
       set({ document: failedDoc, statusMessage: `解析に失敗しました: ${message}` });
+    }
+  },
+
+  runAnalysisFor: async (paragraphId: string) => {
+    const { document, apiKeyConfigured } = get();
+    if (!document || !apiKeyConfigured) return;
+
+    const paragraph = document.paragraphs.find((p) => p.id === paragraphId);
+    if (!paragraph) return;
+
+    set({
+      document: {
+        ...document,
+        paragraphs: document.paragraphs.map((p) =>
+          p.id === paragraphId ? { ...p, lizard: { ...p.lizard, status: 'pending' } } : p
+        ),
+      },
+      statusMessage: '段落を解析中...',
+    });
+
+    const payload: AnalysisRunInput = {
+      documentId: document.documentId,
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      paragraphs: [{ paragraphId: paragraph.id, order: paragraph.order, text: paragraph.light.text }],
+    };
+
+    try {
+      const result = await window.litelizard.runAnalysis(payload);
+      const analyzed = result.results.find((r) => r.paragraphId === paragraphId);
+
+      set((state) => {
+        if (!state.document || !analyzed) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.id === paragraphId
+                ? {
+                    ...p,
+                    lizard: {
+                      status: 'complete',
+                      emotion: analyzed.emotion,
+                      theme: analyzed.theme,
+                      deepMeaning: analyzed.deepMeaning,
+                      confidence: analyzed.confidence,
+                      model: analyzed.model,
+                      requestId: result.requestId,
+                      analyzedAt: analyzed.analyzedAt,
+                    },
+                  }
+                : p
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          dirty: true,
+          statusMessage: '段落の解析が完了しました',
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Analysis failed';
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.id === paragraphId
+                ? { ...p, lizard: { status: 'failed', error: { code: 'ANALYSIS_ABORTED', message } } }
+                : p
+            ),
+          },
+          statusMessage: `解析に失敗しました: ${message}`,
+        };
+      });
     }
   },
 
