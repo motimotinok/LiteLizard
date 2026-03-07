@@ -162,12 +162,12 @@ export function ExplorerPane({
   onDeleteEntry,
   onSelectFile,
 }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
 
   const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
-  const expandedFolders = expanded.size > 0 ? expanded : defaultExpanded;
+  const expandedFolders = expanded ?? defaultExpanded;
 
   useEffect(() => {
     const close = () => {
@@ -183,7 +183,7 @@ export function ExplorerPane({
 
   const toggleFolder = (path: string) => {
     setExpanded((current) => {
-      const source = current.size > 0 ? current : new Set(defaultExpanded);
+      const source = current ?? new Set(defaultExpanded);
       const next = new Set(source);
       if (next.has(path)) {
         next.delete(path);
