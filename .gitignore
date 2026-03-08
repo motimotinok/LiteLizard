@@ -8,3 +8,10 @@ playwright-report
 apps/api/data
 .pnpm-store
 *.tsbuildinfo
+
+# Project memory (Claude task management - local only)
+PROJECTMEMORY/
+
+# Claude user settings (machine-specific)
+.claude/settings.json
+.claude/settings.local.json
