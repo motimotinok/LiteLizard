@@ -100,11 +100,11 @@ export function AnalysisPane({
       <header className="analysis-header">
         <div className="analysis-title-wrap">
           <span className="analysis-title-icon" aria-hidden>
-            🧭
+            ¶
           </span>
           <div>
-            <h2 className="analysis-title">段落生成結果</h2>
-            <p className="analysis-subtitle">保存済みの生成内容のみ表示</p>
+            <h2 className="analysis-title">段落解析</h2>
+            <p className="analysis-subtitle">各段落の感情・テーマ・解釈</p>
           </div>
         </div>
         <button

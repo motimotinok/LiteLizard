@@ -11,7 +11,7 @@ if (!window.litelizard) {
   void (async () => {
     const { openFolder, loadDocument } = useAppStore.getState();
     await openFolder();
-    await loadDocument(`${mockRootPath}/welcome.md`);
+    await loadDocument(`${mockRootPath}/pakira.md`);
   })();
 }
 

@@ -7,6 +7,7 @@
   --accent: #000000;
   --analysis-bg: #fafafa;
   --radius: 12px;
+  --surface: #faf9f6;
 }
 
 * {
@@ -468,7 +469,8 @@ textarea {
   text-align: center;
   user-select: none;
   font-weight: 600;
-  width: 16px;
+  width: 24px;
+  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -691,7 +693,7 @@ textarea {
 
 .analysis-header {
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface, #faf9f6);
   padding: 12px 14px;
   display: flex;
   align-items: center;
@@ -701,9 +703,9 @@ textarea {
 
 .analysis-generate-btn {
   flex-shrink: 0;
-  border: 1px solid #6366f1;
+  border: 1px solid #7a9e87;
   border-radius: 8px;
-  background: #6366f1;
+  background: #7a9e87;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -713,8 +715,8 @@ textarea {
 }
 
 .analysis-generate-btn:hover:not(:disabled) {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #6a8f76;
+  border-color: #6a8f76;
 }
 
 .analysis-generate-btn:disabled {
@@ -734,14 +736,14 @@ textarea {
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--border);
-  background: #fff;
+  color: var(--muted);
+  font-size: 16px;
 }
 
 .analysis-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .analysis-subtitle {
@@ -858,7 +860,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
-  color: #6366f1;
+  color: #7a9e87;
   font-size: 13px;
   line-height: 1;
   padding: 5px 7px;
@@ -866,8 +868,8 @@ textarea {
 }
 
 .analysis-card-regen-btn:hover:not(:disabled) {
-  border-color: #6366f1;
-  background: #f5f3ff;
+  border-color: #7a9e87;
+  background: #f2f7f4;
 }
 
 .analysis-card-regen-btn:disabled {
@@ -1149,7 +1151,7 @@ textarea {
     left: 8px;
     top: 13px;
     font-size: 13px;
-    width: 14px;
+    width: 22px;
   }
 
   .editor-paragraph-textarea {
