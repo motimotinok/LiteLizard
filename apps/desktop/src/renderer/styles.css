@@ -7,6 +7,7 @@
   --accent: #000000;
   --analysis-bg: #fafafa;
   --radius: 12px;
+  --surface: #faf9f6;
 }
 
 * {
@@ -191,11 +192,25 @@ textarea {
   color: var(--muted);
 }
 
-.explorer-plus-wrap {
-  position: relative;
+.explorer-toolbar-actions {
+  display: flex;
+  gap: 2px;
 }
 
-.explorer-popover,
+.explorer-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.explorer-add-plus {
+  position: absolute;
+  bottom: -3px;
+  right: -4px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .context-menu {
   position: fixed;
   min-width: 160px;
@@ -206,13 +221,6 @@ textarea {
   padding: 6px;
   display: grid;
   gap: 4px;
-}
-
-.explorer-popover {
-  top: calc(100% + 6px);
-  right: 0;
-  position: absolute;
-  min-width: 150px;
 }
 
 .menu-item {
@@ -295,6 +303,30 @@ textarea {
   white-space: nowrap;
   font-size: 13px;
   line-height: 1.4;
+}
+
+.explorer-inline-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface, #eef2ff);
+  border: 1px solid #c7d2fe;
+  padding-right: 8px;
+  box-sizing: border-box;
+}
+
+.explorer-inline-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #1f2937);
 }
 
 .workspace-main {
@@ -468,7 +500,8 @@ textarea {
   text-align: center;
   user-select: none;
   font-weight: 600;
-  width: 16px;
+  width: 24px;
+  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -691,7 +724,7 @@ textarea {
 
 .analysis-header {
   border-bottom: 1px solid var(--border);
-  background: #fff;
+  background: var(--surface, #faf9f6);
   padding: 12px 14px;
   display: flex;
   align-items: center;
@@ -701,9 +734,9 @@ textarea {
 
 .analysis-generate-btn {
   flex-shrink: 0;
-  border: 1px solid #6366f1;
+  border: 1px solid #7a9e87;
   border-radius: 8px;
-  background: #6366f1;
+  background: #7a9e87;
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -713,8 +746,8 @@ textarea {
 }
 
 .analysis-generate-btn:hover:not(:disabled) {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: #6a8f76;
+  border-color: #6a8f76;
 }
 
 .analysis-generate-btn:disabled {
@@ -734,14 +767,14 @@ textarea {
   border-radius: 999px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--border);
-  background: #fff;
+  color: var(--muted);
+  font-size: 16px;
 }
 
 .analysis-title {
   margin: 0;
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .analysis-subtitle {
@@ -858,7 +891,7 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
-  color: #6366f1;
+  color: #7a9e87;
   font-size: 13px;
   line-height: 1;
   padding: 5px 7px;
@@ -866,8 +899,8 @@ textarea {
 }
 
 .analysis-card-regen-btn:hover:not(:disabled) {
-  border-color: #6366f1;
-  background: #f5f3ff;
+  border-color: #7a9e87;
+  background: #f2f7f4;
 }
 
 .analysis-card-regen-btn:disabled {
@@ -1149,7 +1182,7 @@ textarea {
     left: 8px;
     top: 13px;
     font-size: 13px;
-    width: 14px;
+    width: 22px;
   }
 
   .editor-paragraph-textarea {
