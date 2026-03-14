@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileNode } from '@litelizard/shared';
 
 interface Props {
@@ -12,6 +12,12 @@ interface Props {
   onSelectFile: (path: string) => void;
 }
 
+interface InlineCreateState {
+  parentPath: string;
+  type: 'file' | 'directory';
+  defaultValue: string;
+}
+
 interface TreeProps {
   nodes: FileNode[];
   currentFilePath: string | null;
@@ -20,6 +26,12 @@ interface TreeProps {
   onToggle: (path: string) => void;
   onSelectFile: (path: string) => void;
   onOpenContextMenu: (event: React.MouseEvent<HTMLElement>, node: FileNode) => void;
+  inlineCreate: InlineCreateState | null;
+  inlineRename: string | null;
+  onInlineCreateConfirm: (name: string) => void;
+  onInlineCreateCancel: () => void;
+  onInlineRenameConfirm: (targetPath: string, name: string) => void;
+  onInlineRenameCancel: () => void;
 }
 
 interface ContextMenuState {
@@ -27,6 +39,14 @@ interface ContextMenuState {
   y: number;
   targetPath: string;
   targetType: 'file' | 'directory';
+}
+
+interface InlineInputProps {
+  type: 'file' | 'directory';
+  depth: number;
+  defaultValue: string;
+  onConfirm: (name: string) => void;
+  onCancel: () => void;
 }
 
 function FolderIcon() {
@@ -72,6 +92,54 @@ function dirName(targetPath: string) {
   return targetPath.slice(0, slash);
 }
 
+function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineInputProps) {
+  const ref = useRef<HTMLInputElement>(null);
+  const confirmed = useRef(false);
+  const [value, setValue] = useState(defaultValue);
+
+  useEffect(() => {
+    ref.current?.select();
+  }, []);
+
+  const paddingLeft = depth * 14 + (type === 'directory' ? 10 : 32);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (e.nativeEvent.isComposing) return; // IME変換中は無視
+      const trimmed = value.trim();
+      if (trimmed) {
+        confirmed.current = true;
+        onConfirm(trimmed);
+      }
+    } else if (e.key === 'Escape') {
+      onCancel();
+    }
+  };
+
+  const handleBlur = () => {
+    setTimeout(() => {
+      if (!confirmed.current) onCancel();
+    }, 150);
+  };
+
+  return (
+    <div className="explorer-inline-input-row" style={{ paddingLeft: `${paddingLeft}px` }}>
+      <span className="explorer-node-icon" aria-hidden>
+        {type === 'directory' ? <FolderIcon /> : <FileIcon />}
+      </span>
+      <input
+        ref={ref}
+        className="explorer-inline-input"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        autoFocus
+      />
+    </div>
+  );
+}
+
 function Tree({
   nodes,
   currentFilePath,
@@ -80,11 +148,30 @@ function Tree({
   onToggle,
   onSelectFile,
   onOpenContextMenu,
+  inlineCreate,
+  inlineRename,
+  onInlineCreateConfirm,
+  onInlineCreateCancel,
+  onInlineRenameConfirm,
+  onInlineRenameCancel,
 }: TreeProps) {
   return (
     <div className="explorer-tree-group">
       {nodes.map((node) => {
         if (node.type === 'directory') {
+          if (inlineRename === node.path) {
+            return (
+              <InlineInput
+                key={node.path}
+                type="directory"
+                depth={depth}
+                defaultValue={baseName(node.path)}
+                onConfirm={(name) => onInlineRenameConfirm(node.path, name)}
+                onCancel={onInlineRenameCancel}
+              />
+            );
+          }
+
           const isExpanded = expanded.has(node.path);
           return (
             <div key={node.path}>
@@ -100,18 +187,50 @@ function Tree({
                 </span>
                 <span className="explorer-node-label">{node.name}</span>
               </button>
-              {isExpanded && node.children && node.children.length > 0 ? (
-                <Tree
-                  nodes={node.children}
-                  currentFilePath={currentFilePath}
-                  depth={depth + 1}
-                  expanded={expanded}
-                  onToggle={onToggle}
-                  onSelectFile={onSelectFile}
-                  onOpenContextMenu={onOpenContextMenu}
-                />
-              ) : null}
+              {isExpanded && (
+                <>
+                  {node.children && node.children.length > 0 && (
+                    <Tree
+                      nodes={node.children}
+                      currentFilePath={currentFilePath}
+                      depth={depth + 1}
+                      expanded={expanded}
+                      onToggle={onToggle}
+                      onSelectFile={onSelectFile}
+                      onOpenContextMenu={onOpenContextMenu}
+                      inlineCreate={inlineCreate}
+                      inlineRename={inlineRename}
+                      onInlineCreateConfirm={onInlineCreateConfirm}
+                      onInlineCreateCancel={onInlineCreateCancel}
+                      onInlineRenameConfirm={onInlineRenameConfirm}
+                      onInlineRenameCancel={onInlineRenameCancel}
+                    />
+                  )}
+                  {inlineCreate?.parentPath === node.path && (
+                    <InlineInput
+                      type={inlineCreate.type}
+                      depth={depth + 1}
+                      defaultValue={inlineCreate.defaultValue}
+                      onConfirm={onInlineCreateConfirm}
+                      onCancel={onInlineCreateCancel}
+                    />
+                  )}
+                </>
+              )}
             </div>
+          );
+        }
+
+        if (inlineRename === node.path) {
+          return (
+            <InlineInput
+              key={node.path}
+              type="file"
+              depth={depth}
+              defaultValue={baseName(node.path)}
+              onConfirm={(name) => onInlineRenameConfirm(node.path, name)}
+              onCancel={onInlineRenameCancel}
+            />
           );
         }
 
@@ -165,6 +284,8 @@ export function ExplorerPane({
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(null);
+  const [inlineCreate, setInlineCreate] = useState<InlineCreateState | null>(null);
+  const [inlineRename, setInlineRename] = useState<string | null>(null);
 
   const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
   const expandedFolders = expanded ?? defaultExpanded;
@@ -216,22 +337,36 @@ export function ExplorerPane({
     }
   }, [tree, selectedFolderPath, rootPath]);
 
-  const openCreatePrompt = (parentPath: string, type: 'file' | 'folder') => {
-    const message = type === 'file' ? '新規ファイル名' : '新規フォルダ名';
-    const fallback = type === 'file' ? 'Untitled' : 'New Folder';
-    const name = window.prompt(message, fallback)?.trim();
-    if (!name) {
-      return;
-    }
-    onCreateEntry(parentPath, type, name);
+  const openInlineCreate = (parentPath: string, type: 'file' | 'folder') => {
+    setExpanded((prev) => {
+      const next = new Set(prev ?? defaultExpanded);
+      next.add(parentPath);
+      return next;
+    });
+    setInlineCreate({
+      parentPath,
+      type: type === 'folder' ? 'directory' : 'file',
+      defaultValue: type === 'file' ? 'Untitled' : 'New Folder',
+    });
+    setContextMenu(null);
   };
 
-  const openRenamePrompt = (targetPath: string) => {
-    const name = window.prompt('新しい名前', baseName(targetPath))?.trim();
-    if (!name) {
-      return;
+  const openInlineRename = (targetPath: string) => {
+    setInlineRename(targetPath);
+    setContextMenu(null);
+  };
+
+  const handleInlineCreateConfirm = (name: string) => {
+    if (inlineCreate) {
+      const type = inlineCreate.type === 'directory' ? 'folder' : 'file';
+      onCreateEntry(inlineCreate.parentPath, type, name);
     }
+    setInlineCreate(null);
+  };
+
+  const handleInlineRenameConfirm = (targetPath: string, name: string) => {
     onRenameEntry(targetPath, name);
+    setInlineRename(null);
   };
 
   const runDelete = (targetPath: string) => {
@@ -268,7 +403,7 @@ export function ExplorerPane({
           <div className="explorer-toolbar-actions">
             <button
               className="icon-button explorer-add-btn"
-              onClick={() => openCreatePrompt(createParent, 'file')}
+              onClick={() => openInlineCreate(createParent, 'file')}
               disabled={!canCreate}
               title="新規ファイル"
               aria-label="新規ファイル"
@@ -277,7 +412,7 @@ export function ExplorerPane({
             </button>
             <button
               className="icon-button explorer-add-btn"
-              onClick={() => openCreatePrompt(createParent, 'folder')}
+              onClick={() => openInlineCreate(createParent, 'folder')}
               disabled={!canCreate}
               title="新規フォルダ"
               aria-label="新規フォルダ"
@@ -303,7 +438,22 @@ export function ExplorerPane({
             onToggle={toggleFolder}
             onSelectFile={handleFileClick}
             onOpenContextMenu={onOpenContextMenu}
+            inlineCreate={inlineCreate}
+            inlineRename={inlineRename}
+            onInlineCreateConfirm={handleInlineCreateConfirm}
+            onInlineCreateCancel={() => setInlineCreate(null)}
+            onInlineRenameConfirm={handleInlineRenameConfirm}
+            onInlineRenameCancel={() => setInlineRename(null)}
           />
+          {inlineCreate?.parentPath === rootPath && (
+            <InlineInput
+              type={inlineCreate.type}
+              depth={0}
+              defaultValue={inlineCreate.defaultValue}
+              onConfirm={handleInlineCreateConfirm}
+              onCancel={() => setInlineCreate(null)}
+            />
+          )}
         </div>
       </div>
 
@@ -317,8 +467,7 @@ export function ExplorerPane({
             className="menu-item"
             onClick={() => {
               const parentPath = resolveCreateParent(contextMenu);
-              openCreatePrompt(parentPath, 'file');
-              setContextMenu(null);
+              openInlineCreate(parentPath, 'file');
             }}
           >
             新規ファイル
@@ -327,8 +476,7 @@ export function ExplorerPane({
             className="menu-item"
             onClick={() => {
               const parentPath = resolveCreateParent(contextMenu);
-              openCreatePrompt(parentPath, 'folder');
-              setContextMenu(null);
+              openInlineCreate(parentPath, 'folder');
             }}
           >
             新規フォルダ
@@ -336,8 +484,7 @@ export function ExplorerPane({
           <button
             className="menu-item"
             onClick={() => {
-              openRenamePrompt(contextMenu.targetPath);
-              setContextMenu(null);
+              openInlineRename(contextMenu.targetPath);
             }}
           >
             リネーム
