@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  base: process.env.GITHUB_PAGES === 'true' ? '/liteLizard/' : './',
   plugins: [react()],
   root: './src/renderer',
   build: {
