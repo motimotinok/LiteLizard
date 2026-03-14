@@ -95,10 +95,14 @@ function dirName(targetPath: string) {
 function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineInputProps) {
   const ref = useRef<HTMLInputElement>(null);
   const confirmed = useRef(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
     ref.current?.select();
+    return () => {
+      if (blurTimer.current !== null) clearTimeout(blurTimer.current);
+    };
   }, []);
 
   const paddingLeft = depth * 14 + (type === 'directory' ? 10 : 32);
@@ -117,7 +121,7 @@ function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineI
   };
 
   const handleBlur = () => {
-    setTimeout(() => {
+    blurTimer.current = setTimeout(() => {
       if (!confirmed.current) onCancel();
     }, 150);
   };
