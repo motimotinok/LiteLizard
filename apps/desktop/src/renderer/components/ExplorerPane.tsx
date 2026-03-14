@@ -164,21 +164,15 @@ export function ExplorerPane({
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [selectedFolderPath, setSelectedFolderPath] = useState<string | null>(null);
 
   const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
   const expandedFolders = expanded ?? defaultExpanded;
 
   useEffect(() => {
-    const close = () => {
-      setContextMenu(null);
-      setQuickCreateOpen(false);
-    };
-
+    const close = () => setContextMenu(null);
     window.addEventListener('click', close);
-    return () => {
-      window.removeEventListener('click', close);
-    };
+    return () => window.removeEventListener('click', close);
   }, []);
 
   const toggleFolder = (path: string) => {
@@ -193,6 +187,31 @@ export function ExplorerPane({
       return next;
     });
   };
+
+  const handleFileClick = (path: string) => {
+    onSelectFile(path);
+  };
+
+  // currentFilePath が変わったとき（自動展開・ファイルクリック・新規作成後）に sync
+  useEffect(() => {
+    if (currentFilePath) {
+      setSelectedFolderPath(dirName(currentFilePath));
+    }
+  }, [currentFilePath]);
+
+  // rootPath 変更時にリセット
+  useEffect(() => {
+    setSelectedFolderPath(null);
+  }, [rootPath]);
+
+  // tree 更新後にパス存在チェック → rootPath へフォールバック
+  useEffect(() => {
+    if (selectedFolderPath === null) return;
+    const dirs = new Set(collectDirectoryPaths(tree));
+    if (!dirs.has(selectedFolderPath) && selectedFolderPath !== rootPath) {
+      setSelectedFolderPath(rootPath);
+    }
+  }, [tree, selectedFolderPath, rootPath]);
 
   const openCreatePrompt = (parentPath: string, type: 'file' | 'folder') => {
     const message = type === 'file' ? '新規ファイル名' : '新規フォルダ名';
@@ -228,7 +247,6 @@ export function ExplorerPane({
 
   const onOpenContextMenu = (event: React.MouseEvent<HTMLElement>, node: FileNode) => {
     event.preventDefault();
-    setQuickCreateOpen(false);
     setContextMenu({
       x: event.clientX,
       y: event.clientY,
@@ -238,57 +256,49 @@ export function ExplorerPane({
   };
 
   const canCreate = Boolean(rootPath);
+  const createParent = selectedFolderPath ?? rootPath ?? '';
 
   return (
     <aside className="explorer-layout" style={style} data-testid="file-browser-pane">
       <div className="explorer-panel">
         <div className="explorer-panel-toolbar">
-          <div className="explorer-plus-wrap">
+          <div className="explorer-toolbar-actions">
             <button
-              className="icon-button"
-              onClick={(event) => {
-                event.stopPropagation();
-                setContextMenu(null);
-                setQuickCreateOpen((value) => !value);
-              }}
+              className="icon-button explorer-add-btn"
+              onClick={() => openCreatePrompt(createParent, 'file')}
               disabled={!canCreate}
-              title="新規作成"
+              title="新規ファイル"
+              aria-label="新規ファイル"
             >
-              ＋
+              <span className="explorer-icon-wrap"><FileIcon /><span className="explorer-add-plus">+</span></span>
             </button>
-
-            {quickCreateOpen && rootPath ? (
-              <div className="explorer-popover" onClick={(event) => event.stopPropagation()}>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    openCreatePrompt(rootPath, 'file');
-                    setQuickCreateOpen(false);
-                  }}
-                >
-                  新規ファイル
-                </button>
-                <button
-                  className="menu-item"
-                  onClick={() => {
-                    openCreatePrompt(rootPath, 'folder');
-                    setQuickCreateOpen(false);
-                  }}
-                >
-                  新規フォルダ
-                </button>
-              </div>
-            ) : null}
+            <button
+              className="icon-button explorer-add-btn"
+              onClick={() => openCreatePrompt(createParent, 'folder')}
+              disabled={!canCreate}
+              title="新規フォルダ"
+              aria-label="新規フォルダ"
+            >
+              <span className="explorer-icon-wrap"><FolderIcon /><span className="explorer-add-plus">+</span></span>
+            </button>
           </div>
         </div>
 
-        <div className="explorer-tree" onContextMenu={(event) => event.preventDefault()}>
+        <div
+          className="explorer-tree"
+          onContextMenu={(event) => event.preventDefault()}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedFolderPath(null);
+            }
+          }}
+        >
           <Tree
             nodes={tree}
             currentFilePath={currentFilePath}
             expanded={expandedFolders}
             onToggle={toggleFolder}
-            onSelectFile={onSelectFile}
+            onSelectFile={handleFileClick}
             onOpenContextMenu={onOpenContextMenu}
           />
         </div>
