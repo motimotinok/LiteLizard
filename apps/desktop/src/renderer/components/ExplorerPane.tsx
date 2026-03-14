@@ -193,9 +193,12 @@ export function ExplorerPane({
   };
 
   // currentFilePath が変わったとき（自動展開・ファイルクリック・新規作成後）に sync
+  // null になった場合（ファイル削除・フォルダ削除）はリセットして rootPath フォールバックに任せる
   useEffect(() => {
     if (currentFilePath) {
       setSelectedFolderPath(dirName(currentFilePath));
+    } else {
+      setSelectedFolderPath(null);
     }
   }, [currentFilePath]);
 
