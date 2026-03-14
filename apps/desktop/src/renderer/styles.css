@@ -967,11 +967,7 @@ textarea {
   color: #155e75;
 }
 
-.analysis-tag-emotion {
-  background: #fff7ed;
-  border-color: #fed7aa;
-  color: #9a3412;
-}
+/* .analysis-tag-emotion の色はインラインスタイル（getEmotionStyle）で制御 */
 
 .analysis-card-body {
   margin: 8px 0 0;

@@ -11,6 +11,38 @@ interface Props {
   onRequestScrollToParagraph?: (id: string) => void;
 }
 
+type TagStyle = { background: string; borderColor: string; color: string };
+
+const EMOTION_COLOR_MAP: Record<string, TagStyle> = {
+  '期待':   { background: '#fef9c3', borderColor: '#fde68a', color: '#713f12' },
+  '安心':   { background: '#dcfce7', borderColor: '#86efac', color: '#14532d' },
+  '孤独':   { background: '#dbeafe', borderColor: '#93c5fd', color: '#1e3a5f' },
+  '後悔':   { background: '#ede9fe', borderColor: '#c4b5fd', color: '#4c1d95' },
+  '焦り':   { background: '#fee2e2', borderColor: '#fca5a5', color: '#7f1d1d' },
+  '内省':   { background: '#ccfbf1', borderColor: '#5eead4', color: '#134e4a' },
+  '罪悪感': { background: '#fce7f3', borderColor: '#f9a8d4', color: '#831843' },
+  '緊張':   { background: '#fff7ed', borderColor: '#fdba74', color: '#7c2d12' },
+  '納得':   { background: '#ecfeff', borderColor: '#a5f3fc', color: '#164e63' },
+  '集中':   { background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' },
+};
+
+const FALLBACK_PALETTE: TagStyle[] = [
+  { background: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' },
+  { background: '#fdf4ff', borderColor: '#e9d5ff', color: '#6b21a8' },
+  { background: '#fff1f2', borderColor: '#fecdd3', color: '#881337' },
+  { background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' },
+];
+
+function hashString(s: string): number {
+  let h = 0;
+  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
+  return Math.abs(h);
+}
+
+function getEmotionStyle(emotion: string): TagStyle {
+  return EMOTION_COLOR_MAP[emotion] ?? FALLBACK_PALETTE[hashString(emotion) % FALLBACK_PALETTE.length];
+}
+
 function statusLabel(document: LiteLizardDocument['paragraphs'][number]['lizard']['status']) {
   if (document === 'pending') {
     return '解析中です。完了後に生成結果が表示されます。';
@@ -247,6 +279,7 @@ export function AnalysisPane({
                             <li
                               key={`${paragraph.id}-${tag.kind}-${tag.value}-${tagIndex}`}
                               className={`analysis-tag analysis-tag-${tag.kind}`}
+                              style={tag.kind === 'emotion' ? getEmotionStyle(tag.value) : undefined}
                             >
                               {tag.value}
                             </li>
