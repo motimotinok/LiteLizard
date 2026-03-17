@@ -4,13 +4,63 @@
 
 ---
 
+## Claude の役割
+
+このプロジェクトでは **Claude（あなた）と Codex が並列で開発** を行う。
+
+### Claude が担うこと
+- **仕様策定・設計判断**: ユーザーとの対話を通じて仕様を詰め、設計を決定する
+- **設計判断が必要な実装タスク**: Lexical 統合、ストア設計変更など、既存コードとの整合判断が必要なもの
+- **WBS の更新・タスク割り振り**: `docs/wbs.md` にタスクを追加・割り振り・優先度付けする
+- **PROJECTMEMORY の管理**: WORKSPACE / TASKS / ARCHIVE の整理・更新
+- **設計判断の記録**: `docs/decisions.md` に技術選択の理由を記録する
+
+### Claude が担わないこと
+- PR レビュー（Codex が自動レビューする）
+- 入出力が明確で機械的な実装タスク（Codex に委譲する）
+
+---
+
+## 並列開発ワークフロー
+
+### 構成
+
+```
+worktree①: /Users/jane/litelizard        → Claude 作業場
+worktree②: /Users/jane/litelizard-codex  → Codex 作業場
+```
+
+### ブランチ運用
+- **Claude**: `claude/{タスクID}` ブランチで作業。PR は `dev` ベース
+- **Codex**: `codex/{タスクID}` ブランチで作業。PR は `dev` ベース
+- 1タスク1ブランチ1PR（小さく出し続ける）
+
+### タスクの流れ
+1. Claude + ユーザーが `docs/wbs.md` でタスクを洗い出し・割り振る
+2. 各自が割り振られたタスクのブランチを切って作業
+3. 完了したら `docs/wbs.md` のステータスを更新して PR を出す
+4. PR マージで `dev` に反映
+
+### ファイルの役割分担
+
+| ファイル | 管理 | 役割 |
+|---------|------|------|
+| `docs/wbs.md` | git 管理 | タスク台帳（唯一の信頼できるソース）。Claude・Codex 両方が参照・更新 |
+| `docs/decisions.md` | git 管理 | 設計判断ログ。Claude・Codex 両方が参照 |
+| `docs/LiteLizard_spec_v003.md` | git 管理 | 仕様書 |
+| `PROJECTMEMORY/WORKSPACE.md` | .gitignore | ユーザーのメモ帳。Claude のみ参照 |
+| `PROJECTMEMORY/TASKS.md` | .gitignore | Claude 対話用ダッシュボード。Claude のみ参照・更新 |
+| `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫。Claude のみ |
+
+---
+
 ## PROJECTMEMORY/ ファイル構成
 
 | ファイル | 所有者 | 役割 |
 |---|---|---|
 | `PROJECTMEMORY/WORKSPACE.md` | ユーザー | 思考・懸念・アイデアのブレインダンプ。形式不問。Claudeがチャット開始時に読んでTASKS.mdへ整理する |
 | `PROJECTMEMORY/TASKS.md` | Claude | タスクリスト（実行タスク / 懸念 / アイデアボックス / 完了済み）。ユーザーは直接編集しない |
-| `PROJECTMEMORY/DECISIONS.md` | Claude | 技術選択の理由・却下した代替案・仕様との意図的な差異のログ。同じ議論を繰り返さないための記録 |
+| `docs/decisions.md` | Claude | 技術選択の理由・却下した代替案・仕様との意図的な差異のログ。同じ議論を繰り返さないための記録。**git 管理**（Codex からも参照可能） |
 | `PROJECTMEMORY/ARCHIVE.md` | Claude | TASKS.mdの完了済みが10件を超えたら古い順に移動する長期保管庫。通常は読まなくてよい |
 
 ---
@@ -35,6 +85,7 @@
    - 該当タスクを `✅ 完了済みタスク` セクションに移動する
    - **ダッシュボードを次の最優先タスクに更新する**（必須）
    - 完了済みが10件を超えたら古い順から `PROJECTMEMORY/ARCHIVE.md` へ移動する
+   - **`docs/wbs.md` のステータスも `✅` に更新する**
 
 ## タスク優先度の判断ルール
 
@@ -55,7 +106,7 @@
 
 ## 実装状況（仕様 v003 対照）
 
-最終更新: 2026-03-07
+最終更新: 2026-03-16
 
 ### ✅ 実装済み
 
@@ -109,8 +160,8 @@
 
 | 項目 | 状況 | 詳細は |
 |------|------|--------|
-| ファイル形式 | 現状 `.md`（仕様は `.lzl`） | `DECISIONS.md` 参照 |
-| APIキー管理 | クライアント側に実装（仕様§9と差異） | `DECISIONS.md` 参照 |
+| ファイル形式 | 現状 `.md`（仕様は `.lzl`） | `docs/decisions.md` 参照 |
+| APIキー管理 | クライアント側に実装（仕様§9と差異） | `docs/decisions.md` 参照 |
 | 章 CRUD | 追加・並び替えは実装済み。削除・吸収マージは未実装 | — |
 | ログイン UI | フラグのみ管理、画面は未実装 | — |
 | Undo / Redo | テキスト編集のみ対応。DnD並び替えは未対応 | — |
