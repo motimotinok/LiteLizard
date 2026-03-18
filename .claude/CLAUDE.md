@@ -26,20 +26,21 @@
 ### 構成
 
 ```
-worktree①: /Users/jane/litelizard        → Claude 作業場
-worktree②: /Users/jane/litelizard-codex  → Codex 作業場
+worktree①: /Users/jane/litelizard/claude  → Claude 作業場
+worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 ```
 
-### ブランチ運用
-- **Claude**: `claude/{タスクID}` ブランチで作業。PR は `dev` ベース
-- **Codex**: `codex/{タスクID}` ブランチで作業。PR は `dev` ベース
-- 1タスク1ブランチ1PR（小さく出し続ける）
+### ブランチ運用（固定ブランチ方式）
+- **Claude**: `claude/task` ブランチに常駐。PR は `dev` ベース
+- **Codex**: `codex/task` ブランチに常駐。PR は `dev` ベース
+- タスクごとにブランチを切らず、固定ブランチ上でこまめに PR を出す
+- PR マージ後は `git fetch origin && git merge origin/dev` で最新を取り込む
 
 ### タスクの流れ
 1. Claude + ユーザーが `docs/wbs.md` でタスクを洗い出し・割り振る
-2. 各自が割り振られたタスクのブランチを切って作業
-3. 完了したら `docs/wbs.md` のステータスを更新して PR を出す
-4. PR マージで `dev` に反映
+2. 各自が固定ブランチ上で作業し、区切りのいいところで PR を出す
+3. 完了したら `docs/wbs.md` のステータスを更新
+4. PR マージで `dev` に反映 → 各自 `git merge origin/dev` で同期
 
 ### ファイルの役割分担
 
