@@ -13,13 +13,14 @@
 このプロジェクトでは **Claude と Codex（あなた）が並列で開発** を行う。
 
 ### Codex が担うこと
-- **`PROJECTMEMORY/TASK.md` を中心にした自律実装**: `docs/wbs.md` を参照しつつ、Codex 担当タスクを `PROJECTMEMORY/TASK.md` に切り出して実行する
+- **`PROJECTMEMORY/TASK.md` を中心にした自律実装**: Claude によって割り振られたタスクを `PROJECTMEMORY/TASK.md` から受け取り、内容に沿って実装する
 - **入出力が明確で完了条件がテストで検証可能なタスク**: パーサー実装、CSS 調整、テスト追加など
-- **タスク管理ファイルの継続更新**: 作業開始前・作業中・完了時に `PROJECTMEMORY/TASK.md` を更新し、今やることと次にやることを明確化する
+- **タスク管理ファイルの継続更新**: 作業開始前・作業中・完了時に `PROJECTMEMORY/TASK.md` を更新し、進捗・完了状態・次アクションを明確化する
 - **WBS のステータス更新**: 担当タスクの完了時に `docs/wbs.md` の該当タスクを `✅` に更新する
 - **PR の作成**: タスク完了後、`dev` ベースで PR を作成する
 
 ### Codex が担わないこと
+- `PROJECTMEMORY/TASK.md` への新規タスクの割り振り・優先順位決定（Claude が行う）
 - 仕様策定・設計判断（Claude がユーザーと対話して決定する）
 - 既存コードとの整合判断が複雑なタスク（Lexical 統合、ストア設計変更など）
 - Claude 側 worktree のファイル管理
@@ -38,9 +39,10 @@ Codex の実行管理は **`PROJECTMEMORY/TASK.md` を単一の運用ビュー**
 - `AGENTS.md`: このファイル。Codex の行動ルール
 
 ### 基本方針
-- `docs/wbs.md` を見て、**担当が `Codex` で、着手可能なタスク**を確認する
-- 着手候補のうち、**優先度順に `PROJECTMEMORY/TASK.md` へ切り出す**
+- Claude が更新した `PROJECTMEMORY/TASK.md` を起点に、**割り振られたタスク**を確認する
+- 必要に応じて `docs/wbs.md` を参照し、詳細・依存関係・完了条件を確認する
 - 実作業は常に `PROJECTMEMORY/TASK.md` の先頭タスクを基準に進める
+- `PROJECTMEMORY/TASK.md` が空・未同期・矛盾ありで着手不能な場合は、Codex は勝手に補完せず、ユーザーに警告して判断を待つ
 - 作業中は `PROJECTMEMORY/TASK.md` を更新し続け、**現在の作業内容・完了条件・次アクション**を常に最新化する
 - タスク完了時は、`PROJECTMEMORY/TASK.md` と `docs/wbs.md` の両方を更新する
 
@@ -63,23 +65,23 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場（ここ）
 
 ### タスク実行の流れ
 
-1. `docs/wbs.md` を読み、Codex に割り振られたタスクを確認する
-2. 依存が解消され、着手可能なタスクを優先度順に `PROJECTMEMORY/TASK.md` へ反映する
-3. `PROJECTMEMORY/TASK.md` のダッシュボードにある「今すぐやるべき1タスク」を実行する
-4. 作業しながら `PROJECTMEMORY/TASK.md` の状態・メモ・次アクションを更新する
-5. タスク完了時に `docs/wbs.md` の該当タスクを `✅` に更新する
-6. `PROJECTMEMORY/TASK.md` で完了済みへ移動し、ダッシュボードを次の最優先タスクへ更新する
-7. コミット & プッシュし、`dev` ベースで PR を作成する
-8. PR マージ後、`git fetch origin && git merge origin/dev` で同期する
+1. Claude が更新した `PROJECTMEMORY/TASK.md` を確認し、今すぐやるべきタスクを把握する
+2. `PROJECTMEMORY/TASK.md` のダッシュボードにある「今すぐやるべき1タスク」を実行する
+3. 作業しながら `PROJECTMEMORY/TASK.md` の状態・メモ・次アクションを更新する
+4. タスク完了時に `docs/wbs.md` の該当タスクを `✅` に更新する
+5. `PROJECTMEMORY/TASK.md` で完了済みへ移動し、ダッシュボードを次の最優先タスクへ更新する
+6. コミット & プッシュし、`dev` ベースで PR を作成する
+7. PR マージ後、`git fetch origin && git merge origin/dev` で同期する
 
 ---
 
 ## `PROJECTMEMORY/TASK.md` の運用ルール
 
 ### Codex が最初にやること
-- セッション開始時に `docs/wbs.md` と `PROJECTMEMORY/TASK.md` を確認する
-- `PROJECTMEMORY/TASK.md` が古い場合、`docs/wbs.md` を基準に内容を更新する
-- Codex 担当タスクが未反映なら、優先度順に追加する
+- セッション開始時に `PROJECTMEMORY/TASK.md` を確認し、Claude からの最新の割り振りを把握する
+- 必要に応じて `docs/wbs.md` を確認し、対象タスクの詳細・依存関係・完了条件を補足する
+- `PROJECTMEMORY/TASK.md` が空、未同期、または内容に不足・矛盾があって着手不能な場合は、その旨をユーザーに警告する
+- その場合でも、Codex は割り振りや優先順位を自分で追加・変更しない
 
 ### 常に維持すべき状態
 - ダッシュボードには **今すぐ着手すべき 1 タスクだけ** を表示する
@@ -88,7 +90,7 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場（ここ）
 - 中断時にも再開しやすいよう、作業メモを簡潔に残す
 
 ### 更新タイミング
-- **作業開始前**: 取り組むタスクを `🔄` として明記し、ダッシュボードを更新する
+- **作業開始前**: Claude により割り振られた対象タスクについて、取り組み開始を `🔄` として明記し、ダッシュボードを更新する
 - **作業中**: 方針変更・進捗・未解決事項・次にやることを反映する
 - **作業完了時**:
   1. `docs/wbs.md` の該当タスクを `✅` に更新する
@@ -97,9 +99,9 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場（ここ）
   4. 必要なら次タスクの着手メモを先に書いておく
 
 ### 優先順位の決め方
-- まず `docs/wbs.md` の優先度（P0 → P1 → P2 → P3）を優先する
-- 同じ優先度なら、依存解消済みでブロッカーになりにくいものを先にする
-- `PROJECTMEMORY/TASK.md` は、**Codex が次に迷わず動ける順番** になっていることを重視する
+- 優先順位付けと割り振りは Claude が行う
+- Codex は `PROJECTMEMORY/TASK.md` の並び順とダッシュボードを実行順として扱う
+- ただし依存関係や完了条件の矛盾を見つけた場合は、`PROJECTMEMORY/TASK.md` にメモを残して共有する
 
 ---
 
