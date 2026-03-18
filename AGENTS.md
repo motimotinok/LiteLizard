@@ -30,23 +30,24 @@
 ### 構成
 
 ```
-worktree①: /Users/jane/litelizard        → Claude 作業場
-worktree②: /Users/jane/litelizard-codex  → Codex 作業場（ここ）
+worktree①: /Users/jane/litelizard/claude  → Claude 作業場
+worktree②: /Users/jane/litelizard/codex   → Codex 作業場（ここ）
 ```
 
-### ブランチ運用
-- **Codex**: `codex/{タスクID}` ブランチで作業。PR は `dev` ベース
-- **Claude**: `claude/{タスクID}` ブランチで作業。PR は `dev` ベース
-- 1タスク1ブランチ1PR（小さく出し続ける）
+### ブランチ運用（固定ブランチ方式）
+- **Codex**: `codex/task` ブランチに常駐。PR は `dev` ベース
+- **Claude**: `claude/task` ブランチに常駐。PR は `dev` ベース
+- タスクごとにブランチを切らず、固定ブランチ上でこまめに PR を出す
+- PR マージ後は `git merge origin/dev` で最新を取り込む
 
 ### タスク実行の流れ
 
 1. `docs/wbs.md` を読み、自分に割り振られたタスク（担当列が `Codex`、状態が `🔄`）を確認する
 2. タスクの「詳細」セクションに書かれた完了条件・対象ファイル・注意点を読む
-3. `dev` から `codex/{タスクID}` ブランチを切る
-4. 実装する
-5. `docs/wbs.md` の該当タスクのステータスを `✅` に更新する
-6. コミット & プッシュし、`dev` ベースで PR を作成する
+3. `codex/task` ブランチ上で実装する
+4. `docs/wbs.md` の該当タスクのステータスを `✅` に更新する
+5. コミット & プッシュし、`dev` ベースで PR を作成する
+6. PR マージ後、`git fetch origin && git merge origin/dev` で同期する
 
 ### 参照すべきファイル
 
