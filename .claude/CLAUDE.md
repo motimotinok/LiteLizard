@@ -50,7 +50,7 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 | `docs/decisions.md` | git 管理 | 設計判断ログ。Claude・Codex 両方が参照 |
 | `docs/LiteLizard_spec_v003.md` | git 管理 | 仕様書 |
 | `PROJECTMEMORY/WORKSPACE.md` | .gitignore | ユーザーのメモ帳。Claude のみ参照 |
-| `PROJECTMEMORY/TASKS.md` | .gitignore | Claude 対話用ダッシュボード。Claude のみ参照・更新 |
+| `PROJECTMEMORY/TASKS.md` | .gitignore | Claude対話用ダッシュボード。方針メモ・懸念・アイデアを管理。実装タスクは `docs/wbs.md` に集約 |
 | `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫。Claude のみ |
 
 ---
@@ -60,7 +60,7 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 | ファイル | 所有者 | 役割 |
 |---|---|---|
 | `PROJECTMEMORY/WORKSPACE.md` | ユーザー | 思考・懸念・アイデアのブレインダンプ。形式不問。Claudeがチャット開始時に読んでTASKS.mdへ整理する |
-| `PROJECTMEMORY/TASKS.md` | Claude | タスクリスト（実行タスク / 懸念 / アイデアボックス / 完了済み）。ユーザーは直接編集しない |
+| `PROJECTMEMORY/TASKS.md` | Claude | ダッシュボード（方針・次にやること）/ 懸念・リスク / アイデアボックス / 完了メモ。実装タスクの管理は `docs/wbs.md` に委ねる。ユーザーは直接編集しない |
 | `docs/decisions.md` | Claude | 技術選択の理由・却下した代替案・仕様との意図的な差異のログ。同じ議論を繰り返さないための記録。**git 管理**（Codex からも参照可能） |
 | `PROJECTMEMORY/ARCHIVE.md` | Claude | TASKS.mdの完了済みが10件を超えたら古い順に移動する長期保管庫。通常は読まなくてよい |
 
@@ -70,7 +70,8 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 
 1. **`PROJECTMEMORY/WORKSPACE.md` を読む**
    - 「📥 インボックス」に未処理の内容があれば分類して処理する：
-     - 実行可能なもの → `PROJECTMEMORY/TASKS.md` の「📋 実行タスク」に優先度順で挿入
+     - 実装タスク（コーディング作業）→ `docs/wbs.md` に追加
+     - 方針・覚書（「次はこういう方向で進める」等）→ `PROJECTMEMORY/TASKS.md` の「📋 方針・覚書」に挿入
      - 懸念・リスク → `TASKS.md` の「⚠️ 懸念・リスク」セクションへ
      - アイデア → `TASKS.md` の「💡 アイデアボックス」へ
      - 文脈・背景情報のみ → TASKS.mdには追加しない（WORKSPACEに残す）
@@ -83,10 +84,9 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
      3. 全体進捗（完了N件 / 残りN件）
 
 3. **タスク完了時**
-   - 該当タスクを `✅ 完了済みタスク` セクションに移動する
-   - **ダッシュボードを次の最優先タスクに更新する**（必須）
-   - 完了済みが10件を超えたら古い順から `PROJECTMEMORY/ARCHIVE.md` へ移動する
-   - **`docs/wbs.md` のステータスも `✅` に更新する**
+   - `docs/wbs.md` のステータスを `✅` に更新する
+   - 必要に応じて `PROJECTMEMORY/TASKS.md` の「✅ 完了メモ」に簡易メモを追記する
+   - **ダッシュボードのフォーカスが変わる場合は更新する**
 
 ## タスク優先度の判断ルール
 
@@ -95,7 +95,7 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
   - 次に、公開目標に直接影響するもの
   - 工数が少なく効果が大きいものを上位に
 - **ユーザーが明示的に指定した場合はその意向を最優先にする**
-- **新規タスク追加時**: WORKSPACEから抽出 → 優先度判断 → 実行タスクリストの適切な位置に挿入 → ダッシュボードが影響を受けるなら更新する
+- **新規タスク追加時**: WORKSPACEから抽出 → 実装タスクは `docs/wbs.md` に追加、方針・覚書は `TASKS.md` に挿入 → ダッシュボードが影響を受けるなら更新する
 
 ## タスク粒度ルール
 
@@ -133,6 +133,22 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 3. **code-reviewer**（レビュー）— 実装とテストをレビュー。問題なければ LGTM → 完了。問題あれば指摘事項を出す
 4. **debugger**（修正）— code-reviewer の指摘をもとに修正。修正後 → 再び code-reviewer へ
 
+### チェーンレベル
+
+タスクサイズに応じてチェーンの段数を調整する。全タスクに4段フルチェーンを適用するとオーバーヘッドが大きいため、以下の基準で短縮する。
+
+| レベル | 対象 | チェーン構成 |
+|--------|------|-------------|
+| **Full** | 新機能追加、複数ファイル変更、ロジック変更 | plan-executor → feature-test-writer → code-reviewer → debugger（通常フロー） |
+| **Light** | 単一ファイルの小規模変更（10〜50行程度）、スタイル修正、既存パターンの踏襲 | plan-executor → code-reviewer（テスト省略、問題あれば debugger 1回のみ） |
+| **Direct** | 変更10行以下、型修正、typo修正、設定値変更、import追加 | plan-executor のみ（レビュー・テスト省略） |
+
+**判断基準:**
+- `/parallel-planner` がプラン出力時にタスクサイズ（S/M/L）をもとにチェーンレベルを指定する
+- S かつ変更ファイル1個 → Light or Direct
+- M 以上 → Full
+- 判断に迷ったら Full を選ぶ（品質側に倒す）
+
 ### Wave 実行手順
 
 1. **Wave 内の全タスクをバックグラウンドで並列起動する**
@@ -141,6 +157,8 @@ plan-executor → feature-test-writer → code-reviewer → debugger
    - 各エージェントのプロンプトにはプランの該当タスク情報（指示・スコープ制約・完了条件）とチェーン実行指示を含める
 2. **全タスクの完了通知を待つ**
 3. **次の Wave に進む**（前の Wave の成果物が必要な場合は `git` で確認）
+   - Wave 間に依存がある場合、プランの「Wave 間依存」セクションに記載された依存理由を確認し、
+     前 Wave の該当成果物（型定義・エクスポート・ストアスライス等）が正しく生成されていることを検証してから次 Wave を開始する
 4. **全 Wave 完了後、ユーザーに結果を報告する**
 
 ### 各サブエージェントへ渡す情報
@@ -149,6 +167,7 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 |------|------|
 | タスクの目的と完了条件 | ✅ |
 | 変更対象ファイルの明示的リスト（スコープ制約） | ✅ |
+| レビュー対象ファイルリスト（code-reviewer 用。変更対象ファイル + テストファイル） | ✅ |
 | 関連する仕様・decisions.md の参照先 | 該当する場合 |
 | 前段エージェントの出力 | チェーン2段目以降 |
 
