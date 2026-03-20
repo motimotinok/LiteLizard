@@ -86,6 +86,7 @@ export function AnalysisPane({
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
   const generateAllDisabled = staleCount === 0 || hasPending || !apiKeyConfigured;
 
+  const [analysisMode, setAnalysisMode] = useState<'paragraph' | 'chapter-summary' | 'theme'>('paragraph');
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
   const [draggingParagraphId, setDraggingParagraphId] = useState<string | null>(null);
   const [dropTargetParagraphId, setDropTargetParagraphId] = useState<string | null>(null);
@@ -156,6 +157,15 @@ export function AnalysisPane({
         >
           生成
         </button>
+        <select
+          className="analysis-mode-select"
+          value={analysisMode}
+          onChange={(e) => setAnalysisMode(e.target.value as 'paragraph' | 'chapter-summary' | 'theme')}
+        >
+          <option value="paragraph">段落解析</option>
+          <option value="chapter-summary">章サマリー</option>
+          <option value="theme">テーマ分析</option>
+        </select>
       </header>
 
       {!document ? (
