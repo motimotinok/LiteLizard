@@ -136,7 +136,8 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 ### Wave 実行手順
 
 1. **Wave 内の全タスクをバックグラウンドで並列起動する**
-   - 各タスクに対して `general-purpose` エージェントを `run_in_background: true` で起動
+   - 各タスクに対して `general-purpose` エージェントを `run_in_background: true` で起動する
+   - **注: この指示は Claude 本体（親）が実行する。** general-purpose を使う理由は、Agent ツールを持つのが general-purpose のみであり、チェーン内で専用エージェント（`plan-executor` → `feature-test-writer` → `code-reviewer` → `debugger`）を順次呼び出すために必要なため。起動時のプロンプトにチェーンの実行手順を含める
    - 各エージェントのプロンプトにはプランの該当タスク情報（指示・スコープ制約・完了条件）とチェーン実行指示を含める
 2. **全タスクの完了通知を待つ**
 3. **次の Wave に進む**（前の Wave の成果物が必要な場合は `git` で確認）
@@ -154,6 +155,8 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 ### スコープ制約の厳守
 
 並列実行時のファイル競合を防ぐため、各タスクのサブエージェントには**プランで指定されたファイルのみ変更可能**という制約を明示すること。プランに記載のないファイルを変更する必要が生じた場合は、実装を中断してその旨を報告する。
+
+**テストファイルの扱い**: 各タスクのスコープには、変更対象ファイルに対応するテストファイル（`*.test.ts`, `*.test.tsx`）も暗黙的に含まれる。プランの「変更ファイル」に明示されていなくても、`feature-test-writer` は対象ファイルと同ディレクトリまたは既存テストディレクトリにテストファイルを作成・編集できる。
 
 ### review-debug ループの上限
 
