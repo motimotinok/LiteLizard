@@ -55,10 +55,12 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 2. **Step 2: feature-test-writer（テスト）** — Full チェーンのみ
    - Step 1 完了後、Full チェーンのタスクに対して `feature-test-writer` を並列起動する
    - プロンプトには Step 1 の実装結果（変更ファイル・実装内容の要約）を含める
+   - 全タスクの完了通知を待つ
 
 3. **Step 3: code-reviewer（レビュー）** — Full / Light チェーン
    - Step 2 完了後（Light は Step 1 完了後）、`code-reviewer` を並列起動する
    - プロンプトにはレビュー対象ファイルリストを必ず含める
+   - 全タスクの完了通知を待つ
 
 4. **Step 4: debugger（修正）** — レビューで指摘があったタスクのみ
    - code-reviewer が指摘を出したタスクに対して `debugger` を起動する
