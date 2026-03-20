@@ -19,3 +19,4 @@ PROJECTMEMORY/
 .claude/settings.json
 .claude/settings.local.json
 .claude/agent-memory-local
+docs/session-summary.md
