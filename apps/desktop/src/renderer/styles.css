@@ -755,6 +755,18 @@ textarea {
   cursor: not-allowed;
 }
 
+.analysis-mode-select {
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  padding: 5px 8px;
+  color: #1f2937;
+  cursor: pointer;
+  line-height: 1;
+}
+
 .analysis-title-wrap {
   display: flex;
   gap: 10px;
@@ -836,9 +848,10 @@ textarea {
   padding: 10px;
   cursor: pointer;
   transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    background-color 200ms ease,
+    transform 200ms ease;
 }
 
 .analysis-card:hover {
@@ -846,9 +859,15 @@ textarea {
   background: #fbfcfd;
 }
 
+.analysis-card:active {
+  transform: scale(0.98);
+  transition-duration: 80ms;
+}
+
 .analysis-card-active {
   border-color: #111;
   box-shadow: 0 0 0 1px rgba(17, 17, 17, 0.08);
+  transform: scale(1.01);
 }
 
 .analysis-card-dragging {
@@ -1115,26 +1134,37 @@ textarea {
   .workspace-content.with-chat {
     flex-direction: column;
     justify-content: flex-start;
+    overflow-y: auto;
   }
 
   .editor-shell {
+    flex: 1;
     min-height: 320px;
+    flex-shrink: 0;
   }
 
   .analysis-shell {
     width: 100%;
     min-width: 0;
     min-height: 250px;
+    max-height: 40vh;
+    overflow-y: auto;
   }
 
   .chat-shell {
     width: 100%;
     min-width: 0;
     min-height: 250px;
+    max-height: 40vh;
+    overflow-y: auto;
   }
 }
 
 @media (max-width: 760px) {
+  .panel-resizer {
+    display: none;
+  }
+
   .workspace-left {
     height: 220px;
   }
@@ -1147,6 +1177,10 @@ textarea {
 
   .explorer-tree-item {
     height: 34px;
+  }
+
+  .editor-shell {
+    min-height: 200px;
   }
 
   .editor-paragraph-list {
