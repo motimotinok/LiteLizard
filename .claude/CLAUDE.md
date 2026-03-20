@@ -66,4 +66,4 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 コードベースの広範な調査が必要な場合は **Explore エージェント**を使う。単純な検索は Glob / Grep を直接使う。
 
 ### 並列実行
-`/parallel-planner` スキルでプランを生成し、スキル内の実行ルールに従ってサブエージェントを起動する。
+`/parallel-planner` スキルでプランを生成し、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。
