@@ -9,6 +9,9 @@ apps/api/data
 .pnpm-store
 *.tsbuildinfo
 
+# Temporary files (codex logs, etc.)
+tmp/
+
 # Project memory (Claude task management - local only)
 PROJECTMEMORY/
 
