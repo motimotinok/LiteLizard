@@ -51,6 +51,8 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 | `docs/decisions.md` | git | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
 | `docs/implementation-status.md` | git | 実装状況（仕様 v003 対照） |
+| `docs/session-summary.md` | git | セッション引き継ぎ（前回の成果・次タスク） |
+| `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
 | `PROJECTMEMORY/WORKSPACE.md` | .gitignore | ユーザーのメモ帳 |
 | `PROJECTMEMORY/TASKS.md` | .gitignore | Claude対話用ダッシュボード |
 | `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫 |
