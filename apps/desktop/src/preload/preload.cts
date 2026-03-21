@@ -1,11 +1,11 @@
 import { contextBridge } from 'electron';
-import { createMockPreloadApi } from './preloadMockApi.js';
+import { createIpcBridge } from './ipcBridge.js';
 
-const api = createMockPreloadApi();
+const api = createIpcBridge();
 
 try {
   contextBridge.exposeInMainWorld('litelizard', api);
-  console.log('[Preload] litelizard bridge exposed (mock mode)');
+  console.log('[Preload] litelizard bridge exposed (IPC mode)');
 } catch (error) {
   console.error('[Preload] expose failed', error);
 }

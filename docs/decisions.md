@@ -117,6 +117,17 @@
 
 ---
 
+## [2026-03-21] IPC チャンネル定義と型安全ブリッジ設計 (E-01)
+
+- **決定**: `BridgeApi` インターフェースと `IPC_CHANNELS` 定数マップを `@litelizard/shared` に配置し、main / preload / renderer の3層で共有する。preload は `ipcRenderer.invoke` による実 IPC ブリッジに切り替え
+- **理由**: API 契約の Single Source of Truth を確立し、チャンネル名の typo を型レベルで防止する。ブラウザ dev モードでは `main.tsx` のモック fallback で動作するため、preload からモック依存を除去できる
+- **却下した案**:
+  - `apps/desktop/src/shared/` に配置: preload の tsconfig（rootDir=src/preload）からインポートできない
+  - パラメータ/戻り値の完全型チェック付き registerHandler ラッパー: IPC 境界はシリアライズされるため実行時は any。過剰な型安全は誤った保証になる
+- **参照**: `packages/shared/src/bridge.ts`, `apps/desktop/src/preload/ipcBridge.ts`
+
+---
+
 ## [2026-02-xx] EditorPane をコンポーネント分割（editor/ ディレクトリ）
 
 - **決定**: 旧 `EditorPane.tsx` を `components/editor/` 配下に分割
