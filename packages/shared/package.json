@@ -4,6 +4,20 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./lzl": {
+      "types": "./src/lzl/index.ts",
+      "default": "./src/lzl/index.ts"
+    },
+    "./lzl/ids": {
+      "types": "./src/lzl/ids.ts",
+      "default": "./src/lzl/ids.ts"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
