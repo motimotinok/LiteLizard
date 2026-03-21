@@ -44,7 +44,7 @@ export interface LiteLizardDocument {
   createdAt: string;
   updatedAt: string;
   source?: {
-    format: 'litelizard-json' | 'markdown-md';
+    format: 'litelizard-json' | 'markdown-md' | 'lzl-v1';
     originPath?: string;
   };
   chapters: Chapter[];
