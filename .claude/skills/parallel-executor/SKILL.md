@@ -45,31 +45,37 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 
 ## Wave 実行手順
 
-各 Wave について以下を実行する。**サブエージェント起動時は `isolation: "worktree"` を指定**し、メインワークスペース（`claude/task`）を汚さない。変更が残った worktree はブランチとして返されるので、全タスク完了後にメインへマージする。
+各 Wave について以下を実行する。**Step 1（plan-executor）は `isolation: "worktree"` で隔離実行**し、メインワークスペース（`claude/task`）を汚さない。Step 1 完了後にワークツリーの変更を `claude/task` にマージし、Step 2 以降は `claude/task` 上で実行する。
 
 1. **Step 1: plan-executor（実装）**
    - Wave 内の全タスクの `plan-executor` を `run_in_background: true`, `isolation: "worktree"` で**並列起動**する
    - 各プロンプトにはタスク情報（指示・スコープ制約・完了条件）を含める
    - 全タスクの完了通知を待つ
 
-2. **Step 2: feature-test-writer（テスト）** — Full チェーンのみ
-   - Step 1 完了後、Full チェーンのタスクに対して `feature-test-writer` を並列起動する
-   - プロンプトには Step 1 の実装結果（変更ファイル・実装内容の要約）を含める
+2. **Step 1.5: ワークツリーのマージ**
+   - Step 1 の各エージェントの結果（変更ファイルリスト・実装内容の要約・ワークツリーブランチ名）を保持する
+   - 各ワークツリーのブランチを `claude/task` にマージする
+   - 競合が発生した場合はユーザーに報告（planner でファイル競合は排除済みのため通常は発生しない）
+   - 保持した結果は Step 2 以降のプロンプトに「前段エージェントの出力」として渡す
+
+3. **Step 2: feature-test-writer（テスト）** — Full チェーンのみ
+   - Step 1.5 のマージ完了後、Full チェーンのタスクに対して `feature-test-writer` を `run_in_background: true` で**並列起動**する（`isolation` は指定しない — `claude/task` 上で実行）
+   - プロンプトには Step 1.5 で保持した各タスクの変更ファイルリスト・実装内容の要約を含める
    - 全タスクの完了通知を待つ
 
-3. **Step 3: code-reviewer（レビュー）** — Full / Light チェーン
-   - Step 2 完了後（Light は Step 1 完了後）、`code-reviewer` を並列起動する
-   - プロンプトにはレビュー対象ファイルリストを必ず含める
+4. **Step 3: code-reviewer（レビュー）** — Full / Light チェーン
+   - Step 2 完了後（Light は Step 1.5 完了後）、`code-reviewer` を `run_in_background: true` で**並列起動**する（`isolation` は指定しない — `claude/task` 上で実行）
+   - プロンプトにはレビュー対象ファイルリストと Step 1.5 で保持した変更要約を含める
    - 全タスクの完了通知を待つ
 
-4. **Step 4: debugger（修正）** — レビューで指摘があったタスクのみ
-   - code-reviewer が指摘を出したタスクに対して `debugger` を起動する
+5. **Step 4: debugger（修正）** — レビューで指摘があったタスクのみ
+   - code-reviewer が指摘を出したタスクに対して `debugger` を起動する（`isolation` は指定しない — `claude/task` 上で実行）
    - 修正後、再度 code-reviewer を起動する（review-debug ループ、最大3回）
 
-5. **次の Wave に進む**
+6. **次の Wave に進む**
    - Wave 間に依存がある場合、前 Wave の該当成果物が正しく生成されていることを検証してから次 Wave を開始する
 
-6. **全 Wave 完了後、ユーザーに結果を報告する**
+7. **全 Wave 完了後、ユーザーに結果を報告する**
 
 ---
 
