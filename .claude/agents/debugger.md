@@ -7,6 +7,8 @@ color: purple
 memory: project
 ---
 
+> **チェーン実行時の動作**: parallel-executor 経由のチェーン実行では、先行するエージェントが作成した git worktree パスを渡されて動作します。渡された作業ディレクトリ内のファイルのみを操作してください。
+
 You are an expert debugger specializing in root cause analysis.
 
 When invoked:

@@ -20,7 +20,7 @@
 ### ブランチ運用
 - メイン作業ディレクトリ（`/Users/jane/litelizard/claude`）は **dev ブランチに常駐**
 - 作業は dev から feature branch（`feat/<task-id>`）を切って実施
-- **並列実行時**: 事前作成済みの worktree（work1〜work5）に feature branch を割り当てて並列作業
+- **並列実行時**: Agent tool の `isolation: "worktree"` により Claude Code が自動作成する一時 worktree で並列作業
 - **単一タスク時**: メインディレクトリで直接 feature branch を切って作業
 - 作業完了・レビュー後、dev にローカルマージし feature branch を削除
 - リモートとの同期: `git fetch origin && git merge origin/dev`
@@ -69,4 +69,4 @@
 
 ### 並列実行
 `/parallel-planner` スキルでプランを生成し、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。
-並列実行時は事前作成済みの worktree（work1〜work5、最大5並列）を使用する。
+並列実行時は plan-executor の `isolation: worktree` 設定により、Claude Code が自動で worktree を作成・管理する。
