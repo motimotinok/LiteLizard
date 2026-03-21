@@ -1,0 +1,5 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+export function EditorEmptyState({ isExpanded, onCreateEssay, onOpenFolder }) {
+    return (_jsx("section", { className: isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell', children: _jsxs("div", { className: "editor-empty-state", children: [_jsx("h2", { className: "editor-empty-title", children: "\u69CB\u9020\u3092\u8A2D\u8A08\u3059\u308B\u305F\u3081\u306E\u57F7\u7B46\u30A8\u30EA\u30A2" }), _jsx("p", { className: "editor-empty-description", children: "\u6BB5\u843D\u5358\u4F4D\u3067\u601D\u8003\u3067\u304D\u308B\u3088\u3046\u306B\u3001\u307E\u305A\u306F\u4F5C\u54C1\u30D5\u30A1\u30A4\u30EB\u3092\u7528\u610F\u3057\u3066\u304F\u3060\u3055\u3044\u3002" }), _jsxs("div", { className: "editor-empty-actions", children: [_jsx("button", { className: "action-button action-button-primary", onClick: onCreateEssay, children: "\u270D \u65B0\u3057\u3044\u30A8\u30C3\u30BB\u30A4\u3092\u66F8\u304F" }), _jsx("button", { className: "action-button", onClick: onOpenFolder, children: "\uD83D\uDCC2 \u30D5\u30A9\u30EB\u30C0\u3092\u958B\u304F" })] })] }) }));
+}
+//# sourceMappingURL=EditorEmptyState.js.map
