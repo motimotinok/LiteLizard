@@ -45,10 +45,10 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 
 ## Wave 実行手順
 
-各 Wave について以下を実行する:
+各 Wave について以下を実行する。**サブエージェント起動時は `isolation: "worktree"` を指定**し、メインワークスペース（`claude/task`）を汚さない。変更が残った worktree はブランチとして返されるので、全タスク完了後にメインへマージする。
 
 1. **Step 1: plan-executor（実装）**
-   - Wave 内の全タスクの `plan-executor` を `run_in_background: true` で**並列起動**する
+   - Wave 内の全タスクの `plan-executor` を `run_in_background: true`, `isolation: "worktree"` で**並列起動**する
    - 各プロンプトにはタスク情報（指示・スコープ制約・完了条件）を含める
    - 全タスクの完了通知を待つ
 
