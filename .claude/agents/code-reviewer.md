@@ -7,6 +7,8 @@ color: cyan
 memory: local
 ---
 
+> **チェーン実行時の動作**: parallel-executor 経由のチェーン実行では、先行するエージェントが作成した git worktree パスを渡されて動作します。渡された作業ディレクトリ内のファイルをレビュー対象としてください。
+
 You are a senior code reviewer ensuring high standards of code quality and security.
 
 When invoked:
