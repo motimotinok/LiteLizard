@@ -6,42 +6,45 @@
 
 ## Claude の役割
 
-このプロジェクトでは **Claude（あなた）と Codex が並列で開発** を行う。
-
 ### Claude が担うこと
 - **仕様策定・設計判断**: ユーザーとの対話を通じて仕様を詰め、設計を決定する
-- **設計判断が必要な実装タスク**: Lexical 統合、ストア設計変更など、既存コードとの整合判断が必要なもの
-- **WBS の更新・タスク割り振り**: `docs/wbs.md` にタスクを追加・割り振り・優先度付けする
-- **PROJECTMEMORY の管理**: WORKSPACE / TASKS / ARCHIVE の整理・更新
+- **実装全般**: すべての実装タスクを Claude が担う
+- **WBS の更新・タスク割り振り**: `docs/wbs.md` にタスクを追加・優先度付けする
+- **PROJECTMEMORY の管理**: TASKS / ARCHIVE の整理・更新
 - **設計判断の記録**: `docs/decisions.md` に技術選択の理由を記録する
-
-### Claude が担わないこと
-- PR レビュー（Codex が自動レビューする）
-- 入出力が明確で機械的な実装タスク（Codex に委譲する）
 
 ---
 
-## 並列開発ワークフロー
+## 開発ワークフロー
 
-### 構成
-
-```
-worktree①: /Users/jane/litelizard/claude  → Claude 作業場
-worktree②: /Users/jane/litelizard/codex   → Codex 作業場
-```
-
-### ブランチ運用（固定ブランチ方式）
-- **Claude**: `claude/task` ブランチに常駐。PR は `dev` ベース
-- **Codex**: `codex/task` ブランチに常駐。PR は `dev` ベース
-- タスクごとにブランチを切らず、固定ブランチ上でこまめに PR を出す
-- PR マージ後は `git fetch origin && git merge origin/dev` で最新を取り込む
+### ブランチ運用
+- メイン作業ディレクトリ（`/Users/jane/litelizard/claude`）は **dev ブランチに常駐**
+- 作業は dev から feature branch（`feat/<task-id>`）を切って実施
+- **並列実行時**: 事前作成済みの worktree（work1〜work5）に feature branch を割り当てて並列作業
+- **単一タスク時**: メインディレクトリで直接 feature branch を切って作業
+- 作業完了・レビュー後、dev にローカルマージし feature branch を削除
+- リモートとの同期: `git fetch origin && git merge origin/dev`
 
 ### タスクの流れ
-1. Claude + ユーザーが `docs/wbs.md` でタスクを洗い出し・割り振る
-2. Codex 担当タスクは `/codex-delegate-task` スキルで Codex実行キューのTASK.md に書き込む
-3. 各自が固定ブランチ上で作業し、区切りのいいところで PR を出す
-4. 完了したら `docs/wbs.md` のステータスを更新
-5. PR マージで `dev` に反映 → 各自 `git merge origin/dev` で同期
+1. `PROJECTMEMORY/TASKS.md` の「NEXT」でタスクを確認
+2. dev から `feat/<task-id>` ブランチを切って実装（並列時は worktree を使用）
+3. 完了したら `docs/wbs.md` のステータスを更新
+4. dev にマージ、feature branch を削除
+5. `PROJECTMEMORY/TASKS.md` のキューを更新
+
+### PR・レビュー方針
+
+- **PR はレビュー依頼の場ではなく変更の記録・区切りとして使う**
+- レビューは Claude が実装時に code-reviewer エージェントで自己完結させる（PR 後の指摘ループは原則行わない）
+- PR に指摘コメントがついた場合の対応基準:
+
+| 優先度 | 内容 | 対応 |
+|--------|------|------|
+| P1 | データ消失・クラッシュ系バグ | マージ前に必ず修正 |
+| P2 | 設計の不整合・将来影響あり | 仕様変更で影響するなら修正、しないなら Issue 起票して後回し |
+| P3 | 軽微なコード品質・スタイル | 仕様が固まったタイミングで Issue 起票、即時対応しない |
+
+- **P2/P3 で即時対応しないものは GitHub Issue として起票する**（TODO コメントより追跡しやすいため）
 
 ### ファイルの役割分担
 
@@ -51,12 +54,9 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 | `docs/decisions.md` | git | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
 | `docs/implementation-status.md` | git | 実装状況（仕様 v003 対照） |
-| `docs/session-summary.md` | git | セッション引き継ぎ（前回の成果・次タスク） |
 | `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
-| `PROJECTMEMORY/WORKSPACE.md` | .gitignore | ユーザーのメモ帳 |
-| `PROJECTMEMORY/TASKS.md` | .gitignore | Claude対話用ダッシュボード |
+| `PROJECTMEMORY/TASKS.md` | .gitignore | 優先度順タスクキュー + 方針覚書ダッシュボード |
 | `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫 |
-| `/Users/jane/litelizard/codex/PROJECTMEMORY/TASK.md` | .gitignore | Codex 実行キュー |
 
 ---
 
@@ -69,3 +69,4 @@ worktree②: /Users/jane/litelizard/codex   → Codex 作業場
 
 ### 並列実行
 `/parallel-planner` スキルでプランを生成し、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。
+並列実行時は事前作成済みの worktree（work1〜work5、最大5並列）を使用する。

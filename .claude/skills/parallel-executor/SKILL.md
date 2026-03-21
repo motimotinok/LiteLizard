@@ -45,32 +45,52 @@ plan-executor → feature-test-writer → code-reviewer → debugger
 
 ## Wave 実行手順
 
-各 Wave について以下を実行する。**Step 1（plan-executor）は `isolation: "worktree"` で隔離実行**し、メインワークスペース（`claude/task`）を汚さない。Step 1 完了後にワークツリーの変更を `claude/task` にマージし、Step 2 以降は `claude/task` 上で実行する。
+各 Wave について以下を実行する。**全チェーン（実装→テスト→レビュー→デバッグ）を事前作成済みの worktree（work1〜work5）上で完結させ**、全ステップ終了後に feature branch を dev にマージする。
+
+0. **Step 0: 準備**
+   - dev を最新化: `git fetch origin && git merge origin/dev`
+   - 全 worktree が detached HEAD であることを確認（前回のクリーンアップ漏れ対策）:
+     ```
+     for i in 1 2 3 4 5; do git -C /Users/jane/litelizard/work$i checkout --detach 2>/dev/null; done
+     ```
+   - Wave 内の各タスクに feature branch を作成: `git branch feat/<task-id> dev`
+   - 各タスクを worktree に割り当て（planner の出力に従う）: `git -C /Users/jane/litelizard/work{N} checkout feat/<task-id>`
 
 1. **Step 1: plan-executor（実装）**
-   - Wave 内の全タスクの `plan-executor` を `run_in_background: true`, `isolation: "worktree"` で**並列起動**する
+   - Wave 内の全タスクの `plan-executor` を `run_in_background: true` で**並列起動**する
+   - **`isolation: "worktree"` は指定しない** — 既存 worktree を使うため
+   - 各サブエージェントのプロンプトに**作業ディレクトリのパス**（`/Users/jane/litelizard/work{N}`）を明示し、「このディレクトリ内のファイルのみ操作すること」と指示する
    - 各プロンプトにはタスク情報（指示・スコープ制約・完了条件）を含める
    - 全タスクの完了通知を待つ
+   - 各エージェントの結果（変更ファイルリスト・実装内容の要約）を保持する
 
-2. **Step 1.5: ワークツリーのマージ**
-   - Step 1 の各エージェントの結果（変更ファイルリスト・実装内容の要約・ワークツリーブランチ名）を保持する
-   - 各ワークツリーのブランチを `claude/task` にマージする
-   - 競合が発生した場合はユーザーに報告（planner でファイル競合は排除済みのため通常は発生しない）
-   - 保持した結果は Step 2 以降のプロンプトに「前段エージェントの出力」として渡す
-
-3. **Step 2: feature-test-writer（テスト）** — Full チェーンのみ
-   - Step 1.5 のマージ完了後、Full チェーンのタスクに対して `feature-test-writer` を `run_in_background: true` で**並列起動**する（`isolation` は指定しない — `claude/task` 上で実行）
-   - プロンプトには Step 1.5 で保持した各タスクの変更ファイルリスト・実装内容の要約を含める
+2. **Step 2: feature-test-writer（テスト）** — Full チェーンのみ
+   - Step 1 完了後、Full チェーンのタスクに対して `feature-test-writer` を `run_in_background: true` で**並列起動**する（**各タスクの worktree 上で実行**）
+   - プロンプトには作業ディレクトリのパスと、Step 1 で保持した変更ファイルリスト・実装内容の要約を含める
    - 全タスクの完了通知を待つ
 
-4. **Step 3: code-reviewer（レビュー）** — Full / Light チェーン
-   - Step 2 完了後（Light は Step 1.5 完了後）、`code-reviewer` を `run_in_background: true` で**並列起動**する（`isolation` は指定しない — `claude/task` 上で実行）
-   - プロンプトにはレビュー対象ファイルリストと Step 1.5 で保持した変更要約を含める
+3. **Step 3: code-reviewer（レビュー）** — Full / Light チェーン
+   - Step 2 完了後（Light は Step 1 完了後）、`code-reviewer` を `run_in_background: true` で**並列起動**する（**各タスクの worktree 上で実行**）
+   - プロンプトには作業ディレクトリのパスとレビュー対象ファイルリスト・変更要約を含める
    - 全タスクの完了通知を待つ
 
-5. **Step 4: debugger（修正）** — レビューで指摘があったタスクのみ
-   - code-reviewer が指摘を出したタスクに対して `debugger` を起動する（`isolation` は指定しない — `claude/task` 上で実行）
+4. **Step 4: debugger（修正）** — レビューで指摘があったタスクのみ
+   - code-reviewer が指摘を出したタスクに対して `debugger` を起動する（**該当タスクの worktree 上で実行**）
    - 修正後、再度 code-reviewer を起動する（review-debug ループ、最大3回）
+
+5. **Step 5: dev へのマージ**
+   - 全タスクのチェーンが完了したことを確認
+   - 各 worktree の変更がコミット済みであることを確認
+   - メインディレクトリで各 feature branch を dev にマージ:
+     ```
+     cd /Users/jane/litelizard/claude
+     git merge feat/<task-id-1>
+     git merge feat/<task-id-2>
+     ...
+     ```
+   - 競合が発生した場合はユーザーに報告（planner でファイル競合は排除済みのため通常は発生しない）
+   - worktree を detached HEAD に戻す: `git -C /Users/jane/litelizard/work{N} checkout --detach`
+   - feature branch を削除: `git branch -d feat/<task-id>`
 
 6. **次の Wave に進む**
    - Wave 間に依存がある場合、前 Wave の該当成果物が正しく生成されていることを検証してから次 Wave を開始する
