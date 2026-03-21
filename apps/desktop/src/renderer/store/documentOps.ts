@@ -1,4 +1,5 @@
 import type { Chapter, LiteLizardDocument } from '@litelizard/shared';
+import { createChapterId, createParagraphId } from '@litelizard/shared/lzl/ids';
 import type { ChapterStructureInput, DocumentStructureInput } from '../types/documentStructure.js';
 
 export function updateParagraphInDocument(
@@ -50,14 +51,6 @@ export function reorderParagraphsInDocument(
 
 export function collectStaleParagraphs(document: LiteLizardDocument) {
   return document.paragraphs.filter((paragraph) => paragraph.lizard.status === 'stale');
-}
-
-function createParagraphId() {
-  return `p_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function createChapterId() {
-  return `c_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function normalizeChapters(chapters: ChapterStructureInput[]): Chapter[] {

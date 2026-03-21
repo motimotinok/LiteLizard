@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Chapter, FileNode, LiteLizardAnalysisFile, LiteLizardDocument, Paragraph } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
 import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
@@ -12,18 +12,6 @@ interface ParsedParagraph {
 interface ParsedMarkdown {
   chapters: Chapter[];
   paragraphs: ParsedParagraph[];
-}
-
-function createDocumentId() {
-  return `doc_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function createParagraphId() {
-  return `p_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function createChapterId() {
-  return `c_${Math.random().toString(36).slice(2, 12)}`;
 }
 
 function toAnalysisPath(markdownPath: string) {

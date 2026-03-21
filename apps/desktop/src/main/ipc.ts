@@ -1,8 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
-import type { AnalysisRunInput, LiteLizardDocument } from '@litelizard/shared';
-import { IPC_CHANNELS } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, IPC_CHANNELS, type AnalysisRunInput, type LiteLizardDocument } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
@@ -23,18 +22,6 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
   return 'Unknown error';
-}
-
-function createDocumentId() {
-  return `doc_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function createParagraphId() {
-  return `p_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function createChapterId() {
-  return `c_${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
