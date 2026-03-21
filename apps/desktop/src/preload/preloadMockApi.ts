@@ -1,36 +1,10 @@
-import type { AnalysisRunInput, AnalysisRunResult, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import type { AnalysisRunInput, AnalysisRunResult, BridgeApi, FileNode, LiteLizardDocument } from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
   initialMockDocuments,
   initialMockTree,
   mockRootPath,
 } from './preloadMockData.js';
-
-export interface PreloadBridgeApi {
-  openFolder: () => Promise<string | null>;
-  listTree: (root: string) => Promise<FileNode[]>;
-  createEntry: (
-    root: string,
-    type: 'file' | 'folder',
-    name: string
-  ) => Promise<{ ok: boolean; path: string; type: 'file' | 'folder' }>;
-  renameEntry: (targetPath: string, nextName: string) => Promise<{ ok: boolean; path: string }>;
-  deleteEntry: (targetPath: string) => Promise<{ ok: boolean }>;
-  loadDocument: (filePath: string) => Promise<LiteLizardDocument>;
-  createDocument: (
-    root: string,
-    title: string
-  ) => Promise<{ filePath: string; document: LiteLizardDocument }>;
-  saveDocument: (
-    filePath: string,
-    doc: LiteLizardDocument,
-    revision: number
-  ) => Promise<{ ok: boolean; code?: string; revision: number }>;
-  runAnalysis: (input: AnalysisRunInput) => Promise<AnalysisRunResult>;
-  getApiKeyStatus: () => Promise<{ configured: boolean }>;
-  saveApiKey: (apiKey: string) => Promise<{ ok: boolean }>;
-  clearApiKey: () => Promise<{ ok: boolean }>;
-}
 
 interface MockState {
   tree: FileNode[];
@@ -259,7 +233,7 @@ function paragraphAnalysisFromText(text: string) {
   };
 }
 
-export function createMockPreloadApi(): PreloadBridgeApi {
+export function createMockPreloadApi(): BridgeApi {
   const state: MockState = {
     tree: clone(initialMockTree),
     documents: new Map(

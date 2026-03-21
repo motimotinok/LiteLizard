@@ -2,6 +2,7 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
 import type { AnalysisRunInput, LiteLizardDocument } from '@litelizard/shared';
+import { IPC_CHANNELS } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
@@ -95,7 +96,7 @@ async function assertRenameTargetAvailable(sourcePath: string, targetPath: strin
 }
 
 export function registerIpcHandlers() {
-  ipcMain.handle('dialog:openFolder', async () => {
+  ipcMain.handle(IPC_CHANNELS.openFolder, async () => {
     try {
       const result = await dialog.showOpenDialog({
         properties: ['openDirectory'],
@@ -112,7 +113,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('fs:listTree', async (_, root: string) => {
+  ipcMain.handle(IPC_CHANNELS.listTree, async (_, root: string) => {
     try {
       return await fileService.listTree(root);
     } catch (error) {
@@ -121,7 +122,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('fs:create', async (_, root: string, type: FsEntryType, name: string) => {
+  ipcMain.handle(IPC_CHANNELS.createEntry, async (_, root: string, type: FsEntryType, name: string) => {
     try {
       const validatedName = validateEntryName(name);
 
@@ -149,7 +150,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('fs:rename', async (_, targetPath: string, nextName: string) => {
+  ipcMain.handle(IPC_CHANNELS.renameEntry, async (_, targetPath: string, nextName: string) => {
     try {
       const stats = await fs.stat(targetPath);
 
@@ -193,7 +194,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('fs:delete', async (_, targetPath: string) => {
+  ipcMain.handle(IPC_CHANNELS.deleteEntry, async (_, targetPath: string) => {
     try {
       const stats = await fs.stat(targetPath);
 
@@ -216,11 +217,11 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle('doc:load', async (_, filePath: string) => {
+  ipcMain.handle(IPC_CHANNELS.loadDocument, async (_, filePath: string) => {
     return fileService.load(filePath);
   });
 
-  ipcMain.handle('doc:create', async (_, root: string, title: string) => {
+  ipcMain.handle(IPC_CHANNELS.createDocument, async (_, root: string, title: string) => {
     const safeStem = sanitizeFileStem(title);
     const fileName = ensureMarkdownFileName(safeStem);
     const filePath = path.join(root, fileName);
@@ -234,16 +235,16 @@ export function registerIpcHandlers() {
     return { filePath, document: doc };
   });
 
-  ipcMain.handle('doc:save', async (_, filePath: string, doc: LiteLizardDocument, revision: number) => {
+  ipcMain.handle(IPC_CHANNELS.saveDocument, async (_, filePath: string, doc: LiteLizardDocument, revision: number) => {
     return fileService.save(filePath, doc, revision);
   });
 
-  ipcMain.handle('settings:apiKey:getStatus', async () => {
+  ipcMain.handle(IPC_CHANNELS.getApiKeyStatus, async () => {
     const apiKey = await apiKeyVault.load();
     return { configured: Boolean(apiKey?.trim()) };
   });
 
-  ipcMain.handle('settings:apiKey:save', async (_, apiKey: string) => {
+  ipcMain.handle(IPC_CHANNELS.saveApiKey, async (_, apiKey: string) => {
     const trimmed = apiKey.trim();
     if (!trimmed) {
       throw new Error('API key must not be empty.');
@@ -252,12 +253,12 @@ export function registerIpcHandlers() {
     return { ok: true };
   });
 
-  ipcMain.handle('settings:apiKey:clear', async () => {
+  ipcMain.handle(IPC_CHANNELS.clearApiKey, async () => {
     await apiKeyVault.clear();
     return { ok: true };
   });
 
-  ipcMain.handle('analysis:run', async (_, input: AnalysisRunInput) => {
+  ipcMain.handle(IPC_CHANNELS.runAnalysis, async (_, input: AnalysisRunInput) => {
     const apiKey = await apiKeyVault.load();
     if (!apiKey) {
       throw new Error('API key is not configured. Open Settings and save your API key.');
