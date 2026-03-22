@@ -35,7 +35,7 @@
 ### PR・レビュー方針
 
 - **PR はレビュー依頼の場ではなく変更の記録・区切りとして使う**
-- レビューは Claude が実装時に code-reviewer エージェントで自己完結させる（PR 後の指摘ループは原則行わない）
+- レビューは Claude が実装時に implementer エージェントの内部レビュー（codex-delegate 経由）で自己完結させる（PR 後の指摘ループは原則行わない）
 - PR に指摘コメントがついた場合の対応基準:
 
 | 優先度 | 内容 | 対応 |
@@ -69,4 +69,4 @@
 
 ### 並列実行
 `/parallel-planner` スキルでプランを生成し、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。
-並列実行時は plan-executor の `isolation: worktree` 設定により、Claude Code が自動で worktree を作成・管理する。
+並列実行時は implementer の `isolation: worktree` 設定により、Claude Code が自動で worktree を作成・管理する。
