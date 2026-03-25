@@ -66,7 +66,10 @@ case "$MODE" in
     echo "    LOG: $LOG_FILE" >&2
     echo "" >&2
 
-    cd "$DIR" && codex review --uncommitted 2>&1 | tee "$LOG_FILE"
+    cd "$DIR" && codex review --uncommitted > "$LOG_FILE" 2>&1 || true
+    # 全文はログ保存済み。最後の "codex" マーカー以降だけ抽出して Claude に渡す
+    REVIEW_SUMMARY=$(awk '/^codex$/{buf=""} !/^codex$/{buf=buf (buf?"\n":"") $0} END{print buf}' "$LOG_FILE")
+    jq -n --arg result "$REVIEW_SUMMARY" '{"hookSpecificOutput":{"additionalContext":$result}}'
     ;;
 
   *)

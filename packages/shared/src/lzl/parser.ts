@@ -1,7 +1,7 @@
 import type { ParsedLzlDocument } from './types.js';
 
-const CHAPTER_MARKER = /^<!--::\s*ch\s+(c_[a-z0-9]{10})\s*\|\s*(.+?)\s*::-->$/;
-const PARAGRAPH_MARKER = /^<!--::\s*p\s+(p_[a-z0-9]{10})\s*::-->$/;
+const CHAPTER_MARKER = /^<!--::\s*ch\s+([^\s|]+)\s*\|\s*(.+?)\s*::-->$/;
+const PARAGRAPH_MARKER = /^<!--::\s*p\s+(\S+)\s*::-->$/;
 
 function emptyFrontmatter(): ParsedLzlDocument['frontmatter'] {
   return {

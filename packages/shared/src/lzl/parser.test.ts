@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseLzl } from './parser.js';
+import { validateAndRepairLzl } from './validator.js';
 
 const completeExample = `---
 documentId: d_a8f3k2m9x1
@@ -152,5 +153,76 @@ B`);
 
     expect(parsed.paragraphs).toHaveLength(5);
     expect(parsed.paragraphs[1]?.text).toBe('どこで生れたかとんと見当がつかぬ。');
+  });
+});
+
+describe('parseLzl - corrupted markers', () => {
+  it('detects chapter markers with a short (corrupted) ID', () => {
+    const parsed = parseLzl(`<!--:: ch c_short | 第一章 ::-->
+
+<!--:: p p_abcdefghij ::-->
+本文`);
+
+    expect(parsed.chapters).toHaveLength(1);
+    expect(parsed.chapters[0].id).toBe('c_short');
+    expect(parsed.chapters[0].title).toBe('第一章');
+    expect(parsed.paragraphs[0].chapterId).toBe('c_short');
+    expect(parsed.paragraphs[0].text).toBe('本文');
+  });
+
+  it('detects chapter markers with an overlong ID', () => {
+    const parsed = parseLzl(`<!--:: ch c_toolongidvalue123 | 第一章 ::-->
+
+<!--:: p p_abcdefghij ::-->
+本文`);
+
+    expect(parsed.chapters).toHaveLength(1);
+    expect(parsed.chapters[0].id).toBe('c_toolongidvalue123');
+  });
+
+  it('detects chapter markers with uppercase in ID', () => {
+    const parsed = parseLzl(`<!--:: ch c_AbCdEfGhIj | 第一章 ::-->
+
+<!--:: p p_abcdefghij ::-->
+本文`);
+
+    expect(parsed.chapters).toHaveLength(1);
+    expect(parsed.chapters[0].id).toBe('c_AbCdEfGhIj');
+  });
+
+  it('detects chapter markers with missing prefix', () => {
+    const parsed = parseLzl(`<!--:: ch xabcdefghij | 第一章 ::-->
+
+<!--:: p p_abcdefghij ::-->
+本文`);
+
+    expect(parsed.chapters).toHaveLength(1);
+    expect(parsed.chapters[0].id).toBe('xabcdefghij');
+  });
+
+  it('detects paragraph markers with a corrupted ID', () => {
+    const parsed = parseLzl(`<!--:: ch c_abcdefghij | 第一章 ::-->
+
+<!--:: p p_short ::-->
+本文`);
+
+    expect(parsed.paragraphs).toHaveLength(1);
+    expect(parsed.paragraphs[0].id).toBe('p_short');
+    expect(parsed.paragraphs[0].text).toBe('本文');
+  });
+
+  it('repairs corrupted IDs via validateAndRepairLzl while preserving chapter structure', () => {
+    const parsed = parseLzl(`<!--:: ch c_SHORT | 第一章 ::-->
+
+<!--:: p p_TOOSHORT ::-->
+本文`);
+
+    const result = validateAndRepairLzl(parsed);
+
+    expect(result.document.chapters).toHaveLength(1);
+    expect(result.document.chapters[0].id).toMatch(/^c_[a-z0-9]{10}$/);
+    expect(result.document.paragraphs[0].id).toMatch(/^p_[a-z0-9]{10}$/);
+    expect(result.document.paragraphs[0].chapterId).toBe(result.document.chapters[0].id);
+    expect(result.document.paragraphs[0].text).toBe('本文');
   });
 });
