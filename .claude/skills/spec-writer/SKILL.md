@@ -1,6 +1,6 @@
 ---
 name: spec-writer
-description: "仕様策定タスクの完了時に、docs/specs/ に詳細仕様ファイルを作成し、decisions.md にリンク付き要約を追記し、specs/README.md のインデックスを更新するスキル。「仕様を書いて」「specに書いて」「仕様を記録して」「specs/に書いて」「仕様をまとめて」と言われたとき、または仕様策定タスク（S-xx）の結論が出て文書化する場面で必ず使う。仕様の議論・レビュー自体には使わない（それは tech-decision-review や spec-review の役割）。"
+description: "仕様策定タスクの完了時に、docs/specs/ に詳細仕様ファイルを作成し、decisions.md にリンク付き要約を追記し、specs/README.md のインデックスを更新するスキル。「仕様を書いて」「specに書いて」「仕様を記録して」「specs/に書いて」「仕様をまとめて」と言われたとき、または仕様策定タスク（S-xx）の結論が出て文書化する場面で必ず使う。仕様の議論・レビュー自体には使わない（それは tech-decision-review や product-review の役割）。"
 ---
 
 # Spec Writer — 仕様文書化スキル
