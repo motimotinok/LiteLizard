@@ -20,4 +20,5 @@ PROJECTMEMORY/
 .claude/settings.local.json
 .claude/agent-memory-local
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 docs/session-summary.md

@@ -30,7 +30,8 @@
 2. dev から `feat/<task-id>` ブランチを切って実装（並列時は worktree を使用）
 3. 完了したら `docs/wbs.md` のステータスを更新
 4. dev にマージ、feature branch を削除
-5. `PROJECTMEMORY/TASKS.md` のキューを更新
+5. `PROJECTMEMORY/TASKS.md` のキューを更新（`/update-tasks` スキルを使う）
+   - タスクの追加・完了・優先度変更はすべて `/update-tasks` スキル経由で行う
 
 ### PR・レビュー方針
 

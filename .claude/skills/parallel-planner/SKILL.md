@@ -194,7 +194,7 @@ Wave 1 → Wave 2 間に上記以外の依存はなし。
 
 ## Step 6: 実行への引き渡し
 
-プラン出力後、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。このスキルはプランの生成までを担い、実行は `parallel-executor` が担う。
+このスキルはプランの生成までを担う。実行は `/parallel-executor` スキルが担う。プラン出力後、ユーザーに `/parallel-executor` スキルの呼び出しを案内する。
 
 ---
 
