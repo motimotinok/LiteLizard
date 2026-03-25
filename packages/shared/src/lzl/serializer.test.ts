@@ -75,3 +75,69 @@ describe('serializeLzl', () => {
     expect(serialized.endsWith('\n')).toBe(true);
   });
 });
+
+describe('serializeLzl - orphan paragraphs', () => {
+  const baseDoc: LiteLizardDocument = {
+    version: 2,
+    documentId: 'd_abcdefghij',
+    title: 'test',
+    personaMode: 'friendly',
+    createdAt: '2026-03-20T00:00:00Z',
+    updatedAt: '2026-03-20T00:00:00Z',
+    source: { format: 'lzl-v1' },
+    chapters: [
+      { id: 'c_first00000', order: 1, title: '第一章' },
+      { id: 'c_second0000', order: 2, title: '第二章' },
+    ],
+    paragraphs: [],
+  };
+
+  it('appends orphan paragraph to the last chapter', () => {
+    const doc: LiteLizardDocument = {
+      ...baseDoc,
+      paragraphs: [
+        { id: 'p_normal0000', chapterId: 'c_first00000', order: 1, light: { text: '正常', charCount: 2 }, lizard: { status: 'stale' } },
+        { id: 'p_orphan0000', chapterId: 'c_nonexistent', order: 1, light: { text: '孤立', charCount: 2 }, lizard: { status: 'stale' } },
+      ],
+    };
+
+    const serialized = serializeLzl(doc);
+
+    const secondChapterStart = serialized.indexOf('<!--:: ch c_second0000 | 第二章 ::-->');
+    const orphanIndex = serialized.indexOf('<!--:: p p_orphan0000 ::-->');
+    expect(orphanIndex).toBeGreaterThan(secondChapterStart);
+    expect(serialized).toContain('孤立');
+  });
+
+  it('preserves paragraph count in round-trip when orphan exists', () => {
+    const doc: LiteLizardDocument = {
+      ...baseDoc,
+      paragraphs: [
+        { id: 'p_normal0000', chapterId: 'c_first00000', order: 1, light: { text: '正常', charCount: 2 }, lizard: { status: 'stale' } },
+        { id: 'p_orphan0000', chapterId: 'c_nonexistent', order: 1, light: { text: '孤立', charCount: 2 }, lizard: { status: 'stale' } },
+      ],
+    };
+
+    const serialized = serializeLzl(doc);
+    const parsed = parseLzl(serialized);
+
+    expect(parsed.paragraphs).toHaveLength(2);
+    expect(parsed.paragraphs.find((p) => p.id === 'p_orphan0000')?.chapterId).toBe('c_second0000');
+  });
+
+  it('appends multiple orphan paragraphs with different invalid chapterIds to the last chapter', () => {
+    const doc: LiteLizardDocument = {
+      ...baseDoc,
+      paragraphs: [
+        { id: 'p_orphan0001', chapterId: 'c_ghost00001', order: 1, light: { text: '孤立A', charCount: 3 }, lizard: { status: 'stale' } },
+        { id: 'p_orphan0002', chapterId: 'c_ghost00002', order: 2, light: { text: '孤立B', charCount: 3 }, lizard: { status: 'stale' } },
+      ],
+    };
+
+    const serialized = serializeLzl(doc);
+    const parsed = parseLzl(serialized);
+
+    expect(parsed.paragraphs).toHaveLength(2);
+    expect(parsed.paragraphs.every((p) => p.chapterId === 'c_second0000')).toBe(true);
+  });
+});
