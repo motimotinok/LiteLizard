@@ -22,6 +22,19 @@ export function serializeLzl(document: LiteLizardDocument): string {
     '---',
   ].join('\n');
 
+  const chapterIdSet = new Set(chapters.map((ch) => ch.id));
+  const lastChapterId = chapters[chapters.length - 1]?.id;
+
+  if (lastChapterId) {
+    document.paragraphs.forEach((paragraph) => {
+      if (!chapterIdSet.has(paragraph.chapterId)) {
+        const list = paragraphsByChapterId.get(lastChapterId) ?? [];
+        list.push(paragraph);
+        paragraphsByChapterId.set(lastChapterId, list);
+      }
+    });
+  }
+
   const blocks = chapters.map((chapter) => {
     const chapterLines = [`<!--:: ch ${chapter.id} | ${chapter.title} ::-->`, ''];
     const paragraphs = (paragraphsByChapterId.get(chapter.id) ?? []).slice().sort((left, right) => left.order - right.order);
