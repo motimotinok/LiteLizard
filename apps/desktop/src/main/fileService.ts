@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createChapterId, createDocumentId, createParagraphId, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, parseLzl, validateAndRepairLzl, toLiteLizardDocument, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
 import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
@@ -345,7 +345,7 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
       continue;
     }
 
-    if (entry.isFile() && /\.md$/i.test(entry.name)) {
+    if (entry.isFile() && /\.(md|lzl)$/i.test(entry.name)) {
       nodes.push({
         path: absolutePath,
         name: entry.name,
@@ -365,60 +365,100 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
 export function createFileService() {
   const revisionMap = new Map<string, number>();
 
+  async function loadMarkdown(filePath: string): Promise<LiteLizardDocument> {
+    const markdownRaw = await fs.readFile(filePath, 'utf8');
+    const parsedMarkdown = parseMarkdownStructure(markdownRaw);
+    const analysis = await readAnalysisFile(filePath);
+    const now = new Date().toISOString();
+
+    const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
+    const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
+    const chapters = (parsedMarkdown.chapters.length > 0
+      ? parsedMarkdown.chapters
+      : [{ id: defaultChapterId, order: 1, title: '章1' }]
+    )
+      .map((chapter, index) => ({
+        ...chapter,
+        title: chapter.title.trim() || `章${index + 1}`,
+        order: index + 1,
+      }));
+
+    const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
+
+    const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
+
+    const document: LiteLizardDocument = {
+      version: 2,
+      documentId: analysis?.documentId ?? createDocumentId(),
+      title: analysis?.title ?? toDocumentTitle(filePath),
+      personaMode: analysis?.personaMode ?? 'general-reader',
+      createdAt: analysis?.createdAt ?? now,
+      updatedAt: analysis?.updatedAt ?? now,
+      source: {
+        format: 'markdown-md',
+        originPath: filePath,
+      },
+      chapters: chapters.length > 0 ? chapters : [{ id: fallbackChapterId, order: 1, title: '章1' }],
+      paragraphs: paragraphs.map((paragraph, index) => ({
+        ...paragraph,
+        chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
+        order: index + 1,
+      })),
+    };
+
+    if (!revisionMap.has(filePath)) {
+      revisionMap.set(filePath, 0);
+    }
+
+    return document;
+  }
+
+  async function loadLzl(filePath: string): Promise<LiteLizardDocument> {
+    const content = await fs.readFile(filePath, 'utf8');
+    const parsed = parseLzl(content);
+    const { issues, document: repairedDoc } = validateAndRepairLzl(parsed);
+    if (issues.length > 0) {
+      console.warn('[fileService] lzl validation issues:', issues.map((i) => i.message));
+    }
+    const doc = toLiteLizardDocument(repairedDoc);
+    const result: LiteLizardDocument = {
+      ...doc,
+      source: {
+        format: 'lzl-v1',
+        originPath: filePath,
+      },
+      paragraphs: doc.paragraphs.map((paragraph, index) => ({
+        ...paragraph,
+        order: index + 1,
+      })),
+    };
+    if (!revisionMap.has(filePath)) {
+      revisionMap.set(filePath, 0);
+    }
+    return result;
+  }
+
   return {
     async listTree(root: string) {
       return walk(root, true);
     },
 
     async load(filePath: string): Promise<LiteLizardDocument> {
-      const markdownRaw = await fs.readFile(filePath, 'utf8');
-      const parsedMarkdown = parseMarkdownStructure(markdownRaw);
-      const analysis = await readAnalysisFile(filePath);
-      const now = new Date().toISOString();
-
-      const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
-      const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
-      const chapters = (parsedMarkdown.chapters.length > 0
-        ? parsedMarkdown.chapters
-        : [{ id: defaultChapterId, order: 1, title: '章1' }]
-      )
-        .map((chapter, index) => ({
-          ...chapter,
-          title: chapter.title.trim() || `章${index + 1}`,
-          order: index + 1,
-        }));
-
-      const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
-
-      const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
-
-      const document: LiteLizardDocument = {
-        version: 2,
-        documentId: analysis?.documentId ?? createDocumentId(),
-        title: analysis?.title ?? toDocumentTitle(filePath),
-        personaMode: analysis?.personaMode ?? 'general-reader',
-        createdAt: analysis?.createdAt ?? now,
-        updatedAt: analysis?.updatedAt ?? now,
-        source: {
-          format: 'markdown-md',
-          originPath: filePath,
-        },
-        chapters: chapters.length > 0 ? chapters : [{ id: fallbackChapterId, order: 1, title: '章1' }],
-        paragraphs: paragraphs.map((paragraph, index) => ({
-          ...paragraph,
-          chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
-          order: index + 1,
-        })),
-      };
-
-      if (!revisionMap.has(filePath)) {
-        revisionMap.set(filePath, 0);
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.lzl') {
+        return loadLzl(filePath);
       }
-
-      return document;
+      if (ext === '.md') {
+        return loadMarkdown(filePath);
+      }
+      throw new Error(`UNSUPPORTED_FORMAT: ${ext}`);
     },
 
     async save(filePath: string, document: LiteLizardDocument, expectedRevision: number) {
+      if (path.extname(filePath).toLowerCase() === '.lzl') {
+        throw new Error('UNSUPPORTED_FORMAT: .lzl save is not yet implemented');
+      }
+
       const current = revisionMap.get(filePath) ?? 0;
       if (current !== expectedRevision) {
         return {

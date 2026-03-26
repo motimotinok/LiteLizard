@@ -260,3 +260,75 @@ describe('fileService markdown + analysis', () => {
     expect(service.toAnalysisPath('/tmp/Essay.MD')).toBe('/tmp/Essay.litelizard.analysis.json');
   });
 });
+
+describe('fileService lzl', () => {
+  const MINIMAL_LZL = `---
+documentId: d_test123456789012345678
+format: lzl-v1
+title: テスト文書
+chapters: 1
+paragraphs: 1
+created: 2024-01-01T00:00:00.000Z
+updated: 2024-01-01T00:00:00.000Z
+---
+<!--:: ch c_test1234567890123456789 | 第1章 ::-->
+<!--:: p p_test12345678901234567890 ::-->
+これはテスト段落です。
+`;
+
+  it('loads a .lzl file and returns LiteLizardDocument', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'story.lzl');
+      await fs.writeFile(filePath, MINIMAL_LZL, 'utf8');
+
+      const service = createFileService();
+      const doc = await service.load(filePath);
+
+      expect(doc.source?.format).toBe('lzl-v1');
+      expect(doc.source?.originPath).toBe(filePath);
+      expect(doc.chapters).toHaveLength(1);
+      expect(doc.chapters[0].title).toBe('第1章');
+      expect(doc.paragraphs.length).toBeGreaterThan(0);
+      expect(doc.paragraphs[0].light.text).toBe('これはテスト段落です。');
+    });
+  });
+
+  it('auto-repairs a .lzl file with missing frontmatter', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'broken.lzl');
+      // frontmatter なし、マーカーなし
+      await fs.writeFile(filePath, 'これは壊れたファイルです。\n', 'utf8');
+
+      const service = createFileService();
+      const doc = await service.load(filePath);
+
+      expect(doc.chapters.length).toBeGreaterThan(0);
+      expect(doc.paragraphs.length).toBeGreaterThan(0);
+      expect(doc.documentId).toBeTruthy();
+    });
+  });
+
+  it('listTree includes .lzl files', async () => {
+    await withTempDir(async (dir) => {
+      await fs.writeFile(path.join(dir, 'a.md'), '', 'utf8');
+      await fs.writeFile(path.join(dir, 'b.lzl'), '', 'utf8');
+      await fs.writeFile(path.join(dir, 'c.txt'), '', 'utf8');
+
+      const service = createFileService();
+      const tree = await service.listTree(dir);
+      const files = flattenFiles(tree).map((f) => path.basename(f)).sort();
+
+      expect(files).toEqual(['a.md', 'b.lzl']);
+    });
+  });
+
+  it('throws UNSUPPORTED_FORMAT for unknown extensions', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'notes.txt');
+      await fs.writeFile(filePath, 'hello', 'utf8');
+
+      const service = createFileService();
+      await expect(service.load(filePath)).rejects.toThrow('UNSUPPORTED_FORMAT');
+    });
+  });
+});
