@@ -1,0 +1,190 @@
+# 解析 API エンドポイント仕様
+
+関連タスク: S-06
+決定経緯: `docs/decisions.md` [2026-03-28] S-06
+
+---
+
+## 1. リクエスト
+
+### 1.1 基本単位
+
+分析の基本単位は**段落**。複数段落をまとめて1リクエストで送信し、サーバー側でループ処理する。
+
+### 1.2 操作パターン
+
+| 操作 | 送信範囲 | 備考 |
+|------|---------|------|
+| 章一括分析 | 章内の全段落 | まとめて1リクエスト |
+| 特定段落の再分析 | 対象段落1つ | ユーザープロンプト入力付き（UI は都度検討） |
+| ドキュメント全体分析 | 全段落 | トークン消費確認ダイアログを表示 |
+
+### 1.3 リクエスト構造（案）
+
+```typescript
+interface AnalysisRequest {
+  documentId: string;
+  paragraphs: AnalysisTargetParagraph[];
+  userPrompt?: string; // 再分析時のユーザー指示
+}
+
+interface AnalysisTargetParagraph {
+  paragraphId: string;
+  text: string;
+  context: string[]; // 直前最大10段落のテキスト配列（古い順）
+}
+```
+
+---
+
+## 2. コンテキスト
+
+- 段落 N の分析時に**段落 1〜N**（ただし直前 10 段落まで）を渡す
+- N+1 以降の段落は参照しない（読者は前から順に読むため）
+- 後半の段落ほどコンテキストが大きくなるが、上限 10 段落で緩和
+
+```
+段落1: context = []
+段落2: context = [段落1]
+段落3: context = [段落1, 段落2]
+...
+段落11: context = [段落2, 段落3, ..., 段落10] (直前10段落)
+段落12: context = [段落3, 段落4, ..., 段落11] (直前10段落)
+```
+
+---
+
+## 3. レスポンス
+
+### 3.1 方式
+
+**SSE（Server-Sent Events）ストリーミング**で段落ごとに逐次返却する。
+
+### 3.2 レスポンス構造（案）
+
+```typescript
+// SSE イベントごとに送信
+interface AnalysisResultEvent {
+  type: 'paragraph_result';
+  paragraphId: string;
+  result: ParagraphAnalysis;
+}
+
+interface AnalysisCompleteEvent {
+  type: 'complete';
+  totalParagraphs: number;
+}
+
+interface AnalysisErrorEvent {
+  type: 'error';
+  paragraphId?: string; // 段落単位のエラー時
+  message: string;
+}
+
+interface ParagraphAnalysis {
+  // 分析結果の具体的なフィールドは分析モード仕様で定義
+  [key: string]: unknown;
+}
+```
+
+### 3.3 サーバーの責務
+
+- **ステートレス**: 処理して返すだけ。分析結果の保存は行わない
+- クライアントから受け取った段落テキスト + コンテキストを LLM API に渡し、結果を SSE で返却
+
+---
+
+## 4. 認証
+
+2系統の認証方式をサポートする。
+
+| 方式 | ログイン | 用途 |
+|------|---------|------|
+| OAuth（S-05 準拠） | 必要 | サブスク契約ユーザー |
+| ユーザー自前 API キー | **不要** | 自分の API キーを使うユーザー |
+
+- OAuth 方式の詳細は `docs/specs/auth-session.md` を参照
+- 自前 API キー方式ではログインをスキップし、ローカルに保存された API キーを直接使用する
+- API キーの保存には `safeStorage`（S-05 と同じ仕組み）を使用
+
+---
+
+## 5. ローカル保存
+
+### 5.1 保存先
+
+`.litelizard/analysis/` ディレクトリ内。
+
+### 5.2 ファイル命名規則
+
+```
+{documentId}_001.json
+{documentId}_002.json
+{documentId}_003.json
+...
+```
+
+世代連番（ゼロ埋め3桁）。起動時に最新連番のファイルを読み込んで表示する。
+
+### 5.3 ファイル内構造
+
+```typescript
+interface AnalysisFile {
+  version: 1;
+  documentId: string;
+  generation: number; // 世代番号（ファイル名の連番と一致）
+  createdAt: string;  // ISO 8601
+  updatedAt: string;  // ISO 8601
+  paragraphs: Record<string, ParagraphAnalysisHistory>;
+}
+
+interface ParagraphAnalysisHistory {
+  patterns: ParagraphAnalysisPattern[];
+  // patterns[patterns.length - 1] が最新（デフォルト表示）
+}
+
+interface ParagraphAnalysisPattern {
+  analyzedAt: string; // ISO 8601
+  userPrompt?: string; // 再分析時のユーザー指示
+  result: ParagraphAnalysis;
+}
+```
+
+---
+
+## 6. 世代管理
+
+### 6.1 世代更新トリガー
+
+以下の**構造変更**が発生したとき、新しい世代ファイルを作成する:
+
+- 段落の追加
+- 段落の削除
+- 段落の並べ替え（DnD）
+
+### 6.2 テキスト編集時
+
+テキスト編集のみの場合は世代更新しない。再分析の結果は同一ファイル内で該当段落の `patterns` 配列に追記する。
+
+### 6.3 世代切り替え
+
+新世代ファイル作成時、旧世代の分析結果は**そのまま残る**。段落 ID が一致する結果は新世代にコピーしない（旧世代ファイルを参照すれば閲覧可能）。
+
+---
+
+## 7. 分析カード UI
+
+- 各段落の分析カードに `< >` ボタンを表示
+- デフォルトは最新パターン（`patterns` 配列の末尾）を表示
+- `<` で1つ前のパターン、`>` で1つ後のパターンに切り替え
+- パターンが1つしかない場合はボタンを非表示またはグレーアウト
+
+---
+
+## 8. 将来の最適化ポイント
+
+> 以下は MVP スコープ外。実運用で問題が顕在化した時点で対応する。
+
+1. **コンテキスト圧縮**: 直前 10 段落の制限に加え、「章タイトル + 冒頭要約 + 直近 N 段落」のような圧縮方式で精度とコストを両立
+2. **SSE リジューム**: 全体分析時の長時間接続で途中切断が発生した場合、どの段落まで完了したかをクライアントが把握し、続きから再開する機構
+3. **世代ファイル自動削除**: 頻繁な構造変更で世代ファイルが増加する場合、直近 N 世代のみ保持するポリシー
