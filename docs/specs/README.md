@@ -7,3 +7,4 @@
 |----------|---------|-----------|------|
 | [lzl-format.md](lzl-format.md) | .lzl ファイルフォーマット (lzl-v1) | S-01 | stable |
 | [document-id.md](document-id.md) | ID 生成・重複検出 | S-03 | stable |
+| [auth-session.md](auth-session.md) | 認証・セッションフロー | S-05 | stable |
