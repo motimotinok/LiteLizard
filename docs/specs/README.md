@@ -7,7 +7,9 @@
 |----------|---------|-----------|------|
 | [lzl-format.md](lzl-format.md) | .lzl ファイルフォーマット (lzl-v1) | S-01 | stable |
 | [document-id.md](document-id.md) | ID 生成・重複検出 | S-03 | stable |
-| [auth-session.md](auth-session.md) | 認証・セッションフロー | S-05 | stable |
+| [auth-session.md](auth-session.md) | 認証・セッションフロー | S-05, S-09 | revised（S-09 でローカル完結主軸に改訂） |
 | [save-model.md](save-model.md) | 保存確定モデル（完全自動保存） | S-02 | stable |
 | [project-management.md](project-management.md) | プロジェクト管理フロー（フォルダベース） | S-04 | stable |
-| [analysis-api.md](analysis-api.md) | 解析 API エンドポイント（リクエスト・レスポンス・保存） | S-06 | stable |
+| [analysis-api.md](analysis-api.md) | 解析 API エンドポイント（リクエスト・レスポンス・保存） | S-06, S-09 | revised（S-09 でローカル処理主軸に改訂） |
+| [chapter-paragraph-ops.md](chapter-paragraph-ops.md) | 章削除・段落統合エッジケース | S-07 | stable |
+| [undo-redo.md](undo-redo.md) | Undo/Redo 対象範囲・実装方針（Zustand 統合 Command スタック） | S-08 | stable |

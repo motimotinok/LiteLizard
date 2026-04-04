@@ -1,7 +1,8 @@
 # 解析 API エンドポイント仕様
 
-関連タスク: S-06
-決定経緯: `docs/decisions.md` [2026-03-28] S-06
+関連タスク: S-06, S-09
+決定経緯: `docs/decisions.md` [2026-03-28] S-06, [2026-03-30] S-09
+改訂: 2026-03-30 S-09 によりローカル完結主軸に改訂
 
 ---
 
@@ -9,7 +10,7 @@
 
 ### 1.1 基本単位
 
-分析の基本単位は**段落**。複数段落をまとめて1リクエストで送信し、サーバー側でループ処理する。
+分析の基本単位は**段落**。複数段落をまとめて1リクエストとし、Electron main プロセス側でループ処理する（外部 LLM API への直接リクエスト、またはローカル LLM へのリクエスト）。
 
 ### 1.2 操作パターン
 
@@ -26,7 +27,16 @@ interface AnalysisRequest {
   documentId: string;
   paragraphs: AnalysisTargetParagraph[];
   userPrompt?: string; // 再分析時のユーザー指示
+  provider: AnalysisProvider; // S-09 追加: プロバイダー設定
 }
+
+// S-09: 3系統のプロバイダー
+type AnalysisProvider =
+  | { type: 'external-api'; provider: 'openai' | 'anthropic' | string; model: string }
+  | { type: 'local-llm'; endpoint: string; model: string }
+  | { type: 'cloud'; accessToken: string }; // 将来拡張パス
+
+// 注: API キーは main プロセスが safeStorage から取得するため、リクエスト構造には含めない
 
 interface AnalysisTargetParagraph {
   paragraphId: string;
@@ -58,12 +68,12 @@ interface AnalysisTargetParagraph {
 
 ### 3.1 方式
 
-**SSE（Server-Sent Events）ストリーミング**で段落ごとに逐次返却する。
+**IPC ストリーミング**（main → renderer）で段落ごとに逐次返却する。main プロセスが LLM API（外部 or ローカル）を呼び出し、結果を `webContents.send` で renderer に逐次送信する。将来のクラウド方式では SSE（Server-Sent Events）を使用する。
 
 ### 3.2 レスポンス構造（案）
 
 ```typescript
-// SSE イベントごとに送信
+// IPC イベントごとに送信（将来のクラウド方式では SSE イベント）
 interface AnalysisResultEvent {
   type: 'paragraph_result';
   paragraphId: string;
@@ -87,25 +97,29 @@ interface ParagraphAnalysis {
 }
 ```
 
-### 3.3 サーバーの責務
+### 3.3 処理層の責務
 
 - **ステートレス**: 処理して返すだけ。分析結果の保存は行わない
-- クライアントから受け取った段落テキスト + コンテキストを LLM API に渡し、結果を SSE で返却
+- Electron main プロセスが段落テキスト + コンテキストを LLM API（外部 or ローカル）に渡し、結果を IPC 経由で renderer に逐次返却する
+- 将来のクラウド方式では、自社サーバーが同等の処理を行い SSE で返却する
 
 ---
 
-## 4. 認証
+## 4. 認証・プロバイダー設定
 
-2系統の認証方式をサポートする。
+> S-09 により改訂: ローカル完結が主軸。クラウドログインは将来拡張パス。
 
-| 方式 | ログイン | 用途 |
-|------|---------|------|
-| OAuth（S-05 準拠） | 必要 | サブスク契約ユーザー |
-| ユーザー自前 API キー | **不要** | 自分の API キーを使うユーザー |
+3系統の方式をサポートする。
 
-- OAuth 方式の詳細は `docs/specs/auth-session.md` を参照
-- 自前 API キー方式ではログインをスキップし、ローカルに保存された API キーを直接使用する
-- API キーの保存には `safeStorage`（S-05 と同じ仕組み）を使用
+| 方式 | ログイン | 処理場所 | 実装時期 |
+|------|---------|---------|---------|
+| 外部 API キー（OpenAI / Anthropic 等） | **不要** | ローカル（main プロセス） | MVP |
+| ローカル LLM（Ollama 等） | **不要** | ローカル | MVP or P2 |
+| クラウドサーバー（OAuth） | 必要 | 自社サーバー | 将来拡張 |
+
+- **外部 API キー方式**（MVP 主軸）: ユーザーが設定画面で API キーを登録。`safeStorage` で暗号化保存。main プロセスが直接 LLM API を呼び出す
+- **ローカル LLM 方式**: ユーザーが Ollama 等をインストールし、エンドポイント URL + モデル名を設定。main プロセスが `localhost` 経由で呼び出す
+- **クラウド方式**（将来）: OAuth ログイン後、自社サーバー API 経由で分析。OAuth の詳細は `docs/specs/auth-session.md` を参照
 
 ---
 
@@ -186,5 +200,5 @@ interface ParagraphAnalysisPattern {
 > 以下は MVP スコープ外。実運用で問題が顕在化した時点で対応する。
 
 1. **コンテキスト圧縮**: 直前 10 段落の制限に加え、「章タイトル + 冒頭要約 + 直近 N 段落」のような圧縮方式で精度とコストを両立
-2. **SSE リジューム**: 全体分析時の長時間接続で途中切断が発生した場合、どの段落まで完了したかをクライアントが把握し、続きから再開する機構
+2. **ストリーミングリジューム**: 全体分析時に途中でエラーが発生した場合、どの段落まで完了したかをクライアントが把握し、続きから再開する機構
 3. **世代ファイル自動削除**: 頻繁な構造変更で世代ファイルが増加する場合、直近 N 世代のみ保持するポリシー

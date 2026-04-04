@@ -12,7 +12,7 @@ apps/desktop/src/
 │   ├── fileService.ts           — ファイル操作サービス
 │   ├── ipc.ts                   — IPC ハンドラ
 │   ├── ipcPathUtils.ts          — IPC パスユーティリティ
-│   └── sessionVault.ts          — セッション管理
+│   └── sessionVault.ts          — API キー暗号化保存 + 将来のセッション管理
 ├── preload/
 │   ├── preloadMockApi.ts        — モック API 定義
 │   └── preloadMockData.ts       — モック初期データ
@@ -96,7 +96,7 @@ apps/desktop/src/
 ### モック・ブラウザ対応
 - **モックAPI**：`preloadMockApi.ts` — ファイル管理・ドキュメントCRUD・モック解析すべて実装済み
 - **モック初期データ**：`preloadMockData.ts`
-- **認証フラグ**：`apiKeyConfigured` フラグ管理、未設定時は解析を無効化
+- **認証フラグ**：`apiKeyConfigured` フラグ管理、未設定時は解析を無効化（S-09 により正式な仕組み）
 - **モックAPI自動注入**：ブラウザ起動時に `main.tsx` でモックAPIを自動セットアップ（T1）
 - **AnalysisPane 生成ボタン**：全体「生成」ボタン（`runAnalysis`）・カード個別「↺」ボタン（`runAnalysisFor`）（T2）
 - **起動時ドキュメント自動展開**：ブラウザ起動時に welcome.md を自動で開く（T3）
@@ -108,9 +108,9 @@ apps/desktop/src/
 | 項目 | 状況 | 詳細は |
 |------|------|--------|
 | ファイル形式 | 現状 `.md`（仕様は `.lzl`） | `docs/decisions.md` 参照 |
-| APIキー管理 | クライアント側に実装（仕様§9と差異） | `docs/decisions.md` 参照 |
+| APIキー管理 | クライアント側に実装（S-09 で正式方針に統一。仕様§9 改訂済み） | `docs/decisions.md` 参照 |
 | 章 CRUD | 追加・並び替えは実装済み。削除・吸収マージは未実装 | — |
-| ログイン UI | フラグのみ管理、画面は未実装 | — |
+| API キー設定 UI | 未実装（L-01 で実装予定）。OAuth ログイン UI は将来実装（A-01, P3） | — |
 | Undo / Redo | テキスト編集のみ対応。DnD並び替えは未対応 | — |
 
 ---
