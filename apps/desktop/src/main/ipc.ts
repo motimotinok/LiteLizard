@@ -6,6 +6,7 @@ import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
 import {
+  ensureFileName,
   ensureMarkdownFileName,
   sanitizeFileStem,
   toTitleFromFileName,
@@ -150,7 +151,7 @@ export function registerIpcHandlers() {
       }
 
       const safeName = sanitizeFileStem(validateEntryName(nextName));
-      const nextFileName = ensureMarkdownFileName(safeName);
+      const nextFileName = ensureFileName(safeName, path.extname(targetPath));
       const nextPath = path.join(path.dirname(targetPath), nextFileName);
       await assertRenameTargetAvailable(targetPath, nextPath);
 
