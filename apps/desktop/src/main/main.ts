@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow } from 'electron';
 import { registerIpcHandlers } from './ipc.js';
+import { getLastOpenedFolder } from './appStore.js';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -66,6 +67,12 @@ function createMainWindow() {
 app.whenReady().then(() => {
   registerIpcHandlers();
   createMainWindow();
+
+  void getLastOpenedFolder().then((lastFolder) => {
+    if (lastFolder) {
+      console.log('[Main] Last opened folder:', lastFolder);
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
