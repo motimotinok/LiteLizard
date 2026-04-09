@@ -331,4 +331,55 @@ updated: 2024-01-01T00:00:00.000Z
       await expect(service.load(filePath)).rejects.toThrow('UNSUPPORTED_FORMAT');
     });
   });
+
+  it('.lzl load → save → load でドキュメント内容が一致する', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'story.lzl');
+      await fs.writeFile(filePath, MINIMAL_LZL, 'utf8');
+
+      const service = createFileService();
+      const loaded = await service.load(filePath);
+      const saveResult = await service.save(filePath, loaded, 0);
+
+      expect(saveResult.ok).toBe(true);
+
+      const reloaded = await service.load(filePath);
+      expect(reloaded.documentId).toBe(loaded.documentId);
+      expect(reloaded.chapters).toHaveLength(loaded.chapters.length);
+      expect(reloaded.paragraphs).toHaveLength(loaded.paragraphs.length);
+      expect(reloaded.paragraphs[0].light.text).toBe(loaded.paragraphs[0].light.text);
+    });
+  });
+
+  it('.lzl save で revision mismatch のとき REVISION_MISMATCH を返す', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'story.lzl');
+      await fs.writeFile(filePath, MINIMAL_LZL, 'utf8');
+
+      const service = createFileService();
+      const loaded = await service.load(filePath);
+
+      const result = await service.save(filePath, loaded, 999);
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBe('REVISION_MISMATCH');
+      }
+    });
+  });
+
+  it('.lzl save 後に .tmp ファイルが残らない', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'story.lzl');
+      await fs.writeFile(filePath, MINIMAL_LZL, 'utf8');
+
+      const service = createFileService();
+      const loaded = await service.load(filePath);
+      await service.save(filePath, loaded, 0);
+
+      const dirEntries = await fs.readdir(dir);
+      const tmpFiles = dirEntries.filter((name) => name.endsWith('.tmp'));
+      expect(tmpFiles).toHaveLength(0);
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ensureFileName,
   ensureMarkdownFileName,
   sanitizeFileStem,
   toTitleFromFileName,
@@ -28,5 +29,22 @@ describe('ipc path utils', () => {
   it('extracts title from markdown filename', () => {
     expect(toTitleFromFileName('essay.md')).toBe('essay');
     expect(toTitleFromFileName('essay.MD')).toBe('essay');
+  });
+
+  it('extracts title from .lzl filename', () => {
+    expect(toTitleFromFileName('story.lzl')).toBe('story');
+    expect(toTitleFromFileName('story.LZL')).toBe('story');
+  });
+
+  it('ensureFileName で .lzl 拡張子が付与される', () => {
+    expect(ensureFileName('story', '.lzl')).toBe('story.lzl');
+    expect(ensureFileName('story.lzl', '.lzl')).toBe('story.lzl');
+    expect(ensureFileName('story.LZL', '.lzl')).toBe('story.lzl');
+  });
+
+  it('ensureFileName で .lzl 以外は .md 拡張子が付与される', () => {
+    expect(ensureFileName('draft', '.md')).toBe('draft.md');
+    expect(ensureFileName('draft.md', '.md')).toBe('draft.md');
+    expect(ensureFileName('draft', '')).toBe('draft.md');
   });
 });
