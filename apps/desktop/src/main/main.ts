@@ -1,9 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import { registerIpcHandlers } from './ipc.js';
 import { getLastOpenedFolder } from './appStore.js';
+import { loadWindowBounds, saveWindowBounds } from './windowState.js';
+import { buildAppMenu } from './menu.js';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -31,9 +33,9 @@ function createMainWindow() {
   const preloadPath = resolvePreloadPath();
   console.log('[Main] preload path:', preloadPath);
 
+  const bounds = loadWindowBounds();
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...bounds,
     webPreferences: {
       contextIsolation: true,
       // Keep sandbox on by default. Only disable explicitly for local debugging.
@@ -41,6 +43,12 @@ function createMainWindow() {
       preload: preloadPath,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.on('close', () => {
+    if (mainWindow) {
+      saveWindowBounds(mainWindow);
+    }
   });
 
   const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
@@ -67,6 +75,7 @@ function createMainWindow() {
 app.whenReady().then(() => {
   registerIpcHandlers();
   createMainWindow();
+  Menu.setApplicationMenu(buildAppMenu());
 
   void getLastOpenedFolder().then((lastFolder) => {
     if (lastFolder) {
