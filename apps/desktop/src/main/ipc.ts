@@ -11,6 +11,8 @@ import {
   toTitleFromFileName,
   validateEntryName,
 } from './ipcPathUtils.js';
+import { ensureProject } from './projectManager.js';
+import { setLastOpenedFolder } from './appStore.js';
 
 const fileService = createFileService();
 const apiKeyVault = createApiKeyVault(app.getPath('userData'));
@@ -93,7 +95,10 @@ export function registerIpcHandlers() {
         return null;
       }
 
-      return result.filePaths[0];
+      const folderPath = result.filePaths[0];
+      await ensureProject(folderPath);
+      await setLastOpenedFolder(folderPath);
+      return folderPath;
     } catch (error) {
       console.error('[IPC dialog:openFolder] failed', error);
       throw new Error(`OPEN_FOLDER_FAILED: ${getErrorMessage(error)}`);
