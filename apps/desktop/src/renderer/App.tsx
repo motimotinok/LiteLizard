@@ -62,7 +62,7 @@ export function App() {
 
     const handle = window.setTimeout(() => {
       void saveNow();
-    }, 2500);
+    }, 300);
 
     return () => {
       window.clearTimeout(handle);

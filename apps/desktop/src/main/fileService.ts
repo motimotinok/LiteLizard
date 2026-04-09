@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createChapterId, createDocumentId, createParagraphId, parseLzl, validateAndRepairLzl, toLiteLizardDocument, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, parseLzl, serializeLzl, validateAndRepairLzl, toLiteLizardDocument, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
 import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
@@ -455,10 +455,6 @@ export function createFileService() {
     },
 
     async save(filePath: string, document: LiteLizardDocument, expectedRevision: number) {
-      if (path.extname(filePath).toLowerCase() === '.lzl') {
-        throw new Error('UNSUPPORTED_FORMAT: .lzl save is not yet implemented');
-      }
-
       const current = revisionMap.get(filePath) ?? 0;
       if (current !== expectedRevision) {
         return {
@@ -469,7 +465,16 @@ export function createFileService() {
       }
 
       const normalized = ensureDocumentChapters(document);
-      await writeDocumentFiles(filePath, normalized);
+
+      if (path.extname(filePath).toLowerCase() === '.lzl') {
+        const content = serializeLzl(normalized);
+        const tmpPath = `${filePath}.tmp`;
+        await fs.writeFile(tmpPath, content, 'utf8');
+        await fs.rename(tmpPath, filePath);
+      } else {
+        await writeDocumentFiles(filePath, normalized);
+      }
+
       const next = current + 1;
       revisionMap.set(filePath, next);
 
