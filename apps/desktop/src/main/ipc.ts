@@ -20,7 +20,7 @@ import {
   validateEntryName,
 } from './ipcPathUtils.js';
 import { ensureProject } from './projectManager.js';
-import { setLastOpenedFolder } from './appStore.js';
+import { getLastOpenedFolder, setLastOpenedFolder } from './appStore.js';
 
 const fileService = createFileService();
 const apiKeyVault = createApiKeyVault(app.getPath('userData'));
@@ -142,12 +142,20 @@ export function registerIpcHandlers() {
 
       const folderPath = result.filePaths[0];
       await ensureProject(folderPath);
-      await setLastOpenedFolder(folderPath);
       return folderPath;
     } catch (error) {
       console.error('[IPC dialog:openFolder] failed', error);
       throw new Error(`OPEN_FOLDER_FAILED: ${getErrorMessage(error)}`);
     }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getLastOpenedFolder, async () => {
+    return getLastOpenedFolder();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.setLastOpenedFolder, async (_, folderPath: string) => {
+    await setLastOpenedFolder(folderPath);
+    return { ok: true as const };
   });
 
   ipcMain.handle(IPC_CHANNELS.listTree, async (_, root: string) => {
