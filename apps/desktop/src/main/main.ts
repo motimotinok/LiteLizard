@@ -2,8 +2,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, Menu } from 'electron';
+import { IPC_CHANNELS } from '@litelizard/shared';
 import { registerIpcHandlers } from './ipc.js';
-import { getLastOpenedFolder } from './appStore.js';
 import { loadWindowBounds, saveWindowBounds } from './windowState.js';
 import { buildAppMenu } from './menu.js';
 
@@ -70,22 +70,48 @@ function createMainWindow() {
   mainWindow.webContents.on('preload-error', (_event, preloadPathWithError, error) => {
     console.error('[Main] preload-error', preloadPathWithError, error);
   });
+
+  mainWindow.on('closed', () => {
+    if (mainWindow?.isDestroyed()) {
+      mainWindow = null;
+    }
+  });
+
+  return mainWindow;
+}
+
+function getUsableMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindow;
+  }
+
+  const fallback = BrowserWindow.getAllWindows().find((win) => !win.isDestroyed()) ?? null;
+  mainWindow = fallback;
+  return fallback;
+}
+
+function requestOpenFolderFromMenu() {
+  const target = getUsableMainWindow() ?? createMainWindow();
+
+  if (target.webContents.isLoading()) {
+    target.webContents.once('did-finish-load', () => {
+      target.webContents.send(IPC_CHANNELS.requestOpenFolder);
+    });
+    return;
+  }
+
+  target.webContents.send(IPC_CHANNELS.requestOpenFolder);
 }
 
 app.whenReady().then(() => {
   registerIpcHandlers();
   createMainWindow();
-  Menu.setApplicationMenu(buildAppMenu());
-
-  void getLastOpenedFolder().then((lastFolder) => {
-    if (lastFolder) {
-      console.log('[Main] Last opened folder:', lastFolder);
-    }
-  });
+  Menu.setApplicationMenu(buildAppMenu(requestOpenFolderFromMenu));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+      Menu.setApplicationMenu(buildAppMenu(requestOpenFolderFromMenu));
     }
   });
 });

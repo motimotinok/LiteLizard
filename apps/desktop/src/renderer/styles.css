@@ -28,6 +28,10 @@ body {
   background: var(--bg);
 }
 
+code {
+  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+}
+
 button,
 input,
 textarea {
@@ -41,6 +45,73 @@ textarea {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg);
+}
+
+.project-launch-screen {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.92), transparent 36%),
+    linear-gradient(135deg, #ece8df 0%, #f7f5ef 45%, #e8edf5 100%);
+}
+
+.project-launch-panel {
+  width: min(560px, 100%);
+  padding: 40px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 70px rgba(28, 35, 49, 0.12);
+}
+
+.project-launch-panel-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.project-launch-eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #516074;
+}
+
+.project-launch-title {
+  margin: 0;
+  font-size: clamp(32px, 4vw, 46px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+}
+
+.project-launch-description {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #4b5563;
+}
+
+.project-launch-button {
+  width: fit-content;
+  min-width: 220px;
+  padding: 14px 20px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #111827 0%, #374151 100%);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 30px rgba(17, 24, 39, 0.22);
+}
+
+.project-launch-button:hover {
+  transform: translateY(-1px);
 }
 
 .global-header {
@@ -1107,6 +1178,14 @@ textarea {
 }
 
 @media (max-width: 1180px) {
+  .project-launch-screen {
+    padding: 24px;
+  }
+
+  .project-launch-panel {
+    padding: 32px;
+  }
+
   .workspace-body {
     flex-direction: column;
   }
@@ -1161,6 +1240,15 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  .project-launch-screen {
+    padding: 18px;
+  }
+
+  .project-launch-panel {
+    padding: 24px;
+    border-radius: 22px;
+  }
+
   .panel-resizer {
     display: none;
   }

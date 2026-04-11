@@ -3,6 +3,7 @@ import { ExplorerPane } from './components/ExplorerPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
 import { EditorPane } from './components/editor/index.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
+import { ProjectSetupScreen } from './components/ProjectSetupScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useResizablePanel } from './hooks/useResizablePanel.js';
 
@@ -19,7 +20,7 @@ function DoorIcon() {
   );
 }
 
-export function App() {
+function WorkspaceShell() {
   const {
     rootPath,
     tree,
@@ -40,7 +41,6 @@ export function App() {
     saveNow,
     cycleEditorMode,
     setViewScale,
-    bootstrapApiKeyStatus,
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
@@ -50,10 +50,6 @@ export function App() {
 
   const explorerPanel = useResizablePanel(260, 160, 480);
   const chatPanel = useResizablePanel(340, 240, 600);
-
-  useEffect(() => {
-    void bootstrapApiKeyStatus();
-  }, [bootstrapApiKeyStatus]);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -233,4 +229,51 @@ export function App() {
       </div>
     </div>
   );
+}
+
+export function App() {
+  const {
+    startupState,
+    rootPath,
+    openFolder,
+    restoreLastProject,
+    bootstrapApiKeyStatus,
+  } = useAppStore();
+
+  useEffect(() => {
+    void bootstrapApiKeyStatus();
+    void restoreLastProject();
+  }, [bootstrapApiKeyStatus, restoreLastProject]);
+
+  useEffect(() => {
+    if (!window.litelizard) {
+      return;
+    }
+
+    const unsubscribe = window.litelizard.onRequestOpenFolder(() => {
+      void openFolder();
+    });
+
+    return unsubscribe;
+  }, [openFolder]);
+
+  if (startupState === 'loading') {
+    return (
+      <div className="project-launch-screen">
+        <div className="project-launch-panel">
+          <p className="project-launch-eyebrow">LiteLizard</p>
+          <h1 className="project-launch-title">プロジェクトを準備しています</h1>
+          <p className="project-launch-description">
+            前回の作業フォルダを確認して、すぐに執筆を再開できる状態にしています。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (startupState === 'needs-project' && !rootPath) {
+    return <ProjectSetupScreen onSelectFolder={() => void openFolder()} />;
+  }
+
+  return <WorkspaceShell />;
 }

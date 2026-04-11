@@ -7,6 +7,9 @@ import type { AnalysisRunInput, AnalysisRunResult } from './api.js';
  */
 export interface BridgeApi {
   openFolder(): Promise<string | null>;
+  getLastOpenedFolder(): Promise<string | null>;
+  setLastOpenedFolder(folderPath: string): Promise<{ ok: true }>;
+  onRequestOpenFolder(listener: () => void): () => void;
   listTree(root: string): Promise<FileNode[]>;
   createEntry(
     root: string,
@@ -37,6 +40,9 @@ export interface BridgeApi {
  */
 export const IPC_CHANNELS = {
   openFolder: 'dialog:openFolder',
+  getLastOpenedFolder: 'app:getLastOpenedFolder',
+  setLastOpenedFolder: 'app:setLastOpenedFolder',
+  requestOpenFolder: 'menu:requestOpenFolder',
   listTree: 'fs:listTree',
   createEntry: 'fs:create',
   renameEntry: 'fs:rename',
@@ -48,6 +54,6 @@ export const IPC_CHANNELS = {
   getApiKeyStatus: 'settings:apiKey:getStatus',
   saveApiKey: 'settings:apiKey:save',
   clearApiKey: 'settings:apiKey:clear',
-} as const satisfies Record<keyof BridgeApi, string>;
+} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

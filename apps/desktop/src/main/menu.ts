@@ -1,6 +1,6 @@
 import { Menu, app } from 'electron';
 
-export function buildAppMenu(): Menu {
+export function buildAppMenu(onRequestOpenFolder: () => void): Menu {
   const isMac = process.platform === 'darwin';
 
   const template: Electron.MenuItemConstructorOptions[] = [
@@ -19,6 +19,12 @@ export function buildAppMenu(): Menu {
     {
       label: 'ファイル',
       submenu: [
+        {
+          label: '別のフォルダを開く...',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click: onRequestOpenFolder,
+        },
+        { type: 'separator' as const },
         isMac ? { role: 'close' as const } : { role: 'quit' as const },
       ],
     },
