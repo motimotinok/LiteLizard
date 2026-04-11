@@ -1,4 +1,4 @@
-import type { FileNode, LiteLizardDocument } from './types.js';
+import type { FileNode, GenerationalAnalysisFile, LiteLizardDocument, ParagraphAnalysisPattern } from './types.js';
 import type { AnalysisRunInput, AnalysisRunResult } from './api.js';
 
 /**
@@ -26,6 +26,14 @@ export interface BridgeApi {
     revision: number,
   ): Promise<{ ok: boolean; code?: string; revision: number }>;
   runAnalysis(input: AnalysisRunInput): Promise<AnalysisRunResult>;
+  loadAnalysis(projectRoot: string, documentId: string, filePath?: string): Promise<GenerationalAnalysisFile | null>;
+  saveAnalysisResult(
+    projectRoot: string,
+    documentId: string,
+    paragraphId: string,
+    pattern: ParagraphAnalysisPattern,
+  ): Promise<void>;
+  createAnalysisGeneration(projectRoot: string, documentId: string): Promise<number>;
   getApiKeyStatus(): Promise<{ configured: boolean }>;
   saveApiKey(apiKey: string): Promise<{ ok: true }>;
   clearApiKey(): Promise<{ ok: true }>;
@@ -45,6 +53,9 @@ export const IPC_CHANNELS = {
   createDocument: 'doc:create',
   saveDocument: 'doc:save',
   runAnalysis: 'analysis:run',
+  loadAnalysis: 'analysis:load',
+  saveAnalysisResult: 'analysis:save',
+  createAnalysisGeneration: 'analysis:newGeneration',
   getApiKeyStatus: 'settings:apiKey:getStatus',
   saveApiKey: 'settings:apiKey:save',
   clearApiKey: 'settings:apiKey:clear',

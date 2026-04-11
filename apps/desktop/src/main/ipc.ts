@@ -1,10 +1,17 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
-import { createChapterId, createDocumentId, createParagraphId, IPC_CHANNELS, type AnalysisRunInput, type LiteLizardDocument } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, IPC_CHANNELS, type AnalysisRunInput, type LiteLizardDocument, type ParagraphAnalysisPattern } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
+import {
+  appendParagraphPattern,
+  createGeneration,
+  deleteAnalysisFiles,
+  loadLatestAnalysis,
+  migrateFromV1,
+} from './analysisStore.js';
 import {
   ensureFileName,
   ensureMarkdownFileName,
@@ -74,6 +81,43 @@ async function fileExists(filePath: string) {
   } catch {
     return false;
   }
+}
+
+/** ファイルパスからプロジェクトルートを上方向に探す（.litelizard/config.json の有無で判定）。 */
+async function findProjectRoot(filePath: string): Promise<string | null> {
+  let current = path.dirname(filePath);
+  const root = path.parse(current).root;
+  while (current !== root) {
+    try {
+      await fs.access(path.join(current, '.litelizard', 'config.json'));
+      return current;
+    } catch {
+      current = path.dirname(current);
+    }
+  }
+  return null;
+}
+
+/**
+ * ファイルから documentId を軽量抽出する（削除前のクリーンアップ用）。
+ * .lzl: YAML フロントマターの documentId 行をパース
+ * .md:  旧サイドカー JSON の documentId フィールドを参照
+ */
+async function extractDocumentId(filePath: string): Promise<string | null> {
+  try {
+    if (/\.lzl$/i.test(filePath)) {
+      const raw = await fs.readFile(filePath, 'utf8');
+      const match = raw.match(/^documentId:\s*(\S+)/m);
+      return match?.[1] ?? null;
+    }
+    if (/\.md$/i.test(filePath)) {
+      const sidecar = await fileService.readSidecarAnalysis(filePath);
+      return sidecar?.documentId ?? null;
+    }
+  } catch {
+    // 読み込み失敗は無視して null を返す
+  }
+  return null;
 }
 
 async function assertRenameTargetAvailable(sourcePath: string, targetPath: string) {
@@ -160,7 +204,7 @@ export function registerIpcHandlers() {
       const nextPath = path.join(path.dirname(targetPath), nextFileName);
       await assertRenameTargetAvailable(targetPath, nextPath);
 
-      if (/\.md$/i.test(targetPath)) {
+      if (/\.(md|lzl)$/i.test(targetPath)) {
         const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
         const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
 
@@ -171,7 +215,7 @@ export function registerIpcHandlers() {
 
       await fs.rename(targetPath, nextPath);
 
-      if (/\.md$/i.test(targetPath)) {
+      if (/\.(md|lzl)$/i.test(targetPath)) {
         const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
         const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
 
@@ -196,11 +240,23 @@ export function registerIpcHandlers() {
         return { ok: true as const };
       }
 
+      // 削除前に documentId とプロジェクトルートを取得（新形式クリーンアップ用）
+      const [documentId, projectRoot] = await Promise.all([
+        extractDocumentId(targetPath),
+        findProjectRoot(targetPath),
+      ]);
+
       await fs.rm(targetPath, { force: true });
 
-      if (/\.md$/i.test(targetPath)) {
+      if (/\.(md|lzl)$/i.test(targetPath)) {
+        // 旧サイドカー削除
         const analysisPath = fileService.toAnalysisPath(targetPath);
         await fs.rm(analysisPath, { force: true });
+      }
+
+      // 新形式世代ファイル削除
+      if (documentId && projectRoot) {
+        await deleteAnalysisFiles(projectRoot, documentId);
       }
 
       return { ok: true as const };
@@ -257,5 +313,44 @@ export function registerIpcHandlers() {
       throw new Error('API key is not configured. Open Settings and save your API key.');
     }
     return runAnalysis(input, apiKey);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.loadAnalysis, async (_, projectRoot: string, documentId: string, filePath?: string) => {
+    try {
+      const result = await loadLatestAnalysis(projectRoot, documentId);
+      if (result) return result;
+
+      // 新形式が存在しない場合、旧サイドカーからマイグレーション
+      if (filePath) {
+        const v1 = await fileService.readSidecarAnalysis(filePath);
+        if (v1) return migrateFromV1(v1);
+      }
+      return null;
+    } catch (error) {
+      console.error('[IPC analysis:load] failed', error);
+      throw new Error(`LOAD_ANALYSIS_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.saveAnalysisResult,
+    async (_, projectRoot: string, documentId: string, paragraphId: string, pattern: ParagraphAnalysisPattern) => {
+      try {
+        await appendParagraphPattern(projectRoot, documentId, paragraphId, pattern);
+      } catch (error) {
+        console.error('[IPC analysis:save] failed', error);
+        throw new Error(`SAVE_ANALYSIS_FAILED: ${getErrorMessage(error)}`);
+      }
+    },
+  );
+
+  ipcMain.handle(IPC_CHANNELS.createAnalysisGeneration, async (_, projectRoot: string, documentId: string) => {
+    try {
+      const file = await createGeneration(projectRoot, documentId);
+      return file.generation;
+    } catch (error) {
+      console.error('[IPC analysis:newGeneration] failed', error);
+      throw new Error(`CREATE_GENERATION_FAILED: ${getErrorMessage(error)}`);
+    }
   });
 }
