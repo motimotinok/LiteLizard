@@ -12,8 +12,10 @@ import {
 
 export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
+export type StartupState = 'loading' | 'needs-project' | 'ready';
 
 interface AppState {
+  startupState: StartupState;
   rootPath: string | null;
   tree: FileNode[];
   currentFilePath: string | null;
@@ -25,6 +27,8 @@ interface AppState {
   viewScale: ViewScale;
   analysisLayerOpen: boolean;
   statusMessage: string;
+  hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
+  restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
   createDocument: (title: string, parentPath?: string) => Promise<void>;
   createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
@@ -74,6 +78,7 @@ function titleFromPath(filePath: string) {
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
+  startupState: 'loading',
   rootPath: null,
   tree: [],
   currentFilePath: null,
@@ -86,10 +91,90 @@ export const useAppStore = create<AppState>((set, get) => ({
   analysisLayerOpen: false,
   statusMessage: '準備完了',
 
+  hydrateProject: async (rootPath, source) => {
+    try {
+      const tree = await window.litelizard.listTree(rootPath);
+      await window.litelizard.setLastOpenedFolder(rootPath);
+      set({
+        startupState: 'ready',
+        rootPath,
+        tree,
+        currentFilePath: null,
+        document: null,
+        revision: 0,
+        dirty: false,
+        statusMessage:
+          source === 'restore'
+            ? `前回のフォルダを復元しました: ${rootPath}`
+            : `フォルダを開きました: ${rootPath}`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const previousState = get();
+      console.error('[Renderer hydrateProject] failed', error);
+      if (source === 'dialog' && previousState.rootPath) {
+        set({
+          startupState: 'ready',
+          statusMessage: `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
+        });
+        return;
+      }
+      set({
+        startupState: 'needs-project',
+        rootPath: null,
+        tree: [],
+        currentFilePath: null,
+        document: null,
+        revision: 0,
+        dirty: false,
+        statusMessage:
+          source === 'restore'
+            ? `前回のフォルダを復元できませんでした: ${message}`
+            : `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
+      });
+    }
+  },
+
+  restoreLastProject: async () => {
+    if (!window.litelizard) {
+      set({
+        startupState: 'needs-project',
+        statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）',
+      });
+      return;
+    }
+
+    set({ startupState: 'loading', statusMessage: '前回のフォルダを確認しています...' });
+
+    try {
+      const root = await window.litelizard.getLastOpenedFolder();
+      if (!root) {
+        set({ startupState: 'needs-project', statusMessage: 'フォルダを選択して始めてください' });
+        return;
+      }
+
+      await get().hydrateProject(root, 'restore');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[Renderer restoreLastProject] failed', error);
+      set({
+        startupState: 'needs-project',
+        statusMessage: `前回のフォルダ確認に失敗しました: ${message}`,
+      });
+    }
+  },
+
   openFolder: async () => {
     if (!window.litelizard) {
-      set({ statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）' });
+      set({
+        startupState: 'needs-project',
+        statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）',
+      });
       return;
+    }
+
+    if (!get().rootPath) {
+      set({ startupState: 'loading', statusMessage: 'フォルダ選択ダイアログを開いています...' });
     }
 
     let root: string | null = null;
@@ -98,27 +183,22 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Renderer openFolder] failed', error);
-      set({ statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}` });
+      set({
+        startupState: get().rootPath ? 'ready' : 'needs-project',
+        statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}`,
+      });
       return;
     }
 
     if (!root) {
-      set({ statusMessage: 'フォルダ選択をキャンセルしました' });
+      set({
+        startupState: get().rootPath ? 'ready' : 'needs-project',
+        statusMessage: 'フォルダ選択をキャンセルしました',
+      });
       return;
     }
 
-    try {
-      const tree = await window.litelizard.listTree(root);
-      set({ rootPath: root, tree, statusMessage: `フォルダを開きました: ${root}` });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[Renderer listTree] failed', error);
-      set({
-        rootPath: root,
-        tree: [],
-        statusMessage: `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
-      });
-    }
+    await get().hydrateProject(root, 'dialog');
   },
 
   createDocument: async (title: string, parentPath?: string) => {

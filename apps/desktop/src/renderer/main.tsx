@@ -6,17 +6,7 @@ import './styles.css';
 async function bootstrap() {
   if (!window.litelizard) {
     const { createMockPreloadApi } = await import('../preload/preloadMockApi.js');
-    const { mockRootPath } = await import('../preload/preloadMockData.js');
     window.litelizard = createMockPreloadApi();
-
-    try {
-      const { useAppStore } = await import('./store/useAppStore.js');
-      const { openFolder, loadDocument } = useAppStore.getState();
-      await openFolder();
-      await loadDocument(`${mockRootPath}/pakira.md`);
-    } catch (error) {
-      console.error('[bootstrap] Mock initialization failed', error);
-    }
   }
 
   createRoot(document.getElementById('root')!).render(
