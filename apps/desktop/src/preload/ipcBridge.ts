@@ -5,6 +5,17 @@ import { IPC_CHANNELS } from '@litelizard/shared';
 export function createIpcBridge(): BridgeApi {
   return {
     openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.openFolder),
+    getLastOpenedFolder: () => ipcRenderer.invoke(IPC_CHANNELS.getLastOpenedFolder),
+    setLastOpenedFolder: (folderPath) => ipcRenderer.invoke(IPC_CHANNELS.setLastOpenedFolder, folderPath),
+    onRequestOpenFolder: (listener) => {
+      const wrapped = () => {
+        listener();
+      };
+      ipcRenderer.on(IPC_CHANNELS.requestOpenFolder, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.requestOpenFolder, wrapped);
+      };
+    },
     listTree: (root) => ipcRenderer.invoke(IPC_CHANNELS.listTree, root),
     createEntry: (root, type, name) =>
       ipcRenderer.invoke(IPC_CHANNELS.createEntry, root, type, name),
