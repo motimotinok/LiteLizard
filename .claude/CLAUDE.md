@@ -18,34 +18,26 @@
 ## 開発ワークフロー
 
 ### ブランチ運用
-- メイン作業ディレクトリ（`/Users/jane/litelizard/claude`）は **dev ブランチに常駐**
-- 作業は dev から feature branch（`feat/<task-id>`）を切って実施
-- **並列実行時**: Agent tool の `isolation: "worktree"` により Claude Code が自動作成する一時 worktree で並列作業
-- **単一タスク時**: メインディレクトリで直接 feature branch を切って作業
-- 作業完了・レビュー後、dev にローカルマージし feature branch を削除
+- **dev ブランチ** = 変更をマージ・統合するための基点。動作確認もここで行う
+- タスクごとに dev から `feat/<task-id>` ブランチを切り、worktree を作成して作業する
+  - worktree は手動で作成・管理する（`git worktree add ../worktree-<task-id> -b feat/<task-id>`）
+  - 複数タスクを並行する場合は複数の worktree セッションを使う
+- 作業完了後、diff をレビューし問題なければ dev にローカルマージして feature branch・worktree を削除
 - リモートとの同期: `git fetch origin && git merge origin/dev`
 
 ### タスクの流れ
 1. `PROJECTMEMORY/TASKS.md` の「NEXT」でタスクを確認
-2. dev から `feat/<task-id>` ブランチを切って実装（並列時は worktree を使用）
-3. 完了したら `docs/wbs.md` のステータスを更新
-4. dev にマージ、feature branch を削除
-5. `PROJECTMEMORY/TASKS.md` のキューを更新（`/update-tasks` スキルを使う）
+2. dev から worktree を切って `feat/<task-id>` ブランチで実装
+3. 実装完了後、変更差分をレビューして確認
+4. 問題なければ dev にローカルマージ、feature branch・worktree を削除
+5. `docs/wbs.md` のステータスを更新
+6. `PROJECTMEMORY/TASKS.md` のキューを更新（`/update-tasks` スキルを使う）
    - タスクの追加・完了・優先度変更はすべて `/update-tasks` スキル経由で行う
 
-### PR・レビュー方針
-
-- **PR はレビュー依頼の場ではなく変更の記録・区切りとして使う**
-- レビューは Claude が実装時に implementer エージェントの内部レビュー（codex-delegate 経由）で自己完結させる（PR 後の指摘ループは原則行わない）
-- PR に指摘コメントがついた場合の対応基準:
-
-| 優先度 | 内容 | 対応 |
-|--------|------|------|
-| P1 | データ消失・クラッシュ系バグ | マージ前に必ず修正 |
-| P2 | 設計の不整合・将来影響あり | 仕様変更で影響するなら修正、しないなら Issue 起票して後回し |
-| P3 | 軽微なコード品質・スタイル | 仕様が固まったタイミングで Issue 起票、即時対応しない |
-
-- **P2/P3 で即時対応しないものは GitHub Issue として起票する**（TODO コメントより追跡しやすいため）
+### マージ・レビュー方針
+- 個人開発のためリモート PR は原則作成しない（ローカルで完結）
+- マージ前に `git diff dev..feat/<task-id>` で差分を確認し、問題なければ dev にマージ
+- プッシュはマージ後に `git push origin dev` で行う
 
 ### ファイルの役割分担
 
@@ -67,7 +59,3 @@
 
 ### コードベース調査
 コードベースの広範な調査が必要な場合は **Explore エージェント**を使う。単純な検索は Glob / Grep を直接使う。
-
-### 並列実行
-`/parallel-planner` スキルでプランを生成し、`/parallel-executor` スキルに従ってサブエージェントを起動・実行する。
-並列実行時は implementer の `isolation: worktree` 設定により、Claude Code が自動で worktree を作成・管理する。
