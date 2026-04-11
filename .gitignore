@@ -22,3 +22,4 @@ PROJECTMEMORY/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 docs/session-summary.md
+開発コマンド.md
