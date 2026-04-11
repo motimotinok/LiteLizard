@@ -70,6 +70,27 @@ export interface LiteLizardAnalysisFile {
   paragraphs: LiteLizardAnalysisParagraph[];
 }
 
+// 新形式 .litelizard/analysis/{documentId}_NNN.json のルート構造
+export interface GenerationalAnalysisFile {
+  version: 1;
+  documentId: string;
+  generation: number;
+  createdAt: string;
+  updatedAt: string;
+  paragraphs: Record<string, ParagraphAnalysisHistory>;
+}
+
+export interface ParagraphAnalysisHistory {
+  // patterns[length - 1] が最新（デフォルト表示）
+  patterns: ParagraphAnalysisPattern[];
+}
+
+export interface ParagraphAnalysisPattern {
+  analyzedAt: string;
+  userPrompt?: string;
+  result: Record<string, unknown>;
+}
+
 export interface FileNode {
   path: string;
   name: string;

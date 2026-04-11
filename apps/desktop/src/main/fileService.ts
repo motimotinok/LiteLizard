@@ -491,5 +491,6 @@ export function createFileService() {
     },
 
     toAnalysisPath,
+    readSidecarAnalysis: readAnalysisFile,
   };
 }

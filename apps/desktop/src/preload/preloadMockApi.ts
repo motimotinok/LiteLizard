@@ -426,5 +426,22 @@ export function createMockPreloadApi(): BridgeApi {
       state.apiKeyConfigured = false;
       return { ok: true };
     },
+
+    loadAnalysis: async (_projectRoot: string, _documentId: string, _filePath?: string) => {
+      return null;
+    },
+
+    saveAnalysisResult: async (
+      _projectRoot: string,
+      _documentId: string,
+      _paragraphId: string,
+      _pattern: import('@litelizard/shared').ParagraphAnalysisPattern,
+    ) => {
+      // mock: no-op
+    },
+
+    createAnalysisGeneration: async (_projectRoot: string, _documentId: string) => {
+      return 1;
+    },
   };
 }

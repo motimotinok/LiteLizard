@@ -20,6 +20,12 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.saveDocument, filePath, doc, revision),
     runAnalysis: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.runAnalysis, input),
+    loadAnalysis: (projectRoot, documentId, filePath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.loadAnalysis, projectRoot, documentId, filePath),
+    saveAnalysisResult: (projectRoot, documentId, paragraphId, pattern) =>
+      ipcRenderer.invoke(IPC_CHANNELS.saveAnalysisResult, projectRoot, documentId, paragraphId, pattern),
+    createAnalysisGeneration: (projectRoot, documentId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.createAnalysisGeneration, projectRoot, documentId),
     getApiKeyStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.getApiKeyStatus),
     saveApiKey: (apiKey) =>
