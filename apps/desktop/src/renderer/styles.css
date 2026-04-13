@@ -449,6 +449,7 @@ textarea {
   gap: 0;
   padding: 0;
   justify-content: flex-start;
+  align-items: stretch;
 }
 
 .workspace-content.no-analysis,
@@ -785,6 +786,7 @@ textarea {
   background: #ffffff;
   min-height: 0;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .chat-body {
@@ -842,6 +844,8 @@ textarea {
   display: flex;
   gap: 10px;
   align-items: center;
+  min-width: 0;
+  flex: 1;
 }
 
 .analysis-title-icon {
@@ -858,12 +862,18 @@ textarea {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .analysis-subtitle {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .analysis-empty {
@@ -1193,7 +1203,7 @@ textarea {
   .workspace-left {
     width: 100%;
     min-width: 0;
-    height: 260px;
+    height: min(260px, 35vh);
     border-bottom: 1px solid var(--border);
     border-right: 0;
   }
@@ -1214,9 +1224,11 @@ textarea {
     flex-direction: column;
     justify-content: flex-start;
     overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .editor-shell {
+    width: 100%;
     flex: 1;
     min-height: 320px;
     flex-shrink: 0;
@@ -1236,6 +1248,24 @@ textarea {
     min-height: 250px;
     max-height: 40vh;
     overflow-y: auto;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .analysis-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .analysis-title-wrap {
+    min-width: min(100%, 240px);
+  }
+
+  .analysis-generate-btn,
+  .analysis-mode-select {
+    min-height: 32px;
   }
 }
 
@@ -1255,6 +1285,14 @@ textarea {
 
   .workspace-left {
     height: 220px;
+  }
+
+  .global-header {
+    padding: 0 6px;
+  }
+
+  .global-tab {
+    max-width: 100%;
   }
 
   .left-icon-rail {
@@ -1320,5 +1358,18 @@ textarea {
     gap: 2px;
     height: auto;
     padding: 6px 14px;
+  }
+
+  .analysis-header {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .analysis-title {
+    font-size: 13px;
+  }
+
+  .analysis-subtitle {
+    font-size: 11px;
   }
 }
