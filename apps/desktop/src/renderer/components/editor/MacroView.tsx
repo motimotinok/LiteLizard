@@ -20,9 +20,10 @@ import { ChapterCard } from './components/ChapterCard.js';
 interface Props {
   document: LiteLizardDocument;
   onReorderChapters?: (orderedIds: string[]) => void;
+  onDeleteChapter?: (chapterId: string) => void;
 }
 
-export function MacroView({ document, onReorderChapters }: Props) {
+export function MacroView({ document, onReorderChapters, onDeleteChapter }: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -48,7 +49,15 @@ export function MacroView({ document, onReorderChapters }: Props) {
             const paragraphs = document.paragraphs
               .filter((p) => p.chapterId === chapter.id)
               .sort((a, b) => a.order - b.order);
-            return <ChapterCard key={chapter.id} chapter={chapter} index={index} paragraphs={paragraphs} />;
+            return (
+              <ChapterCard
+                key={chapter.id}
+                chapter={chapter}
+                index={index}
+                paragraphs={paragraphs}
+                onDelete={onDeleteChapter ? () => onDeleteChapter(chapter.id) : undefined}
+              />
+            );
           })}
         </div>
       </SortableContext>
