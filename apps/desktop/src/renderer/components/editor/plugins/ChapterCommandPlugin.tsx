@@ -7,13 +7,61 @@ import {
   KEY_TAB_COMMAND,
   $createParagraphNode,
   $createTextNode,
-  $getRoot,
   $getSelection,
   $isParagraphNode,
   $isRangeSelection,
+  type LexicalNode,
   type ParagraphNode,
 } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+
+/** 指定ノードより前に章ノードが存在するか（先頭章判定に使用）*/
+function hasPrecedingChapterNode(node: LexicalNode, chapterNodeKeySet: Set<string>): boolean {
+  let walker = node.getPreviousSibling();
+  while (walker) {
+    if ($isParagraphNode(walker) && chapterNodeKeySet.has(walker.getKey())) return true;
+    walker = walker.getPreviousSibling();
+  }
+  return false;
+}
+
+export function deleteChapterNodeInLexical(
+  topLevel: ParagraphNode,
+  chapterNodeKeySetRef: React.MutableRefObject<Set<string>>,
+) {
+  // 前の章ノードを探す（後方走査）
+  let prevChapterNode: ParagraphNode | null = null;
+  let prevWalker = topLevel.getPreviousSibling();
+  while (prevWalker) {
+    if ($isParagraphNode(prevWalker) && chapterNodeKeySetRef.current.has(prevWalker.getKey())) {
+      prevChapterNode = prevWalker;
+      break;
+    }
+    prevWalker = prevWalker.getPreviousSibling();
+  }
+
+  // 削除前に参照を取得（topLevel 削除後に取れなくなるため）
+  const insertAfterNode = topLevel.getPreviousSibling();
+
+  if (prevChapterNode === null) {
+    // 先頭章 or 唯一の章: 無題の章を前に挿入し、段落はそのまま残す
+    const untitledChapter = $createParagraphNode();
+    topLevel.insertBefore(untitledChapter);
+    chapterNodeKeySetRef.current.add(untitledChapter.getKey());
+    chapterNodeKeySetRef.current.delete(topLevel.getKey());
+    topLevel.remove();
+    untitledChapter.selectStart();
+  } else {
+    // 前の章あり: 章マーカーノードのみ削除（段落はそのまま → 前章に帰属）
+    chapterNodeKeySetRef.current.delete(topLevel.getKey());
+    topLevel.remove();
+    if (insertAfterNode && $isParagraphNode(insertAfterNode)) {
+      insertAfterNode.selectEnd();
+    } else {
+      prevChapterNode.selectEnd();
+    }
+  }
+}
 
 function findCurrentChapterNode(topLevel: ParagraphNode | null, chapterNodeKeySet: Set<string>): ParagraphNode | null {
   if (!topLevel) {
@@ -151,54 +199,42 @@ export function ChapterCommandPlugin({
             return;
           }
 
-          if (!chapterNodeKeySetRef.current.has(topLevel.getKey())) {
-            return;
-          }
-
           const isAtStart = selection.anchor.offset === 0;
-          if (!isAtStart || topLevel.getTextContent().trim().length > 0) {
+          if (!isAtStart) {
             return;
           }
 
-          handled = true;
-          event?.preventDefault();
-
-          const paragraphsInChapter: ParagraphNode[] = [];
-          let walker = topLevel.getNextSibling();
-          while (walker && !($isParagraphNode(walker) && chapterNodeKeySetRef.current.has(walker.getKey()))) {
-            if ($isParagraphNode(walker)) {
-              paragraphsInChapter.push(walker);
+          if (chapterNodeKeySetRef.current.has(topLevel.getKey())) {
+            // 章タイトルノード上での Backspace（先頭位置）
+            // 先頭章は格下げ不可（構造破壊防止）
+            if (!hasPrecedingChapterNode(topLevel, chapterNodeKeySetRef.current)) {
+              return;
             }
-            walker = walker.getNextSibling();
-          }
-
-          const hasContent = paragraphsInChapter.some((node) => node.getTextContent().trim().length > 0);
-          if (hasContent) {
-            return;
-          }
-
-          const previous = topLevel.getPreviousSibling();
-          paragraphsInChapter.forEach((node) => node.remove());
-          chapterNodeKeySetRef.current.delete(topLevel.getKey());
-          topLevel.remove();
-
-          const root = $getRoot();
-          const topParagraphs = root.getChildren().filter((node): node is ParagraphNode => $isParagraphNode(node));
-
-          if (topParagraphs.length === 0) {
-            const chapter = $createParagraphNode();
-            chapter.append($createTextNode('章1'));
-            const paragraph = $createParagraphNode();
-            root.append(chapter, paragraph);
-            chapterNodeKeySetRef.current = new Set([chapter.getKey()]);
-            chapter.selectStart();
-            return;
-          }
-
-          if (previous && $isParagraphNode(previous)) {
-            previous.selectEnd();
+            handled = true;
+            event?.preventDefault();
+            // 章タイトルを通常段落に格下げ（chapterNodeKeySet から除去するだけ）
+            chapterNodeKeySetRef.current.delete(topLevel.getKey());
+            // カーソルは格下げした段落の先頭に留まる（移動不要）
           } else {
-            topParagraphs[0].selectStart();
+            // 本文段落の先頭で Backspace → 前のノードが章タイトルかチェック
+            const prevSibling = topLevel.getPreviousSibling();
+            if (!prevSibling || !$isParagraphNode(prevSibling) || !chapterNodeKeySetRef.current.has(prevSibling.getKey())) {
+              // 前が章タイトルでない → Lexical デフォルト（通常段落マージ）に委譲
+              return;
+            }
+            // 前が章タイトル
+            if (!hasPrecedingChapterNode(prevSibling, chapterNodeKeySetRef.current)) {
+              // 先頭章タイトルへのマージは許可しない
+              handled = true;
+              event?.preventDefault();
+              return;
+            }
+            handled = true;
+            event?.preventDefault();
+            // 章タイトルを通常段落に格下げ
+            chapterNodeKeySetRef.current.delete(prevSibling.getKey());
+            // カーソルを格下げした章タイトル（旧）の末尾に移動
+            prevSibling.selectEnd();
           }
         });
 

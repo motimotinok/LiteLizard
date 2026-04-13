@@ -17,6 +17,7 @@ interface Props {
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onReorderChapters?: (orderedIds: string[]) => void;
+  onDeleteChapter?: (chapterId: string) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
 }
@@ -33,6 +34,7 @@ export function EditorPane({
   onSyncStructure,
   onReorderParagraphs,
   onReorderChapters,
+  onDeleteChapter,
   onCreateEssay,
   onOpenFolder,
 }: Props) {
@@ -74,7 +76,7 @@ export function EditorPane({
       <div className="editor-frame">
         <div className="editor-body" ref={setEditorBodyEl}>
           {viewScale === 'macro' ? (
-            <MacroView document={document} onReorderChapters={onReorderChapters} />
+            <MacroView document={document} onReorderChapters={onReorderChapters} onDeleteChapter={onDeleteChapter} />
           ) : (
             <MicroEditorView
               document={document}
