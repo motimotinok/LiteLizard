@@ -7,6 +7,8 @@ import { ProjectSetupScreen } from './components/ProjectSetupScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useResizablePanel } from './hooks/useResizablePanel.js';
 
+const COMPACT_LAYOUT_BREAKPOINT = 1180;
+
 function DoorIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -47,9 +49,21 @@ function WorkspaceShell() {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
+  const [isCompactLayout, setIsCompactLayout] = useState(() => window.innerWidth <= COMPACT_LAYOUT_BREAKPOINT);
 
-  const explorerPanel = useResizablePanel(260, 160, 480);
-  const chatPanel = useResizablePanel(340, 240, 600);
+  const explorerPanel = useResizablePanel(260, 160, 480, { disabled: isCompactLayout });
+  const chatPanel = useResizablePanel(340, 240, 600, { disabled: isCompactLayout });
+
+  useEffect(() => {
+    const onResize = () => {
+      setIsCompactLayout(window.innerWidth <= COMPACT_LAYOUT_BREAKPOINT);
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -160,14 +174,14 @@ function WorkspaceShell() {
               rootPath={rootPath}
               tree={tree}
               currentFilePath={currentFilePath}
-              style={{ width: explorerPanel.width }}
+              style={isCompactLayout ? undefined : { width: explorerPanel.width }}
               onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
               onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
               onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
               onSelectFile={(path) => void loadDocument(path)}
             />
           )}
-          {explorerOpen && (
+          {explorerOpen && !isCompactLayout && (
             <div
               className="panel-resizer"
               onMouseDown={(e) => explorerPanel.onMouseDown(e, 1)}
@@ -200,11 +214,17 @@ function WorkspaceShell() {
             />
 
             {chatPanelOpen ? (
-              <aside className="chat-shell" style={{ width: chatPanel.width }} aria-label="chat-panel">
-                <div
-                  className="panel-resizer panel-resizer-left"
-                  onMouseDown={(e) => chatPanel.onMouseDown(e, -1)}
-                />
+              <aside
+                className="chat-shell"
+                style={isCompactLayout ? undefined : { width: chatPanel.width }}
+                aria-label="chat-panel"
+              >
+                {!isCompactLayout ? (
+                  <div
+                    className="panel-resizer panel-resizer-left"
+                    onMouseDown={(e) => chatPanel.onMouseDown(e, -1)}
+                  />
+                ) : null}
                 <div className="chat-body">
                   <AnalysisPane
                     document={currentDocument}

@@ -1,8 +1,22 @@
 import { useState, useCallback, useEffect } from 'react';
 
-export function useResizablePanel(initialWidth: number, min: number, max: number) {
+export function getEffectivePanelMaxWidth(min: number, max: number, viewportWidth: number) {
+  return Math.max(min, Math.min(max, viewportWidth * 0.5));
+}
+
+interface UseResizablePanelOptions {
+  disabled?: boolean;
+}
+
+export function useResizablePanel(
+  initialWidth: number,
+  min: number,
+  max: number,
+  options?: UseResizablePanelOptions,
+) {
+  const disabled = options?.disabled ?? false;
   const getEffectiveMax = useCallback(
-    () => Math.max(min, Math.min(max, window.innerWidth * 0.5)),
+    () => getEffectivePanelMaxWidth(min, max, window.innerWidth),
     [min, max],
   );
 
@@ -18,6 +32,10 @@ export function useResizablePanel(initialWidth: number, min: number, max: number
 
   const onMouseDown = useCallback(
     (e: React.MouseEvent, growDirection: 1 | -1 = 1) => {
+      if (disabled) {
+        return;
+      }
+
       e.preventDefault();
       const startX = e.clientX;
       const startWidth = width;
@@ -38,7 +56,7 @@ export function useResizablePanel(initialWidth: number, min: number, max: number
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [width, min, getEffectiveMax],
+    [disabled, width, min, getEffectiveMax],
   );
 
   return { width, onMouseDown };
