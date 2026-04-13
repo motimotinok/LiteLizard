@@ -19,6 +19,7 @@ import { StructureChromePlugin } from './plugins/StructureChromePlugin.js';
 import { ChapterCommandPlugin } from './plugins/ChapterCommandPlugin.js';
 import { LexicalEditorRefPlugin } from './plugins/LexicalEditorRefPlugin.js';
 import { DragHandlePlugin } from './plugins/DragHandlePlugin.js';
+import { ChapterDeletePlugin } from './plugins/ChapterDeletePlugin.js';
 import {
   buildChapterInputs,
   buildFallbackChapterNodeIndexes,
@@ -323,6 +324,12 @@ export function MicroEditorView({
             <ChapterCommandPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
 
             <DragHandlePlugin paragraphNodeKeys={paragraphNodeKeys} containerRef={containerRef} />
+
+            <ChapterDeletePlugin
+              chapterNodeKeys={chapterNodeKeys}
+              chapterNodeKeySetRef={chapterNodeKeySetRef}
+              containerRef={containerRef}
+            />
 
             <HistoryPlugin />
 

@@ -39,6 +39,7 @@ function WorkspaceShell() {
     loadDocument,
     reorderParagraphs,
     reorderChapters,
+    deleteChapter,
     syncDocumentStructure,
     saveNow,
     cycleEditorMode,
@@ -203,6 +204,7 @@ function WorkspaceShell() {
               onSyncStructure={(input) => syncDocumentStructure(input)}
               onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
               onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
+              onDeleteChapter={(chapterId) => deleteChapter(chapterId)}
               onCreateEssay={() => {
                 if (!rootPath) {
                   void openFolder();
