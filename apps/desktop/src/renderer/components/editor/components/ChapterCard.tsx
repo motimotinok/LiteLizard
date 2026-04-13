@@ -10,9 +10,10 @@ interface Props {
   chapter: Chapter;
   index: number;
   paragraphs: Paragraph[];
+  onDelete?: () => void;
 }
 
-export function ChapterCard({ chapter, index, paragraphs }: Props) {
+export function ChapterCard({ chapter, index, paragraphs, onDelete }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: chapter.id });
 
   const style: React.CSSProperties = {
@@ -46,6 +47,17 @@ export function ChapterCard({ chapter, index, paragraphs }: Props) {
         >
           ⋮⋮
         </button>
+        {onDelete && (
+          <button
+            className="macro-card-delete-btn"
+            type="button"
+            aria-label={`${chapter.title || '無題の章'} を削除`}
+            title="章を削除"
+            onClick={onDelete}
+          >
+            ×
+          </button>
+        )}
       </header>
       <p className="editor-macro-card-preview macro-card-preview-dense">{previewText || '（空の章）'}</p>
       <footer className="editor-macro-card-footer">{paragraphs.length} 段落</footer>
