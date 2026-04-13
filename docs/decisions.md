@@ -6,6 +6,17 @@
 
 ---
 
+## [2026-04-13] 狭幅レイアウトでは固定パネル幅より縦積みを優先する (R-11)
+
+- **決定**: renderer の狭幅時 (`1180px` 以下) は explorer / analysis パネルのインライン固定幅とドラッグリサイズを無効化し、CSS の縦積みレイアウトを優先する
+- **理由**: media query による縦積み切り替えと JS 側の固定幅指定が競合すると、横スクロールやパネル食い込みが起きやすい。狭幅では幅調整の自由度よりレイアウト安定性を優先する
+- **却下した案**:
+  - 狭幅でも固定幅を維持したまま CSS だけで吸収する → inline style が優先され、崩れの根本原因を残す
+  - 狭幅専用UIに大きく作り替える → R-11 の目的に対して変更範囲が広すぎる
+- **参照**: `apps/desktop/src/renderer/App.tsx`, `apps/desktop/src/renderer/hooks/useResizablePanel.ts`, `apps/desktop/src/renderer/styles.css`
+
+---
+
 ## [2026-03-05] GitHub Pages MVP はモックAPIでデモする
 
 - **決定**: LLMなし・モックデータのみで動くデモを GitHub Pages に公開する
