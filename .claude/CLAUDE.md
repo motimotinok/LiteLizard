@@ -36,8 +36,19 @@
 
 ### マージ・レビュー方針
 - 個人開発のためリモート PR は原則作成しない（ローカルで完結）
-- マージ前に `git diff dev..feat/<task-id>` で差分を確認し、問題なければ dev にマージ
+- マージ前に `git diff dev..feat/<task-id> --stat` で差分を確認し、問題なければ dev にマージ
 - プッシュはマージ後に `git push origin dev` で行う
+
+### 並列ブランチのマージ手順（rebase）
+- 複数の feature ブランチを並列で進めた場合、先にマージされたブランチによって dev が進んでいることがある
+- その場合、後からマージする feature ブランチの worktree で `git rebase dev` を実行してから dev にマージする
+- rebase により「古い dev を根っこにしたまま同じファイルを上書きしてしまう」問題を防ぐ
+  ```bash
+  cd /Users/jane/litelizard/feat-<task-id>
+  git rebase dev
+  cd /Users/jane/litelizard/dev
+  git merge feat/<task-id> --no-ff
+  ```
 
 ### ファイルの役割分担
 
