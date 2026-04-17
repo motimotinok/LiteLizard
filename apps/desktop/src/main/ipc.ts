@@ -14,7 +14,7 @@ import {
 } from './analysisStore.js';
 import {
   ensureFileName,
-  ensureMarkdownFileName,
+  ensureLzlFileName,
   sanitizeFileStem,
   toTitleFromFileName,
   validateEntryName,
@@ -177,7 +177,7 @@ export function registerIpcHandlers() {
         return { ok: true as const, path: folderPath, type };
       }
 
-      const fileName = ensureMarkdownFileName(validateEntryName(sanitizeFileStem(validatedName)));
+      const fileName = ensureLzlFileName(validateEntryName(sanitizeFileStem(validatedName)));
       const filePath = path.join(root, fileName);
       const title = toTitleFromFileName(fileName);
 
@@ -280,7 +280,7 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.createDocument, async (_, root: string, title: string) => {
     const safeStem = sanitizeFileStem(title);
-    const fileName = ensureMarkdownFileName(safeStem);
+    const fileName = ensureLzlFileName(safeStem);
     const filePath = path.join(root, fileName);
     const doc = buildInitialDocument(filePath, toTitleFromFileName(fileName));
 

@@ -24,6 +24,9 @@ function dirName(filePath) {
 function withMarkdownExtension(fileName) {
     return /\.md$/i.test(fileName) ? fileName : `${fileName}.md`;
 }
+function withLzlExtension(fileName) {
+    return /\.lzl$/i.test(fileName) ? fileName : `${fileName}.lzl`;
+}
 function sanitizeName(name) {
     const trimmed = name.trim();
     if (!trimmed) {
@@ -48,7 +51,7 @@ function isSameOrNestedPath(value, base) {
         normalizedValue.startsWith(`${normalizedBase}\\`));
 }
 function toTitle(filePath) {
-    return baseName(filePath).replace(/\.md$/i, '');
+    return baseName(filePath).replace(/\.(md|lzl)$/i, '');
 }
 function buildInitialDocument(filePath, title) {
     const now = new Date().toISOString();
@@ -208,7 +211,7 @@ export function createMockPreloadApi() {
                 });
                 return { ok: true, path: folderPath, type };
             }
-            const fileName = withMarkdownExtension(safeName);
+            const fileName = withLzlExtension(safeName);
             const filePath = joinPath(root, fileName);
             if (pathExists(state.tree, filePath)) {
                 throw new Error(`Target already exists: ${filePath}`);
@@ -232,7 +235,7 @@ export function createMockPreloadApi() {
             const parentPath = dirName(oldPath);
             const safeName = sanitizeName(nextName);
             const nextPath = found.node.type === 'file'
-                ? joinPath(parentPath, withMarkdownExtension(safeName))
+                ? joinPath(parentPath, withLzlExtension(safeName))
                 : joinPath(parentPath, safeName);
             if (pathExists(state.tree, nextPath)) {
                 throw new Error(`Target already exists: ${nextPath}`);
@@ -273,7 +276,7 @@ export function createMockPreloadApi() {
         },
         createDocument: async (root, title) => {
             const safeStem = sanitizeName(title);
-            const fileName = withMarkdownExtension(safeStem);
+            const fileName = withLzlExtension(safeStem);
             const filePath = joinPath(root, fileName);
             const children = findDirectoryChildren(state, root);
             if (pathExists(state.tree, filePath)) {
