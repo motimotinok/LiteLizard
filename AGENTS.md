@@ -10,7 +10,7 @@
 - **仕様策定・設計判断**: ユーザーとの対話を通じて仕様を詰め、設計を決定する
 - **実装全般**: すべての実装タスクを Codex が担う
 - **WBS の更新・タスク割り振り**: `docs/wbs.md` にタスクを追加・優先度付けする
-- **PROJECTMEMORY の管理**: TASKS / ARCHIVE の整理・更新
+- **変更履歴の管理**: `CHANGELOG.md` に変更の背景・意図・残課題を記録する
 - **設計判断の記録**: `docs/decisions.md` に技術選択の理由を記録する
 
 ---
@@ -26,13 +26,14 @@
 - リモートとの同期: `git fetch origin && git merge origin/dev`
 
 ### タスクの流れ
-1. `PROJECTMEMORY/TASKS.md` の「NEXT」でタスクを確認
+1. `docs/wbs.md` を確認し、着手タスクと優先度を把握する
 2. dev から worktree を切って `feat/<task-id>` ブランチで実装
 3. 実装完了後、変更差分をレビューして確認
 4. 問題なければ dev にローカルマージ、feature branch・worktree を削除
 5. `docs/wbs.md` のステータスを更新
-6. `PROJECTMEMORY/TASKS.md` のキューを更新
-   - タスクの追加・完了・優先度変更はすべてユーザーに確認の上行う
+6. `CHANGELOG.md` に変更履歴を追記する
+   - 変更内容だけでなく、背景・意図・残課題まで残す
+   - タスクの追加・完了・優先度変更は `docs/wbs.md` 上で管理し、更新時はユーザー確認を前提にする
 
 ### マージ・レビュー方針
 - 個人開発のためリモート PR は原則作成しない（ローカルで完結）
@@ -44,12 +45,10 @@
 | ファイル | 管理 | 役割 |
 |---------|------|------|
 | `docs/wbs.md` | git | タスク台帳（唯一の信頼できるソース） |
+| `CHANGELOG.md` | git | 変更履歴（何を、なぜ変えたか・残課題の記録） |
 | `docs/decisions.md` | git | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
-| `docs/implementation-status.md` | git | 実装状況（仕様 v003 対照） |
 | `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
-| `PROJECTMEMORY/TASKS.md` | .gitignore | 優先度順タスクキュー + 方針覚書ダッシュボード |
-| `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫 |
 
 ---
 
