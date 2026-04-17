@@ -186,59 +186,58 @@ export function ChapterCommandPlugin({
     const unregisterBackspace = editor.registerCommand(
       KEY_BACKSPACE_COMMAND,
       (event) => {
-        let handled = false;
+        // コマンドリスナーは Lexical の editor.update() ラッパー内で実行されるため、
+        // $getSelection() で pending state（現在の DOM selection）を直接読める。
+        // editor.getEditorState().read() はコミット済みの古い selection を返すため使わない。
+        // また editor.update() を内部で呼ぶとキューに積まれ return より後に実行されるため使わない。
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
 
-        editor.update(() => {
-          const selection = $getSelection();
-          if (!$isRangeSelection(selection) || !selection.isCollapsed()) {
-            return;
-          }
+        const topLevel = selection.anchor.getNode().getTopLevelElement();
+        if (!topLevel || !$isParagraphNode(topLevel)) return false;
 
-          const topLevel = selection.anchor.getNode().getTopLevelElement();
-          if (!topLevel || !$isParagraphNode(topLevel)) {
-            return;
-          }
+        if (selection.anchor.offset !== 0) return false;
 
-          const isAtStart = selection.anchor.offset === 0;
-          if (!isAtStart) {
-            return;
-          }
-
-          if (chapterNodeKeySetRef.current.has(topLevel.getKey())) {
-            // 章タイトルノード上での Backspace（先頭位置）
-            // 先頭章は格下げ不可（構造破壊防止）
-            if (!hasPrecedingChapterNode(topLevel, chapterNodeKeySetRef.current)) {
-              return;
-            }
-            handled = true;
+        if (chapterNodeKeySetRef.current.has(topLevel.getKey())) {
+          // 章タイトルノード上での Backspace
+          if (!hasPrecedingChapterNode(topLevel, chapterNodeKeySetRef.current)) {
             event?.preventDefault();
-            // 章タイトルを通常段落に格下げ（chapterNodeKeySet から除去するだけ）
-            chapterNodeKeySetRef.current.delete(topLevel.getKey());
-            // カーソルは格下げした段落の先頭に留まる（移動不要）
-          } else {
-            // 本文段落の先頭で Backspace → 前のノードが章タイトルかチェック
-            const prevSibling = topLevel.getPreviousSibling();
-            if (!prevSibling || !$isParagraphNode(prevSibling) || !chapterNodeKeySetRef.current.has(prevSibling.getKey())) {
-              // 前が章タイトルでない → Lexical デフォルト（通常段落マージ）に委譲
-              return;
-            }
-            // 前が章タイトル
-            if (!hasPrecedingChapterNode(prevSibling, chapterNodeKeySetRef.current)) {
-              // 先頭章タイトルへのマージは許可しない
-              handled = true;
-              event?.preventDefault();
-              return;
-            }
-            handled = true;
-            event?.preventDefault();
-            // 章タイトルを通常段落に格下げ
-            chapterNodeKeySetRef.current.delete(prevSibling.getKey());
-            // カーソルを格下げした章タイトル（旧）の末尾に移動
-            prevSibling.selectEnd();
+            return true; // 先頭章タイトル → no-op
           }
-        });
+          // 非先頭章タイトル → 格下げ
+          event?.preventDefault();
+          chapterNodeKeySetRef.current.delete(topLevel.getKey());
+          return true;
+        }
 
-        return handled;
+        // 本文段落の先頭で Backspace
+        const prevSibling = topLevel.getPreviousSibling();
+        if (!prevSibling || !$isParagraphNode(prevSibling)) return false;
+
+        if (chapterNodeKeySetRef.current.has(prevSibling.getKey())) {
+          event?.preventDefault();
+          return true; // 章の最初の段落 → no-op
+        }
+
+        // 同一章内の2番目以降の段落 → 段落統合
+        event?.preventDefault();
+        const prevText = prevSibling.getTextContent();
+        const currText = topLevel.getTextContent();
+        const mergeOffset = prevText.length;
+        const mergedText = prevText + currText;
+
+        prevSibling.clear();
+        topLevel.remove();
+
+        if (mergedText.length > 0) {
+          const mergedTextNode = $createTextNode(mergedText);
+          prevSibling.append(mergedTextNode);
+          mergedTextNode.select(mergeOffset, mergeOffset);
+        } else {
+          prevSibling.selectEnd();
+        }
+
+        return true;
       },
       COMMAND_PRIORITY_HIGH,
     );
