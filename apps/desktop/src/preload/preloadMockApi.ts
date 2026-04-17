@@ -44,6 +44,10 @@ function withMarkdownExtension(fileName: string) {
   return /\.md$/i.test(fileName) ? fileName : `${fileName}.md`;
 }
 
+function withLzlExtension(fileName: string) {
+  return /\.lzl$/i.test(fileName) ? fileName : `${fileName}.lzl`;
+}
+
 function sanitizeName(name: string) {
   const trimmed = name.trim();
   if (!trimmed) {
@@ -75,7 +79,7 @@ function isSameOrNestedPath(value: string, base: string) {
 }
 
 function toTitle(filePath: string) {
-  return baseName(filePath).replace(/\.md$/i, '');
+  return baseName(filePath).replace(/\.(md|lzl)$/i, '');
 }
 
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
@@ -269,7 +273,7 @@ export function createMockPreloadApi(): BridgeApi {
         return { ok: true, path: folderPath, type };
       }
 
-      const fileName = withMarkdownExtension(safeName);
+      const fileName = withLzlExtension(safeName);
       const filePath = joinPath(root, fileName);
       if (pathExists(state.tree, filePath)) {
         throw new Error(`Target already exists: ${filePath}`);
@@ -299,7 +303,7 @@ export function createMockPreloadApi(): BridgeApi {
       const safeName = sanitizeName(nextName);
       const nextPath =
         found.node.type === 'file'
-          ? joinPath(parentPath, withMarkdownExtension(safeName))
+          ? joinPath(parentPath, withLzlExtension(safeName))
           : joinPath(parentPath, safeName);
 
       if (pathExists(state.tree, nextPath)) {
@@ -350,7 +354,7 @@ export function createMockPreloadApi(): BridgeApi {
 
     createDocument: async (root: string, title: string) => {
       const safeStem = sanitizeName(title);
-      const fileName = withMarkdownExtension(safeStem);
+      const fileName = withLzlExtension(safeStem);
       const filePath = joinPath(root, fileName);
 
       const children = findDirectoryChildren(state, root);

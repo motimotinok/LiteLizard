@@ -18,7 +18,7 @@ function remapPathForRename(current, source, target) {
 function titleFromPath(filePath) {
     const normalized = filePath.replace(/\\/g, '/');
     const fileName = normalized.split('/').pop() ?? filePath;
-    return fileName.replace(/\.md$/i, '');
+    return fileName.replace(/\.(md|lzl)$/i, '');
 }
 export const useAppStore = create((set, get) => ({
     rootPath: null,
@@ -138,7 +138,7 @@ export const useAppStore = create((set, get) => ({
                                 ...document,
                                 title: remapped === result.path ? titleFromPath(remapped) : document.title,
                                 updatedAt: document.updatedAt,
-                                source: { format: 'markdown-md', originPath: remapped },
+                                source: { ...document.source, originPath: remapped },
                             }
                             : document,
                     });

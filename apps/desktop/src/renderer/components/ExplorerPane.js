@@ -18,6 +18,12 @@ function dirName(targetPath) {
     }
     return targetPath.slice(0, slash);
 }
+function displayName(node) {
+    if (node.type === 'file') {
+        return node.name.replace(/\.lzl$/i, '');
+    }
+    return node.name;
+}
 function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }) {
     const ref = useRef(null);
     const confirmed = useRef(false);
@@ -60,7 +66,7 @@ function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectF
                     return (_jsx(InlineInput, { type: "directory", depth: depth, defaultValue: baseName(node.path), onConfirm: (name) => onInlineRenameConfirm(node.path, name), onCancel: onInlineRenameCancel }, node.path));
                 }
                 const isExpanded = expanded.has(node.path);
-                return (_jsxs("div", { children: [_jsxs("button", { className: "explorer-tree-item explorer-tree-item-folder", style: { paddingLeft: `${depth * 14 + 10}px` }, onClick: () => onToggle(node.path), onContextMenu: (event) => onOpenContextMenu(event, node), children: [_jsx("span", { className: "explorer-chevron", children: isExpanded ? '▾' : '▸' }), _jsx("span", { className: "explorer-node-icon", "aria-hidden": true, children: _jsx(FolderIcon, {}) }), _jsx("span", { className: "explorer-node-label", children: node.name })] }), isExpanded && (_jsxs(_Fragment, { children: [node.children && node.children.length > 0 && (_jsx(Tree, { nodes: node.children, currentFilePath: currentFilePath, depth: depth + 1, expanded: expanded, onToggle: onToggle, onSelectFile: onSelectFile, onOpenContextMenu: onOpenContextMenu, inlineCreate: inlineCreate, inlineRename: inlineRename, onInlineCreateConfirm: onInlineCreateConfirm, onInlineCreateCancel: onInlineCreateCancel, onInlineRenameConfirm: onInlineRenameConfirm, onInlineRenameCancel: onInlineRenameCancel })), inlineCreate?.parentPath === node.path && (_jsx(InlineInput, { type: inlineCreate.type, depth: depth + 1, defaultValue: inlineCreate.defaultValue, onConfirm: onInlineCreateConfirm, onCancel: onInlineCreateCancel }))] }))] }, node.path));
+                return (_jsxs("div", { children: [_jsxs("button", { className: "explorer-tree-item explorer-tree-item-folder", style: { paddingLeft: `${depth * 14 + 10}px` }, onClick: () => onToggle(node.path), onContextMenu: (event) => onOpenContextMenu(event, node), children: [_jsx("span", { className: "explorer-chevron", children: isExpanded ? '▾' : '▸' }), _jsx("span", { className: "explorer-node-icon", "aria-hidden": true, children: _jsx(FolderIcon, {}) }), _jsx("span", { className: "explorer-node-label", children: displayName(node) })] }), isExpanded && (_jsxs(_Fragment, { children: [node.children && node.children.length > 0 && (_jsx(Tree, { nodes: node.children, currentFilePath: currentFilePath, depth: depth + 1, expanded: expanded, onToggle: onToggle, onSelectFile: onSelectFile, onOpenContextMenu: onOpenContextMenu, inlineCreate: inlineCreate, inlineRename: inlineRename, onInlineCreateConfirm: onInlineCreateConfirm, onInlineCreateCancel: onInlineCreateCancel, onInlineRenameConfirm: onInlineRenameConfirm, onInlineRenameCancel: onInlineRenameCancel })), inlineCreate?.parentPath === node.path && (_jsx(InlineInput, { type: inlineCreate.type, depth: depth + 1, defaultValue: inlineCreate.defaultValue, onConfirm: onInlineCreateConfirm, onCancel: onInlineCreateCancel }))] }))] }, node.path));
             }
             if (inlineRename === node.path) {
                 return (_jsx(InlineInput, { type: "file", depth: depth, defaultValue: baseName(node.path), onConfirm: (name) => onInlineRenameConfirm(node.path, name), onCancel: onInlineRenameCancel }, node.path));
@@ -68,7 +74,7 @@ function Tree({ nodes, currentFilePath, depth = 0, expanded, onToggle, onSelectF
             const isSelected = node.path === currentFilePath;
             return (_jsxs("button", { className: isSelected
                     ? 'explorer-tree-item explorer-tree-item-file active'
-                    : 'explorer-tree-item explorer-tree-item-file', style: { paddingLeft: `${depth * 14 + 32}px` }, onClick: () => onSelectFile(node.path), onContextMenu: (event) => onOpenContextMenu(event, node), children: [_jsx("span", { className: "explorer-node-icon", "aria-hidden": true, children: _jsx(FileIcon, {}) }), _jsx("span", { className: "explorer-node-label", children: node.name })] }, node.path));
+                    : 'explorer-tree-item explorer-tree-item-file', style: { paddingLeft: `${depth * 14 + 32}px` }, onClick: () => onSelectFile(node.path), onContextMenu: (event) => onOpenContextMenu(event, node), children: [_jsx("span", { className: "explorer-node-icon", "aria-hidden": true, children: _jsx(FileIcon, {}) }), _jsx("span", { className: "explorer-node-label", children: displayName(node) })] }, node.path));
         }) }));
 }
 function collectDirectoryPaths(nodes) {
