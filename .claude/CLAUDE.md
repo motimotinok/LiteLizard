@@ -64,6 +64,31 @@
 
 ---
 
+## アーキテクチャ上の制約
+
+### Electron アプリであること
+- このアプリは **Electron アプリ**。レンダラーは `window.litelizard`（Electron preload IPC）でファイル操作を行う
+- **ブラウザ版 Playwright（localhost:5173）ではドキュメントを開けない** → 使わない
+- 動作確認の選択肢（優先順）:
+  1. **Codex レビュー** — ロジック検証はこれで十分かつ最速
+  2. **Electron ごと起動する Playwright** — `_electron` fixture を使う
+  3. **Lexical unit test** — Plugin 単体テスト
+
+---
+
+## ライブラリドキュメント調査
+
+ライブラリ（Lexical, Electron, React 等）の API・挙動を調べるときは、ソースコードを直接読む前に **context7 MCP** を使う。
+
+```
+mcp__plugin_context7_context7__resolve-library-id  → ライブラリ ID を取得
+mcp__plugin_context7_context7__query-docs          → ドキュメントを取得
+```
+
+context7 で見つからない実装詳細（内部挙動など）のみ、ソースコードを読む。
+
+---
+
 ## サブエージェント利用ルール
 サブエージェントは自己判断で自由に使ってよい。ユーザーへの確認は不要。調査・実装・レビュー・テストなど、必要と判断したら積極的に活用すること。
 
