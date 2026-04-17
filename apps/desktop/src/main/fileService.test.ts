@@ -322,6 +322,42 @@ updated: 2024-01-01T00:00:00.000Z
     });
   });
 
+  it('createDocument writes a valid .lzl file for .lzl paths', async () => {
+    await withTempDir(async (dir) => {
+      const filePath = path.join(dir, 'fresh.lzl');
+      const service = createFileService();
+      const document: LiteLizardDocument = {
+        version: 2,
+        documentId: 'd_test123456789012345678',
+        title: 'fresh',
+        personaMode: 'general-reader',
+        createdAt: '2026-04-14T00:00:00.000Z',
+        updatedAt: '2026-04-14T00:00:00.000Z',
+        chapters: [{ id: 'c_test1234567890123456789', order: 1, title: '第1章' }],
+        paragraphs: [
+          {
+            id: 'p_test12345678901234567890',
+            chapterId: 'c_test1234567890123456789',
+            order: 1,
+            light: { text: '新しい段落' },
+            lizard: { status: 'stale' },
+          },
+        ],
+      };
+
+      await service.createDocument(filePath, document);
+
+      const raw = await fs.readFile(filePath, 'utf8');
+      expect(raw).toContain('format: lzl-v1');
+      expect(raw).toContain('documentId: d_test123456789012345678');
+
+      const loaded = await service.load(filePath);
+      expect(loaded.source?.format).toBe('lzl-v1');
+      expect(loaded.title).toBe('fresh');
+      expect(loaded.paragraphs[0]?.light.text).toBe('新しい段落');
+    });
+  });
+
   it('throws UNSUPPORTED_FORMAT for unknown extensions', async () => {
     await withTempDir(async (dir) => {
       const filePath = path.join(dir, 'notes.txt');

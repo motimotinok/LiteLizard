@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ensureFileName,
+  ensureLzlFileName,
   ensureMarkdownFileName,
   sanitizeFileStem,
   toTitleFromFileName,
@@ -18,6 +19,12 @@ describe('ipc path utils', () => {
     expect(ensureMarkdownFileName('draft')).toBe('draft.md');
     expect(ensureMarkdownFileName('draft.md')).toBe('draft.md');
     expect(ensureMarkdownFileName('Essay.MD')).toBe('Essay.md');
+  });
+
+  it('normalizes lzl file names', () => {
+    expect(ensureLzlFileName('story')).toBe('story.lzl');
+    expect(ensureLzlFileName('story.lzl')).toBe('story.lzl');
+    expect(ensureLzlFileName('Story.LZL')).toBe('Story.lzl');
   });
 
   it('sanitizes file stem and recovers fallback', () => {
