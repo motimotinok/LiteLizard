@@ -1,5 +1,4 @@
 日本語で応答してください。
-ユーザーは音声入力で指示を飛ばすことがあります。誤字がある場合は適宜文脈から内容を読み取ってください。
 実装を進めながら仕様を動的に変更していく予定のため、将来的な拡張性を加味した実装方針の検討や問題点の指摘などを行なってください。
 
 ---
@@ -10,7 +9,7 @@
 - **仕様策定・設計判断**: ユーザーとの対話を通じて仕様を詰め、設計を決定する
 - **実装全般**: すべての実装タスクを Claude が担う
 - **WBS の更新・タスク割り振り**: `docs/wbs.md` にタスクを追加・優先度付けする
-- **PROJECTMEMORY の管理**: TASKS / ARCHIVE の整理・更新
+- **タスクの進捗状況 の管理**: PROJECTMEMORY/TASKS.md / CHANGELOG.md の整理・更新
 - **設計判断の記録**: `docs/decisions.md` に技術選択の理由を記録する
 
 ---
@@ -18,11 +17,13 @@
 ## 開発ワークフロー
 
 ### ブランチ運用
-- **dev ブランチ** = 変更をマージ・統合するための基点。動作確認もここで行う
+- **dev ブランチ** = 変更をマージ・統合するための基点。
+- **feat/<task-id>ブランチ** = 実際の実装作業をするためのブランチ
 - タスクごとに dev から `feat/<task-id>` ブランチを切り、worktree を作成して作業する
-  - worktree は手動で作成・管理する（`git worktree add ../worktree-<task-id> -b feat/<task-id>`）
+  - worktree は手動で作成・管理する（`git worktree add ../feat-<task-id> -b feat/<task-id>`）
   - 複数タスクを並行する場合は複数の worktree セッションを使う
 - 作業完了後、diff をレビューし問題なければ dev にローカルマージして feature branch・worktree を削除
+  - **worktree の削除は必ず `git worktree remove <path>` を使う。`rm -rf` で直接削除しない**
 - リモートとの同期: `git fetch origin && git merge origin/dev`
 
 ### タスクの流れ
@@ -57,15 +58,13 @@
 | `docs/wbs.md` | git | タスク台帳（唯一の信頼できるソース） |
 | `docs/decisions.md` | git | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
-| `docs/implementation-status.md` | git | 実装状況（仕様 v003 対照） |
 | `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
-| `PROJECTMEMORY/TASKS.md` | .gitignore | 優先度順タスクキュー + 方針覚書ダッシュボード |
-| `PROJECTMEMORY/ARCHIVE.md` | .gitignore | 完了タスク保管庫 |
+| `PROJECTMEMORY/TASKS.md` | git | 優先度順タスクキュー + 方針覚書ダッシュボード |
+| `./CHANGELOG.md` | git | 完了タスク保管庫 |
 
 ---
 
 ## サブエージェント利用ルール
-
 サブエージェントは自己判断で自由に使ってよい。ユーザーへの確認は不要。調査・実装・レビュー・テストなど、必要と判断したら積極的に活用すること。
 
 ### コードベース調査
