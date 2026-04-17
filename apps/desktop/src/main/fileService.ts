@@ -318,6 +318,17 @@ async function writeDocumentFiles(markdownPath: string, rawDocument: LiteLizardD
   await fs.writeFile(analysisPath, JSON.stringify(analysis, null, 2), 'utf8');
 }
 
+async function writeInitialDocument(filePath: string, rawDocument: LiteLizardDocument) {
+  const document = ensureDocumentChapters(rawDocument);
+
+  if (path.extname(filePath).toLowerCase() === '.lzl') {
+    await fs.writeFile(filePath, serializeLzl(document), 'utf8');
+    return;
+  }
+
+  await writeDocumentFiles(filePath, document);
+}
+
 async function walk(root: string, isRoot = false): Promise<FileNode[]> {
   let entries: Dirent[];
   try {
@@ -485,8 +496,7 @@ export function createFileService() {
     },
 
     async createDocument(filePath: string, document: LiteLizardDocument) {
-      const normalized = ensureDocumentChapters(document);
-      await writeDocumentFiles(filePath, normalized);
+      await writeInitialDocument(filePath, document);
       revisionMap.set(filePath, 0);
     },
 

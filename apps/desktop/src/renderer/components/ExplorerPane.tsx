@@ -92,6 +92,13 @@ function dirName(targetPath: string) {
   return targetPath.slice(0, slash);
 }
 
+function displayName(node: FileNode) {
+  if (node.type === 'file') {
+    return node.name.replace(/\.lzl$/i, '');
+  }
+  return node.name;
+}
+
 function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineInputProps) {
   const ref = useRef<HTMLInputElement>(null);
   const confirmed = useRef(false);
@@ -189,7 +196,7 @@ function Tree({
                 <span className="explorer-node-icon" aria-hidden>
                   <FolderIcon />
                 </span>
-                <span className="explorer-node-label">{node.name}</span>
+                <span className="explorer-node-label">{displayName(node)}</span>
               </button>
               {isExpanded && (
                 <>
@@ -254,7 +261,7 @@ function Tree({
             <span className="explorer-node-icon" aria-hidden>
               <FileIcon />
             </span>
-            <span className="explorer-node-label">{node.name}</span>
+            <span className="explorer-node-label">{displayName(node)}</span>
           </button>
         );
       })}
