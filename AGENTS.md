@@ -15,6 +15,18 @@
 
 ---
 
+## アーキテクチャ上の制約
+
+### Electron アプリであること
+- このアプリは **Electron アプリ**。レンダラーは `window.litelizard`（Electron preload IPC）でファイル操作を行う
+- **ブラウザ版 Playwright（localhost:5173）ではドキュメントを開けない** → 使わない
+- 動作確認の選択肢（優先順）:
+  1. **Codex レビュー** — ロジック検証はこれで十分かつ最速
+  2. **Electron ごと起動する Playwright** — `_electron` fixture を使う
+  3. **Lexical unit test** — Plugin 単体テスト
+
+---
+
 ## ファイルの役割分担
 
 | ファイル | 管理 | 役割 |
