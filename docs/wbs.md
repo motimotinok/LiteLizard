@@ -1,7 +1,7 @@
 # LiteLizard WBS（Work Breakdown Structure）
 
 > **目的**: 仕様 v003 → 製品完成までの全タスクを網羅し、Codex 並列開発を可能にする
-> **最終更新**: 2026-04-11
+> **最終更新**: 2026-04-20
 > **仕様参照**: `docs/LiteLizard_spec_v003.md`
 
 ---
@@ -132,7 +132,7 @@
 | ID | タスク | 依存 | 優先度 | サイズ | 状態 | 担当 | ブランチ |
 |----|--------|------|--------|--------|------|------|----------|
 | L-01 | API キー設定 UI（renderer: 設定画面） | E-01 ✅ | P1 | M | ⬜ | | |
-| L-02 | API キー暗号化保存（main: safeStorage） | E-01 ✅ | P1 | M | ⬜ | | |
+| L-02 | API キー暗号化保存（main: safeStorage） | E-01 ✅ | P1 | M | ✅ | | |
 | L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ⬜ | | |
 | L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ⬜ | | |
 | L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ⬜ | | |
@@ -149,6 +149,7 @@
 #### L-02: API キー暗号化保存
 - **対象**: main プロセスで `safeStorage` を使った暗号化保存/読み込み
 - **注**: 既存 `sessionVault.ts` を拡張するか、新規 `keyVault.ts` を作成するかは着手時に判断
+- **完了**: 2026-04-20。`sessionVault.ts` を `safeStorage` ベースへ置き換え、暗号化不可環境では平文フォールバックする保存層と単体テストを実装
 
 #### L-03: LLM プロバイダー抽象化層
 - **対象**: Strategy パターンでプロバイダーを切り替え。将来のクラウド方式もこのインターフェースに乗る

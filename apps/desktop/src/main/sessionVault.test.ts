@@ -1,20 +1,99 @@
-import os from 'node:os';
-import path from 'node:path';
-import fs from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mkdir = vi.fn();
+const readFile = vi.fn();
+const writeFile = vi.fn();
+const unlink = vi.fn();
+
+const isEncryptionAvailable = vi.fn();
+const encryptString = vi.fn();
+const decryptString = vi.fn();
+
+vi.mock('node:fs/promises', () => ({
+  default: {
+    mkdir,
+    readFile,
+    writeFile,
+    unlink,
+  },
+}));
+
+vi.mock('electron', () => ({
+  safeStorage: {
+    isEncryptionAvailable,
+    encryptString,
+    decryptString,
+  },
+}));
+
 import { createApiKeyVault } from './sessionVault.js';
 
 describe('apiKeyVault', () => {
-  it('encrypts and decrypts API key', async () => {
-    const dir = path.join(os.tmpdir(), `litelizard-vault-${Date.now()}`);
-    const vault = createApiKeyVault(dir);
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('safeStorage が利用可能な場合は暗号化ファイルへ保存して復号できる', async () => {
+    const encrypted = Buffer.from('encrypted-api-key');
+    isEncryptionAvailable.mockReturnValue(true);
+    encryptString.mockReturnValue(encrypted);
+    readFile.mockResolvedValue(encrypted);
+    decryptString.mockReturnValue('sk-test-123');
+
+    const vault = createApiKeyVault('/tmp/litelizard-user-data');
 
     await vault.save('sk-test-123');
+    await expect(vault.load()).resolves.toBe('sk-test-123');
 
-    const loaded = await vault.load();
-    expect(loaded).toBe('sk-test-123');
+    expect(mkdir).toHaveBeenCalledWith('/tmp/litelizard-user-data', { recursive: true });
+    expect(encryptString).toHaveBeenCalledWith('sk-test-123');
+    expect(writeFile).toHaveBeenCalledWith('/tmp/litelizard-user-data/api-keys.bin', encrypted);
+    expect(decryptString).toHaveBeenCalledWith(encrypted);
+  });
+
+  it('safeStorage が使えない場合は平文ファイルへフォールバックする', async () => {
+    isEncryptionAvailable.mockReturnValue(false);
+    readFile
+      .mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+      .mockResolvedValueOnce('sk-plain-123');
+
+    const vault = createApiKeyVault('/tmp/litelizard-user-data');
+
+    await vault.save('sk-plain-123');
+    await expect(vault.load()).resolves.toBe('sk-plain-123');
+
+    expect(writeFile).toHaveBeenCalledWith('/tmp/litelizard-user-data/api-keys.plaintext', 'sk-plain-123', 'utf8');
+    expect(encryptString).not.toHaveBeenCalled();
+  });
+
+  it('保存済みファイルが無い場合は null を返す', async () => {
+    readFile.mockRejectedValue(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+
+    const vault = createApiKeyVault('/tmp/litelizard-user-data');
+
+    await expect(vault.load()).resolves.toBeNull();
+  });
+
+  it('暗号化ファイルが破損している場合は null を返す', async () => {
+    const encrypted = Buffer.from('broken-encrypted-api-key');
+    readFile.mockResolvedValue(encrypted);
+    decryptString.mockImplementation(() => {
+      throw new Error('corrupted payload');
+    });
+
+    const vault = createApiKeyVault('/tmp/litelizard-user-data');
+
+    await expect(vault.load()).resolves.toBeNull();
+  });
+
+  it('clear は暗号化ファイルと平文ファイルの両方を削除対象にする', async () => {
+    unlink.mockResolvedValue(undefined);
+
+    const vault = createApiKeyVault('/tmp/litelizard-user-data');
 
     await vault.clear();
-    await fs.rm(dir, { recursive: true, force: true });
+
+    expect(unlink).toHaveBeenCalledWith('/tmp/litelizard-user-data/api-keys.bin');
+    expect(unlink).toHaveBeenCalledWith('/tmp/litelizard-user-data/api-keys.plaintext');
   });
 });

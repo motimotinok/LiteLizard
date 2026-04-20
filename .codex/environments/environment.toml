@@ -7,3 +7,8 @@ script = '''
 cd "$CODEX_WORKTREE_PATH"
 pnpm install
 '''
+
+[[actions]]
+name = "デスクトップ起動"
+icon = "tool"
+command = "pnpm --filter @litelizard/desktop dev"
