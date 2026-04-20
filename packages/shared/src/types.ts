@@ -1,4 +1,5 @@
 export type PersonaMode = 'friendly' | 'editor' | 'general-reader';
+export type AnalysisProviderId = 'openai' | 'anthropic' | 'local-llm';
 
 export type LizardStatus = 'pending' | 'complete' | 'failed' | 'stale';
 
@@ -124,3 +125,58 @@ export interface RevisionMismatchError {
   code: 'REVISION_MISMATCH';
   message: string;
 }
+
+export interface CloudProviderSettings {
+  apiKeyConfigured: boolean;
+  defaultModel: string;
+}
+
+export interface LocalLlmSettings {
+  endpoint: string;
+  defaultModel: string;
+  configured: boolean;
+}
+
+export interface AnalysisSettings {
+  defaultProvider: AnalysisProviderId;
+  providers: {
+    openai: CloudProviderSettings;
+    anthropic: CloudProviderSettings;
+  };
+  localLlm: LocalLlmSettings;
+}
+
+export interface AnalysisSettingsInput {
+  defaultProvider: AnalysisProviderId;
+  providers: {
+    openai: {
+      defaultModel: string;
+    };
+    anthropic: {
+      defaultModel: string;
+    };
+  };
+  localLlm: {
+    endpoint: string;
+    defaultModel: string;
+  };
+}
+
+export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
+  defaultProvider: 'openai',
+  providers: {
+    openai: {
+      apiKeyConfigured: false,
+      defaultModel: 'gpt-4o-mini',
+    },
+    anthropic: {
+      apiKeyConfigured: false,
+      defaultModel: 'claude-3-5-sonnet-latest',
+    },
+  },
+  localLlm: {
+    endpoint: 'http://127.0.0.1:11434',
+    defaultModel: 'llama3.1:8b',
+    configured: false,
+  },
+};

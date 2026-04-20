@@ -34,17 +34,24 @@ function SettingsIcon() {
 }
 
 interface LeftIconRailProps {
+  activePanel?: 'editor' | 'settings';
+  onDocumentsClick?: () => void;
   onSettingsClick?: () => void;
 }
 
-export function LeftIconRail({ onSettingsClick }: LeftIconRailProps) {
+export function LeftIconRail({ activePanel = 'editor', onDocumentsClick, onSettingsClick }: LeftIconRailProps) {
   return (
     <aside className="left-icon-rail" aria-label="primary-navigation">
-      <button className="rail-icon-button is-active" aria-label="Documents" title="Documents">
+      <button
+        className={activePanel === 'editor' ? 'rail-icon-button is-active' : 'rail-icon-button'}
+        aria-label="Documents"
+        title="Documents"
+        onClick={() => onDocumentsClick?.()}
+      >
         <DocumentIcon />
       </button>
       <button
-        className="rail-icon-button"
+        className={activePanel === 'settings' ? 'rail-icon-button is-active' : 'rail-icon-button'}
         aria-label="Settings"
         title="Settings"
         onClick={() => onSettingsClick?.()}

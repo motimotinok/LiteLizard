@@ -1,4 +1,11 @@
-import type { FileNode, GenerationalAnalysisFile, LiteLizardDocument, ParagraphAnalysisPattern } from './types.js';
+import type {
+  AnalysisSettings,
+  AnalysisSettingsInput,
+  FileNode,
+  GenerationalAnalysisFile,
+  LiteLizardDocument,
+  ParagraphAnalysisPattern,
+} from './types.js';
 import type { AnalysisRunInput, AnalysisRunResult } from './api.js';
 
 /**
@@ -37,9 +44,13 @@ export interface BridgeApi {
     pattern: ParagraphAnalysisPattern,
   ): Promise<void>;
   createAnalysisGeneration(projectRoot: string, documentId: string): Promise<number>;
-  getApiKeyStatus(): Promise<{ configured: boolean }>;
-  saveApiKey(apiKey: string): Promise<{ ok: true }>;
-  clearApiKey(): Promise<{ ok: true }>;
+  loadAnalysisSettings(): Promise<AnalysisSettings>;
+  saveProviderApiKey(providerId: string, apiKey: string): Promise<{ ok: true }>;
+  clearProviderApiKey(providerId: string): Promise<{ ok: true }>;
+  saveAnalysisSettings(input: AnalysisSettingsInput): Promise<{ ok: true }>;
+  testLocalLlmConnection(
+    input: { endpoint: string; model: string }
+  ): Promise<{ ok: true; model?: string } | { ok: false; message: string }>;
 }
 
 /**
@@ -62,9 +73,11 @@ export const IPC_CHANNELS = {
   loadAnalysis: 'analysis:load',
   saveAnalysisResult: 'analysis:save',
   createAnalysisGeneration: 'analysis:newGeneration',
-  getApiKeyStatus: 'settings:apiKey:getStatus',
-  saveApiKey: 'settings:apiKey:save',
-  clearApiKey: 'settings:apiKey:clear',
+  loadAnalysisSettings: 'settings:analysis:load',
+  saveProviderApiKey: 'settings:analysis:saveProviderApiKey',
+  clearProviderApiKey: 'settings:analysis:clearProviderApiKey',
+  saveAnalysisSettings: 'settings:analysis:save',
+  testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

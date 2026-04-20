@@ -44,4 +44,27 @@ describe('createMockPreloadApi', () => {
       ]),
     );
   });
+
+  it('analysis settings を保存して再読込できる', async () => {
+    const api = createMockPreloadApi();
+
+    await api.saveProviderApiKey('openai', 'sk-test');
+    await api.saveAnalysisSettings({
+      defaultProvider: 'local-llm',
+      providers: {
+        openai: { defaultModel: 'gpt-4.1-mini' },
+        anthropic: { defaultModel: 'claude-3-7-sonnet-latest' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.2',
+      },
+    });
+
+    const settings = await api.loadAnalysisSettings();
+
+    expect(settings.providers.openai.apiKeyConfigured).toBe(true);
+    expect(settings.defaultProvider).toBe('local-llm');
+    expect(settings.localLlm.configured).toBe(true);
+  });
 });

@@ -1,10 +1,20 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
-import { createChapterId, createDocumentId, createParagraphId, IPC_CHANNELS, type AnalysisRunInput, type LiteLizardDocument, type ParagraphAnalysisPattern } from '@litelizard/shared';
+import {
+  createChapterId,
+  createDocumentId,
+  createParagraphId,
+  IPC_CHANNELS,
+  type AnalysisRunInput,
+  type AnalysisSettingsInput,
+  type LiteLizardDocument,
+  type ParagraphAnalysisPattern,
+} from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
+import { createAnalysisSettingsStore, mergeAnalysisSettings } from './analysisSettingsStore.js';
 import {
   appendParagraphPattern,
   createGeneration,
@@ -24,6 +34,7 @@ import { getLastOpenedFolder, setLastOpenedFolder } from './appStore.js';
 
 const fileService = createFileService();
 const apiKeyVault = createApiKeyVault(app.getPath('userData'));
+const analysisSettingsStore = createAnalysisSettingsStore(app.getPath('userData'));
 
 type FsEntryType = 'file' | 'folder';
 
@@ -296,27 +307,78 @@ export function registerIpcHandlers() {
     return fileService.save(filePath, doc, revision);
   });
 
-  ipcMain.handle(IPC_CHANNELS.getApiKeyStatus, async () => {
-    const apiKey = await apiKeyVault.load();
-    return { configured: Boolean(apiKey?.trim()) };
+  ipcMain.handle(IPC_CHANNELS.loadAnalysisSettings, async () => {
+    const [savedSettings, secrets] = await Promise.all([
+      analysisSettingsStore.load(),
+      apiKeyVault.loadAll(),
+    ]);
+
+    return mergeAnalysisSettings(savedSettings, {
+      openai: Boolean(secrets.openai?.trim()),
+      anthropic: Boolean(secrets.anthropic?.trim()),
+    });
   });
 
-  ipcMain.handle(IPC_CHANNELS.saveApiKey, async (_, apiKey: string) => {
+  ipcMain.handle(IPC_CHANNELS.saveProviderApiKey, async (_, providerId: string, apiKey: string) => {
     const trimmed = apiKey.trim();
     if (!trimmed) {
       throw new Error('API key must not be empty.');
     }
-    await apiKeyVault.save(trimmed);
+    await apiKeyVault.save(providerId, trimmed);
     return { ok: true };
   });
 
-  ipcMain.handle(IPC_CHANNELS.clearApiKey, async () => {
-    await apiKeyVault.clear();
+  ipcMain.handle(IPC_CHANNELS.clearProviderApiKey, async (_, providerId: string) => {
+    await apiKeyVault.clear(providerId);
     return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.saveAnalysisSettings, async (_, input: AnalysisSettingsInput) => {
+    await analysisSettingsStore.save(input);
+    return { ok: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.testLocalLlmConnection, async (_, input: { endpoint: string; model: string }) => {
+    const endpoint = input.endpoint.trim().replace(/\/$/, '');
+    const model = input.model.trim();
+
+    if (!endpoint) {
+      return { ok: false as const, message: 'エンドポイント URL を入力してください。' };
+    }
+
+    if (!model) {
+      return { ok: false as const, message: 'モデル名を入力してください。' };
+    }
+
+    try {
+      const response = await fetch(`${endpoint}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(4_000),
+      });
+
+      if (!response.ok) {
+        return { ok: false as const, message: `接続先が応答しましたが、状態コード ${response.status} でした。` };
+      }
+
+      const payload = await response.json() as { models?: Array<{ name?: string }> };
+      const matched = payload.models?.find((entry) => entry.name === model);
+
+      if (!matched) {
+        return {
+          ok: false as const,
+          message: `接続できましたが、モデル「${model}」は見つかりませんでした。`,
+        };
+      }
+
+      return { ok: true as const, model: matched.name };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { ok: false as const, message: `接続に失敗しました: ${message}` };
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.runAnalysis, async (_, input: AnalysisRunInput) => {
-    const apiKey = await apiKeyVault.load();
+    const apiKey = await apiKeyVault.load('openai');
     if (!apiKey) {
       throw new Error('API key is not configured. Open Settings and save your API key.');
     }
