@@ -4,6 +4,7 @@ import { AnalysisPane } from './components/AnalysisPane.js';
 import { EditorPane } from './components/editor/index.js';
 import { LeftIconRail } from './components/LeftIconRail.js';
 import { ProjectSetupScreen } from './components/ProjectSetupScreen.js';
+import { SettingsScreen } from './components/SettingsScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { useResizablePanel } from './hooks/useResizablePanel.js';
 
@@ -29,9 +30,12 @@ function WorkspaceShell() {
     currentFilePath,
     document: currentDocument,
     dirty,
+    activeWorkspacePanel,
     editorMode,
     viewScale,
     openFolder,
+    openEditorPanel,
+    openSettingsPanel,
     createDocument,
     createEntry,
     renameEntry,
@@ -151,7 +155,9 @@ function WorkspaceShell() {
         </div>
 
         <div className="global-header-center">
-          {currentDocument ? (
+          {activeWorkspacePanel === 'settings' ? (
+            <div className="global-tab">分析設定</div>
+          ) : currentDocument ? (
             <div className="global-tab">{currentDocument.title}</div>
           ) : null}
         </div>
@@ -169,7 +175,11 @@ function WorkspaceShell() {
 
       <div className="workspace-body">
         <div className="workspace-left">
-          <LeftIconRail />
+          <LeftIconRail
+            activePanel={activeWorkspacePanel}
+            onDocumentsClick={openEditorPanel}
+            onSettingsClick={openSettingsPanel}
+          />
           {explorerOpen && (
             <ExplorerPane
               rootPath={rootPath}
@@ -192,30 +202,34 @@ function WorkspaceShell() {
 
         <main className="workspace-main">
           <div className={chatPanelOpen ? 'workspace-content with-chat' : 'workspace-content no-chat'}>
-            <EditorPane
-              isExpanded={!chatPanelOpen}
-              document={currentDocument}
-              dirty={dirty}
-              activeParagraphId={activeParagraphId}
-              scrollRequest={scrollRequest}
-              setActiveParagraphId={setActiveParagraphId}
-              viewScale={viewScale}
-              onSetViewScale={setViewScale}
-              onSyncStructure={(input) => syncDocumentStructure(input)}
-              onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
-              onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
-              onDeleteChapter={(chapterId) => deleteChapter(chapterId)}
-              onCreateEssay={() => {
-                if (!rootPath) {
-                  void openFolder();
-                  return;
-                }
-                void createDocument('Untitled', rootPath);
-              }}
-              onOpenFolder={() => void openFolder()}
-            />
+            {activeWorkspacePanel === 'settings' ? (
+              <SettingsScreen />
+            ) : (
+              <EditorPane
+                isExpanded={!chatPanelOpen}
+                document={currentDocument}
+                dirty={dirty}
+                activeParagraphId={activeParagraphId}
+                scrollRequest={scrollRequest}
+                setActiveParagraphId={setActiveParagraphId}
+                viewScale={viewScale}
+                onSetViewScale={setViewScale}
+                onSyncStructure={(input) => syncDocumentStructure(input)}
+                onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
+                onReorderChapters={(orderedIds) => reorderChapters(orderedIds)}
+                onDeleteChapter={(chapterId) => deleteChapter(chapterId)}
+                onCreateEssay={() => {
+                  if (!rootPath) {
+                    void openFolder();
+                    return;
+                  }
+                  void createDocument('Untitled', rootPath);
+                }}
+                onOpenFolder={() => void openFolder()}
+              />
+            )}
 
-            {chatPanelOpen ? (
+            {chatPanelOpen && activeWorkspacePanel === 'editor' ? (
               <aside
                 className="chat-shell"
                 style={isCompactLayout ? undefined : { width: chatPanel.width }}
@@ -259,13 +273,13 @@ export function App() {
     rootPath,
     openFolder,
     restoreLastProject,
-    bootstrapApiKeyStatus,
+    bootstrapAnalysisSettings,
   } = useAppStore();
 
   useEffect(() => {
-    void bootstrapApiKeyStatus();
+    void bootstrapAnalysisSettings();
     void restoreLastProject();
-  }, [bootstrapApiKeyStatus, restoreLastProject]);
+  }, [bootstrapAnalysisSettings, restoreLastProject]);
 
   useEffect(() => {
     if (!window.litelizard) {

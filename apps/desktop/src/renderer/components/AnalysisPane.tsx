@@ -80,11 +80,13 @@ export function AnalysisPane({
 }: Props) {
   const runAnalysis = useAppStore((s) => s.runAnalysis);
   const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
-  const apiKeyConfigured = useAppStore((s) => s.apiKeyConfigured);
+  const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
+  const analysisSettings = useAppStore((s) => s.analysisSettings);
+  const openAiConfigured = analysisSettings.providers.openai.apiKeyConfigured;
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-  const generateAllDisabled = staleCount === 0 || hasPending || !apiKeyConfigured;
+  const generateAllDisabled = staleCount === 0 || hasPending || !openAiConfigured;
 
   const [analysisMode, setAnalysisMode] = useState<'paragraph' | 'chapter-summary' | 'theme'>('paragraph');
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
@@ -146,8 +148,8 @@ export function AnalysisPane({
           onClick={runAnalysis}
           disabled={generateAllDisabled}
           title={
-            !apiKeyConfigured
-              ? 'APIキーが未設定です'
+            !openAiConfigured
+              ? 'OpenAI API キーが未設定です'
               : hasPending
                 ? '解析実行中です'
                 : staleCount === 0
@@ -172,6 +174,17 @@ export function AnalysisPane({
         <div className="analysis-empty">ドキュメントを開くと分析カードが表示されます。</div>
       ) : (
         <div className="analysis-scroll">
+          {!openAiConfigured ? (
+            <div className="analysis-settings-callout">
+              <div>
+                <strong>OpenAI API キーを設定すると解析を開始できます。</strong>
+                <p>歯車アイコンから設定画面を開き、OpenAI のキーを保存してください。</p>
+              </div>
+              <button type="button" className="analysis-settings-link" onClick={() => openSettingsPanel()}>
+                設定を開く
+              </button>
+            </div>
+          ) : null}
           <div className="analysis-card-list">
             {document.paragraphs.map((paragraph, index) => {
               const expanded = Boolean(expandedByParagraphId[paragraph.id]);
@@ -221,7 +234,7 @@ export function AnalysisPane({
                           event.stopPropagation();
                           runAnalysisFor(paragraph.id);
                         }}
-                        disabled={paragraph.lizard.status === 'pending' || hasPending || !apiKeyConfigured}
+                        disabled={paragraph.lizard.status === 'pending' || hasPending || !openAiConfigured}
                         title="この段落だけ再解析"
                         aria-label={`P${index + 1} を再解析`}
                       >

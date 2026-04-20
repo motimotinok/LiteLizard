@@ -1,4 +1,13 @@
-import type { AnalysisRunInput, AnalysisRunResult, BridgeApi, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import {
+  DEFAULT_ANALYSIS_SETTINGS,
+  type AnalysisRunInput,
+  type AnalysisRunResult,
+  type AnalysisSettings,
+  type AnalysisSettingsInput,
+  type BridgeApi,
+  type FileNode,
+  type LiteLizardDocument,
+} from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
   initialMockDocuments,
@@ -10,7 +19,7 @@ interface MockState {
   tree: FileNode[];
   documents: Map<string, LiteLizardDocument>;
   revisions: Map<string, number>;
-  apiKeyConfigured: boolean;
+  analysisSettings: AnalysisSettings;
 }
 
 function clone<T>(value: T): T {
@@ -244,7 +253,16 @@ export function createMockPreloadApi(): BridgeApi {
       Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])
     ),
     revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
-    apiKeyConfigured: initialMockApiKeyConfigured,
+    analysisSettings: {
+      ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
+      providers: {
+        ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers),
+        openai: {
+          ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers.openai),
+          apiKeyConfigured: initialMockApiKeyConfigured,
+        },
+      },
+    },
   };
 
   return {
@@ -419,19 +437,60 @@ export function createMockPreloadApi(): BridgeApi {
       };
     },
 
-    getApiKeyStatus: async () => ({ configured: state.apiKeyConfigured }),
+    loadAnalysisSettings: async () => clone(state.analysisSettings),
 
-    saveApiKey: async (apiKey: string) => {
+    saveProviderApiKey: async (providerId: string, apiKey: string) => {
       if (!apiKey.trim()) {
         throw new Error('API key must not be empty.');
       }
-      state.apiKeyConfigured = true;
+      if (providerId === 'openai' || providerId === 'anthropic') {
+        state.analysisSettings.providers[providerId].apiKeyConfigured = true;
+      }
       return { ok: true };
     },
 
-    clearApiKey: async () => {
-      state.apiKeyConfigured = false;
+    clearProviderApiKey: async (providerId: string) => {
+      if (providerId === 'openai' || providerId === 'anthropic') {
+        state.analysisSettings.providers[providerId].apiKeyConfigured = false;
+      }
       return { ok: true };
+    },
+
+    saveAnalysisSettings: async (input: AnalysisSettingsInput) => {
+      state.analysisSettings = {
+        ...state.analysisSettings,
+        defaultProvider: input.defaultProvider,
+        providers: {
+          openai: {
+            ...state.analysisSettings.providers.openai,
+            defaultModel: input.providers.openai.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel,
+          },
+          anthropic: {
+            ...state.analysisSettings.providers.anthropic,
+            defaultModel:
+              input.providers.anthropic.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel,
+          },
+        },
+        localLlm: {
+          endpoint: input.localLlm.endpoint.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.endpoint,
+          defaultModel: input.localLlm.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.defaultModel,
+          configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
+        },
+      };
+      return { ok: true };
+    },
+
+    testLocalLlmConnection: async (input: { endpoint: string; model: string }) => {
+      if (!input.endpoint.trim()) {
+        return { ok: false as const, message: 'エンドポイント URL を入力してください。' };
+      }
+      if (!input.model.trim()) {
+        return { ok: false as const, message: 'モデル名を入力してください。' };
+      }
+      if (/fail/i.test(input.endpoint) || /missing/i.test(input.model)) {
+        return { ok: false as const, message: '接続できましたが、指定モデルは見つかりませんでした。' };
+      }
+      return { ok: true as const, model: input.model.trim() };
     },
 
     loadAnalysis: async (_projectRoot: string, _documentId: string, _filePath?: string) => {

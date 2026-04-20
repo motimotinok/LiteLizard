@@ -1,5 +1,12 @@
 import { create } from 'zustand';
-import type { AnalysisRunInput, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import {
+  DEFAULT_ANALYSIS_SETTINGS,
+  type AnalysisRunInput,
+  type AnalysisSettings,
+  type AnalysisSettingsInput,
+  type FileNode,
+  type LiteLizardDocument,
+} from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
   collectStaleParagraphs,
@@ -14,6 +21,29 @@ import {
 export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
+export type WorkspacePanel = 'editor' | 'settings';
+
+function cloneAnalysisSettings(): AnalysisSettings {
+  return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
+}
+
+function toAnalysisSettingsInput(settings: AnalysisSettings): AnalysisSettingsInput {
+  return {
+    defaultProvider: settings.defaultProvider,
+    providers: {
+      openai: {
+        defaultModel: settings.providers.openai.defaultModel,
+      },
+      anthropic: {
+        defaultModel: settings.providers.anthropic.defaultModel,
+      },
+    },
+    localLlm: {
+      endpoint: settings.localLlm.endpoint,
+      defaultModel: settings.localLlm.defaultModel,
+    },
+  };
+}
 
 interface AppState {
   startupState: StartupState;
@@ -23,7 +53,8 @@ interface AppState {
   document: LiteLizardDocument | null;
   revision: number;
   dirty: boolean;
-  apiKeyConfigured: boolean;
+  analysisSettings: AnalysisSettings;
+  activeWorkspacePanel: WorkspacePanel;
   editorMode: EditorMode;
   viewScale: ViewScale;
   analysisLayerOpen: boolean;
@@ -49,11 +80,15 @@ interface AppState {
   setViewScale: (viewScale: ViewScale) => void;
   toggleViewScale: () => void;
   cycleEditorMode: () => void;
+  openSettingsPanel: () => void;
+  openEditorPanel: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
-  bootstrapApiKeyStatus: () => Promise<void>;
-  saveApiKey: (apiKey: string) => Promise<void>;
-  clearApiKey: () => Promise<void>;
+  bootstrapAnalysisSettings: () => Promise<void>;
+  saveProviderApiKey: (providerId: 'openai' | 'anthropic', apiKey: string) => Promise<void>;
+  clearProviderApiKey: (providerId: 'openai' | 'anthropic') => Promise<void>;
+  saveAnalysisSettings: (input: AnalysisSettingsInput) => Promise<void>;
+  testLocalLlmConnection: (input: { endpoint: string; model: string }) => Promise<{ ok: boolean; message: string }>;
 }
 
 function isSameOrNestedPath(value: string, base: string) {
@@ -87,7 +122,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   document: null,
   revision: 0,
   dirty: false,
-  apiKeyConfigured: false,
+  analysisSettings: cloneAnalysisSettings(),
+  activeWorkspacePanel: 'editor',
   editorMode: 'writing',
   viewScale: 'micro',
   analysisLayerOpen: false,
@@ -440,13 +476,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysis: async () => {
-    const { document, apiKeyConfigured } = get();
+    const { document, analysisSettings } = get();
     if (!document) {
       return;
     }
 
-    if (!apiKeyConfigured) {
-      set({ statusMessage: '解析の実行にはログインが必要です。' });
+    if (!analysisSettings.providers.openai.apiKeyConfigured) {
+      set({ statusMessage: 'OpenAI API キーを設定すると解析を実行できます。' });
       return;
     }
 
@@ -540,8 +576,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   runAnalysisFor: async (paragraphId: string) => {
-    const { document, apiKeyConfigured } = get();
-    if (!document || !apiKeyConfigured) return;
+    const { document, analysisSettings } = get();
+    if (!document || !analysisSettings.providers.openai.apiKeyConfigured) return;
 
     const paragraph = document.paragraphs.find((p) => p.id === paragraphId);
     if (!paragraph) return;
@@ -643,7 +679,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ editorMode: 'writing', analysisLayerOpen: false });
   },
 
+  openSettingsPanel: () => {
+    set({ activeWorkspacePanel: 'settings', statusMessage: '設定を開きました' });
+  },
+
+  openEditorPanel: () => {
+    set({ activeWorkspacePanel: 'editor', statusMessage: 'ドキュメント表示に戻りました' });
+  },
+
   setAnalysisLayerOpen: (open: boolean) => {
+    if (get().activeWorkspacePanel !== 'editor') {
+      set({ analysisLayerOpen: false });
+      return;
+    }
     const mode = get().editorMode;
     if (mode === 'writing') {
       set({ analysisLayerOpen: false });
@@ -653,6 +701,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   toggleAnalysisLayer: () => {
+    if (get().activeWorkspacePanel !== 'editor') {
+      return;
+    }
     const { editorMode, analysisLayerOpen } = get();
     if (editorMode === 'writing') {
       set({ editorMode: 'structure', analysisLayerOpen: true });
@@ -661,16 +712,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ analysisLayerOpen: !analysisLayerOpen });
   },
 
-  bootstrapApiKeyStatus: async () => {
+  bootstrapAnalysisSettings: async () => {
     try {
-      const status = await window.litelizard.getApiKeyStatus();
-      set({ apiKeyConfigured: status.configured });
+      const analysisSettings = await window.litelizard.loadAnalysisSettings();
+      set({ analysisSettings });
     } catch {
-      set({ statusMessage: '認証状態の取得に失敗しました' });
+      set({ statusMessage: '分析設定の取得に失敗しました' });
     }
   },
 
-  saveApiKey: async (apiKey: string) => {
+  saveProviderApiKey: async (providerId, apiKey) => {
     const trimmed = apiKey.trim();
     if (!trimmed) {
       set({ statusMessage: 'APIキーを入力してください' });
@@ -678,21 +729,96 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     try {
-      await window.litelizard.saveApiKey(trimmed);
-      set({ apiKeyConfigured: true, statusMessage: 'APIキーを保存しました' });
+      await window.litelizard.saveProviderApiKey(providerId, trimmed);
+      set((state) => ({
+        analysisSettings: {
+          ...state.analysisSettings,
+          providers: {
+            ...state.analysisSettings.providers,
+            [providerId]: {
+              ...state.analysisSettings.providers[providerId],
+              apiKeyConfigured: true,
+            },
+          },
+        },
+        statusMessage: `${providerId === 'openai' ? 'OpenAI' : 'Anthropic'} APIキーを保存しました`,
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `APIキー保存に失敗しました: ${message}` });
     }
   },
 
-  clearApiKey: async () => {
+  clearProviderApiKey: async (providerId) => {
     try {
-      await window.litelizard.clearApiKey();
-      set({ apiKeyConfigured: false, statusMessage: 'APIキーを削除しました' });
+      await window.litelizard.clearProviderApiKey(providerId);
+      set((state) => ({
+        analysisSettings: {
+          ...state.analysisSettings,
+          providers: {
+            ...state.analysisSettings.providers,
+            [providerId]: {
+              ...state.analysisSettings.providers[providerId],
+              apiKeyConfigured: false,
+            },
+          },
+        },
+        statusMessage: `${providerId === 'openai' ? 'OpenAI' : 'Anthropic'} APIキーを削除しました`,
+      }));
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `APIキー削除に失敗しました: ${message}` });
+    }
+  },
+
+  saveAnalysisSettings: async (input) => {
+    try {
+      await window.litelizard.saveAnalysisSettings(input);
+      const current = get().analysisSettings;
+      const analysisSettings: AnalysisSettings = {
+        ...current,
+        defaultProvider: input.defaultProvider,
+        providers: {
+          openai: {
+            ...current.providers.openai,
+            defaultModel: input.providers.openai.defaultModel,
+          },
+          anthropic: {
+            ...current.providers.anthropic,
+            defaultModel: input.providers.anthropic.defaultModel,
+          },
+        },
+        localLlm: {
+          endpoint: input.localLlm.endpoint,
+          defaultModel: input.localLlm.defaultModel,
+          configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
+        },
+      };
+      set({ analysisSettings, statusMessage: '分析設定を保存しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `分析設定の保存に失敗しました: ${message}` });
+    }
+  },
+
+  testLocalLlmConnection: async (input) => {
+    try {
+      const result = await window.litelizard.testLocalLlmConnection(input);
+      if (!result.ok) {
+        set({ statusMessage: result.message });
+        return { ok: false, message: result.message };
+      }
+
+      const message = result.model
+        ? `ローカル LLM に接続できました: ${result.model}`
+        : 'ローカル LLM に接続できました';
+      set({ statusMessage: message });
+      return { ok: true, message };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const nextMessage = `接続テストに失敗しました: ${message}`;
+      set({ statusMessage: nextMessage });
+      return { ok: false, message: nextMessage };
     }
   },
 }));

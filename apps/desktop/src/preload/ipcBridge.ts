@@ -37,11 +37,15 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.saveAnalysisResult, projectRoot, documentId, paragraphId, pattern),
     createAnalysisGeneration: (projectRoot, documentId) =>
       ipcRenderer.invoke(IPC_CHANNELS.createAnalysisGeneration, projectRoot, documentId),
-    getApiKeyStatus: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.getApiKeyStatus),
-    saveApiKey: (apiKey) =>
-      ipcRenderer.invoke(IPC_CHANNELS.saveApiKey, apiKey),
-    clearApiKey: () =>
-      ipcRenderer.invoke(IPC_CHANNELS.clearApiKey),
+    loadAnalysisSettings: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.loadAnalysisSettings),
+    saveProviderApiKey: (providerId, apiKey) =>
+      ipcRenderer.invoke(IPC_CHANNELS.saveProviderApiKey, providerId, apiKey),
+    clearProviderApiKey: (providerId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.clearProviderApiKey, providerId),
+    saveAnalysisSettings: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.saveAnalysisSettings, input),
+    testLocalLlmConnection: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.testLocalLlmConnection, input),
   };
 }
