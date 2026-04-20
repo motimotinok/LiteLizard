@@ -1,85 +1,72 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
+import { safeStorage } from 'electron';
 
-interface EncryptedPayload {
-  version: 1;
-  salt: string;
-  iv: string;
-  tag: string;
-  ciphertext: string;
+const ENCRYPTED_FILE_NAME = 'api-keys.bin';
+const PLAINTEXT_FILE_NAME = 'api-keys.plaintext';
+
+function isMissingFileError(error: unknown) {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
-const PEPPER = 'litelizard-v1-pepper';
-
-function deriveKey(salt: Buffer) {
-  const userMaterial = `${os.userInfo().username}:${os.homedir()}:${PEPPER}`;
-  return crypto.pbkdf2Sync(userMaterial, salt, 210_000, 32, 'sha256');
-}
-
-function encryptValue(value: string): EncryptedPayload {
-  const salt = crypto.randomBytes(16);
-  const iv = crypto.randomBytes(12);
-  const key = deriveKey(salt);
-
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = JSON.stringify({ value });
-  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return {
-    version: 1,
-    salt: salt.toString('base64'),
-    iv: iv.toString('base64'),
-    tag: tag.toString('base64'),
-    ciphertext: ciphertext.toString('base64'),
-  };
-}
-
-function decryptValue(payload: EncryptedPayload): string {
-  const salt = Buffer.from(payload.salt, 'base64');
-  const iv = Buffer.from(payload.iv, 'base64');
-  const tag = Buffer.from(payload.tag, 'base64');
-  const ciphertext = Buffer.from(payload.ciphertext, 'base64');
-  const key = deriveKey(salt);
-
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-  const parsed = JSON.parse(plaintext) as { value?: unknown };
-  if (typeof parsed.value !== 'string') {
-    throw new Error('Invalid vault payload');
+async function readIfExists(filePath: string, encoding?: BufferEncoding) {
+  try {
+    return await fs.readFile(filePath, encoding);
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return null;
+    }
+    throw error;
   }
-  return parsed.value;
+}
+
+async function removeIfExists(filePath: string) {
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+  }
 }
 
 export function createApiKeyVault(userDataPath: string) {
-  const apiKeyPath = path.join(userDataPath, 'api-key.enc.json');
+  const encryptedPath = path.join(userDataPath, ENCRYPTED_FILE_NAME);
+  const plaintextPath = path.join(userDataPath, PLAINTEXT_FILE_NAME);
 
   return {
     async load(): Promise<string | null> {
-      try {
-        const raw = await fs.readFile(apiKeyPath, 'utf8');
-        const parsed = JSON.parse(raw) as EncryptedPayload;
-        return decryptValue(parsed);
-      } catch {
-        return null;
+      const encrypted = await readIfExists(encryptedPath);
+      if (encrypted) {
+        try {
+          return safeStorage.decryptString(encrypted);
+        } catch {
+          return null;
+        }
       }
+
+      return readIfExists(plaintextPath, 'utf8');
     },
 
     async save(apiKey: string) {
-      const encrypted = encryptValue(apiKey);
-      await fs.mkdir(path.dirname(apiKeyPath), { recursive: true });
-      await fs.writeFile(apiKeyPath, JSON.stringify(encrypted, null, 2), 'utf8');
+      await fs.mkdir(userDataPath, { recursive: true });
+
+      if (safeStorage.isEncryptionAvailable()) {
+        const encrypted = safeStorage.encryptString(apiKey);
+        await fs.writeFile(encryptedPath, encrypted);
+        await removeIfExists(plaintextPath);
+        return;
+      }
+
+      await fs.writeFile(plaintextPath, apiKey, 'utf8');
+      await removeIfExists(encryptedPath);
     },
 
     async clear() {
-      try {
-        await fs.unlink(apiKeyPath);
-      } catch {
-        // ignore missing key
-      }
+      await Promise.all([
+        removeIfExists(encryptedPath),
+        removeIfExists(plaintextPath),
+      ]);
     },
   };
 }
