@@ -17,15 +17,15 @@ const PROVIDER_META: Array<{
   {
     id: 'anthropic',
     label: 'Anthropic',
-    description: '次段の provider 切替実装に備えてキーとモデルを保持します。',
+    description: '既定 provider に選ぶと Anthropic で解析を実行します。',
     placeholder: 'sk-ant-...',
   },
 ];
 
 const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string; hint: string }> = [
   { value: 'openai', label: 'OpenAI', hint: '現行の解析実行に使用' },
-  { value: 'anthropic', label: 'Anthropic', hint: '次段で接続予定' },
-  { value: 'local-llm', label: 'Local LLM', hint: 'Ollama 接続を保持' },
+  { value: 'anthropic', label: 'Anthropic', hint: '現行の解析実行に使用' },
+  { value: 'local-llm', label: 'Local LLM', hint: '設定保持のみ。実行は後続対応' },
 ];
 
 export function SettingsScreen() {
@@ -168,7 +168,7 @@ export function SettingsScreen() {
               <p className="settings-section-kicker">Defaults</p>
               <h2>分析モデル設定</h2>
             </div>
-            <p>初回は設定だけ先行します。実際の provider 切替は次段で接続します。</p>
+            <p>既定 provider を選ぶと解析実行時の接続先が切り替わります。Local LLM はまだ設定保持のみです。</p>
           </div>
 
           <div className="settings-stack">
@@ -328,7 +328,7 @@ export function SettingsScreen() {
       </div>
 
       <footer className="settings-footer">
-        <p>既定 provider とモデル設定は先に保存され、解析実行の分岐は次段の provider 抽象化で接続します。</p>
+        <p>OpenAI / Anthropic は既定 provider に応じて解析実行へ反映されます。Local LLM は後続タスクで接続します。</p>
         <button type="button" className="settings-primary-button" onClick={() => void saveDraftSettings()}>
           全体設定を保存
         </button>

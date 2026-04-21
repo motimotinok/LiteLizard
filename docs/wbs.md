@@ -133,7 +133,7 @@
 |----|--------|------|--------|--------|------|------|----------|
 | L-01 | API キー設定 UI（renderer: 設定画面） | E-01 ✅ | P1 | M | ✅ | Codex | |
 | L-02 | API キー暗号化保存（main: safeStorage） | E-01 ✅ | P1 | M | ✅ | | |
-| L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ⬜ | | |
+| L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ✅ | Codex | |
 | L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ⬜ | | |
 | L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ⬜ | | |
 | L-06 | 解析結果の保存・UI 反映 | L-05, E-06 ✅ | P1 | M | ⬜ | | |
@@ -155,6 +155,7 @@
 #### L-03: LLM プロバイダー抽象化層
 - **対象**: Strategy パターンでプロバイダーを切り替え。将来のクラウド方式もこのインターフェースに乗る
 - **完了条件**: `AnalysisProvider` インターフェースが定義され、外部 API / ローカル LLM / クラウド（将来）を差し替え可能
+- **完了**: 2026-04-21。main 側に `AnalysisProvider` 抽象層と provider resolver を追加し、OpenAI / Anthropic の実行切替、未対応 provider の明示エラー、文書全体順序ベースの context 構築、関連テストを実装
 
 #### L-05: 解析結果の IPC ストリーミング
 - **対象**: `webContents.send` で段落ごとの分析結果を renderer に逐次送信

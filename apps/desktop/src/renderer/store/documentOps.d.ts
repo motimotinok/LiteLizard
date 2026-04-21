@@ -5,4 +5,5 @@ export declare function reorderParagraphsInDocument(document: LiteLizardDocument
 export declare function collectStaleParagraphs(document: LiteLizardDocument): import("@litelizard/shared").Paragraph[];
 export declare function replaceDocumentStructureInDocument(document: LiteLizardDocument, input: DocumentStructureInput): LiteLizardDocument;
 export declare function reorderChaptersInDocument(document: LiteLizardDocument, orderedIds: string[]): LiteLizardDocument;
+export declare function deleteChapterFromDocument(document: LiteLizardDocument, chapterId: string): LiteLizardDocument;
 export declare function replaceParagraphsInDocument(document: LiteLizardDocument, nextParagraphTexts: string[]): LiteLizardDocument;

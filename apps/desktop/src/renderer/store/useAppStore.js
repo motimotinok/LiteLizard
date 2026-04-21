@@ -1,5 +1,54 @@
 import { create } from 'zustand';
-import { collectStaleParagraphs, reorderChaptersInDocument, reorderParagraphsInDocument, replaceDocumentStructureInDocument, replaceParagraphsInDocument, updateParagraphInDocument, } from './documentOps.js';
+import { DEFAULT_ANALYSIS_SETTINGS, } from '@litelizard/shared';
+import { collectStaleParagraphs, deleteChapterFromDocument, reorderChaptersInDocument, reorderParagraphsInDocument, replaceDocumentStructureInDocument, replaceParagraphsInDocument, updateParagraphInDocument, } from './documentOps.js';
+function getSelectedAnalysisProviderState(settings) {
+    if (settings.defaultProvider === 'openai') {
+        return {
+            id: 'openai',
+            label: 'OpenAI',
+            runnable: settings.providers.openai.apiKeyConfigured,
+            reason: settings.providers.openai.apiKeyConfigured
+                ? null
+                : 'OpenAI API キーが未設定です。設定画面で保存してください。',
+        };
+    }
+    if (settings.defaultProvider === 'anthropic') {
+        return {
+            id: 'anthropic',
+            label: 'Anthropic',
+            runnable: settings.providers.anthropic.apiKeyConfigured,
+            reason: settings.providers.anthropic.apiKeyConfigured
+                ? null
+                : 'Anthropic API キーが未設定です。設定画面で保存してください。',
+        };
+    }
+    return {
+        id: 'local-llm',
+        label: 'Local LLM',
+        runnable: false,
+        reason: 'ローカル LLM は未対応です。設定を OpenAI または Anthropic に変更してください。',
+    };
+}
+function cloneAnalysisSettings() {
+    return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
+}
+function toAnalysisSettingsInput(settings) {
+    return {
+        defaultProvider: settings.defaultProvider,
+        providers: {
+            openai: {
+                defaultModel: settings.providers.openai.defaultModel,
+            },
+            anthropic: {
+                defaultModel: settings.providers.anthropic.defaultModel,
+            },
+        },
+        localLlm: {
+            endpoint: settings.localLlm.endpoint,
+            defaultModel: settings.localLlm.defaultModel,
+        },
+    };
+}
 function isSameOrNestedPath(value, base) {
     return value === base || value.startsWith(`${base}/`) || value.startsWith(`${base}\\`);
 }
@@ -20,22 +69,105 @@ function titleFromPath(filePath) {
     const fileName = normalized.split('/').pop() ?? filePath;
     return fileName.replace(/\.(md|lzl)$/i, '');
 }
+function toAnalysisParagraphInput(document) {
+    return document.paragraphs.map((paragraph) => ({
+        paragraphId: paragraph.id,
+        order: paragraph.order,
+        text: paragraph.light.text,
+    }));
+}
 export const useAppStore = create((set, get) => ({
+    startupState: 'loading',
     rootPath: null,
     tree: [],
     currentFilePath: null,
     document: null,
     revision: 0,
     dirty: false,
-    apiKeyConfigured: false,
+    analysisSettings: cloneAnalysisSettings(),
+    activeWorkspacePanel: 'editor',
     editorMode: 'writing',
     viewScale: 'micro',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
+    hydrateProject: async (rootPath, source) => {
+        try {
+            const tree = await window.litelizard.listTree(rootPath);
+            await window.litelizard.setLastOpenedFolder(rootPath);
+            set({
+                startupState: 'ready',
+                rootPath,
+                tree,
+                currentFilePath: null,
+                document: null,
+                revision: 0,
+                dirty: false,
+                statusMessage: source === 'restore'
+                    ? `前回のフォルダを復元しました: ${rootPath}`
+                    : `フォルダを開きました: ${rootPath}`,
+            });
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            const previousState = get();
+            console.error('[Renderer hydrateProject] failed', error);
+            if (source === 'dialog' && previousState.rootPath) {
+                set({
+                    startupState: 'ready',
+                    statusMessage: `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
+                });
+                return;
+            }
+            set({
+                startupState: 'needs-project',
+                rootPath: null,
+                tree: [],
+                currentFilePath: null,
+                document: null,
+                revision: 0,
+                dirty: false,
+                statusMessage: source === 'restore'
+                    ? `前回のフォルダを復元できませんでした: ${message}`
+                    : `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
+            });
+        }
+    },
+    restoreLastProject: async () => {
+        if (!window.litelizard) {
+            set({
+                startupState: 'needs-project',
+                statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）',
+            });
+            return;
+        }
+        set({ startupState: 'loading', statusMessage: '前回のフォルダを確認しています...' });
+        try {
+            const root = await window.litelizard.getLastOpenedFolder();
+            if (!root) {
+                set({ startupState: 'needs-project', statusMessage: 'フォルダを選択して始めてください' });
+                return;
+            }
+            await get().hydrateProject(root, 'restore');
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.error('[Renderer restoreLastProject] failed', error);
+            set({
+                startupState: 'needs-project',
+                statusMessage: `前回のフォルダ確認に失敗しました: ${message}`,
+            });
+        }
+    },
     openFolder: async () => {
         if (!window.litelizard) {
-            set({ statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）' });
+            set({
+                startupState: 'needs-project',
+                statusMessage: 'アプリ内部ブリッジの初期化に失敗しました（preload未接続）',
+            });
             return;
+        }
+        if (!get().rootPath) {
+            set({ startupState: 'loading', statusMessage: 'フォルダ選択ダイアログを開いています...' });
         }
         let root = null;
         try {
@@ -44,26 +176,20 @@ export const useAppStore = create((set, get) => ({
         catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             console.error('[Renderer openFolder] failed', error);
-            set({ statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}` });
+            set({
+                startupState: get().rootPath ? 'ready' : 'needs-project',
+                statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}`,
+            });
             return;
         }
         if (!root) {
-            set({ statusMessage: 'フォルダ選択をキャンセルしました' });
+            set({
+                startupState: get().rootPath ? 'ready' : 'needs-project',
+                statusMessage: 'フォルダ選択をキャンセルしました',
+            });
             return;
         }
-        try {
-            const tree = await window.litelizard.listTree(root);
-            set({ rootPath: root, tree, statusMessage: `フォルダを開きました: ${root}` });
-        }
-        catch (error) {
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            console.error('[Renderer listTree] failed', error);
-            set({
-                rootPath: root,
-                tree: [],
-                statusMessage: `フォルダは選択されましたが一覧取得に失敗しました: ${message}`,
-            });
-        }
+        await get().hydrateProject(root, 'dialog');
     },
     createDocument: async (title, parentPath) => {
         const root = parentPath ?? get().rootPath;
@@ -138,7 +264,9 @@ export const useAppStore = create((set, get) => ({
                                 ...document,
                                 title: remapped === result.path ? titleFromPath(remapped) : document.title,
                                 updatedAt: document.updatedAt,
-                                source: { ...document.source, originPath: remapped },
+                                source: document.source
+                                    ? { ...document.source, format: document.source.format, originPath: remapped }
+                                    : { format: 'litelizard-json', originPath: remapped },
                             }
                             : document,
                     });
@@ -223,6 +351,16 @@ export const useAppStore = create((set, get) => ({
             statusMessage: '章順を変更しました',
         });
     },
+    deleteChapter: (chapterId) => {
+        const document = get().document;
+        if (!document) {
+            return;
+        }
+        set({
+            document: deleteChapterFromDocument(document, chapterId),
+            dirty: true,
+        });
+    },
     replaceParagraphs: (paragraphTexts) => {
         const document = get().document;
         if (!document) {
@@ -268,12 +406,13 @@ export const useAppStore = create((set, get) => ({
         }
     },
     runAnalysis: async () => {
-        const { document, apiKeyConfigured } = get();
+        const { document, analysisSettings } = get();
         if (!document) {
             return;
         }
-        if (!apiKeyConfigured) {
-            set({ statusMessage: '解析の実行にはログインが必要です。' });
+        const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+        if (!selectedProvider.runnable) {
+            set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
             return;
         }
         const staleParagraphs = collectStaleParagraphs(document);
@@ -300,6 +439,7 @@ export const useAppStore = create((set, get) => ({
                 order: paragraph.order,
                 text: paragraph.light.text,
             })),
+            documentParagraphs: toAnalysisParagraphInput(document),
         };
         try {
             const result = await window.litelizard.runAnalysis(payload);
@@ -356,9 +496,14 @@ export const useAppStore = create((set, get) => ({
         }
     },
     runAnalysisFor: async (paragraphId) => {
-        const { document, apiKeyConfigured } = get();
-        if (!document || !apiKeyConfigured)
+        const { document, analysisSettings } = get();
+        if (!document)
             return;
+        const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+        if (!selectedProvider.runnable) {
+            set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
+            return;
+        }
         const paragraph = document.paragraphs.find((p) => p.id === paragraphId);
         if (!paragraph)
             return;
@@ -374,6 +519,7 @@ export const useAppStore = create((set, get) => ({
             personaMode: document.personaMode,
             promptVersion: 'v1.0.0',
             paragraphs: [{ paragraphId: paragraph.id, order: paragraph.order, text: paragraph.light.text }],
+            documentParagraphs: toAnalysisParagraphInput(document),
         };
         try {
             const result = await window.litelizard.runAnalysis(payload);
@@ -448,7 +594,17 @@ export const useAppStore = create((set, get) => ({
         }
         set({ editorMode: 'writing', analysisLayerOpen: false });
     },
+    openSettingsPanel: () => {
+        set({ activeWorkspacePanel: 'settings', statusMessage: '設定を開きました' });
+    },
+    openEditorPanel: () => {
+        set({ activeWorkspacePanel: 'editor', statusMessage: 'ドキュメント表示に戻りました' });
+    },
     setAnalysisLayerOpen: (open) => {
+        if (get().activeWorkspacePanel !== 'editor') {
+            set({ analysisLayerOpen: false });
+            return;
+        }
         const mode = get().editorMode;
         if (mode === 'writing') {
             set({ analysisLayerOpen: false });
@@ -457,6 +613,9 @@ export const useAppStore = create((set, get) => ({
         set({ analysisLayerOpen: open });
     },
     toggleAnalysisLayer: () => {
+        if (get().activeWorkspacePanel !== 'editor') {
+            return;
+        }
         const { editorMode, analysisLayerOpen } = get();
         if (editorMode === 'writing') {
             set({ editorMode: 'structure', analysisLayerOpen: true });
@@ -464,38 +623,112 @@ export const useAppStore = create((set, get) => ({
         }
         set({ analysisLayerOpen: !analysisLayerOpen });
     },
-    bootstrapApiKeyStatus: async () => {
+    bootstrapAnalysisSettings: async () => {
         try {
-            const status = await window.litelizard.getApiKeyStatus();
-            set({ apiKeyConfigured: status.configured });
+            const analysisSettings = await window.litelizard.loadAnalysisSettings();
+            set({ analysisSettings });
         }
         catch {
-            set({ statusMessage: '認証状態の取得に失敗しました' });
+            set({ statusMessage: '分析設定の取得に失敗しました' });
         }
     },
-    saveApiKey: async (apiKey) => {
+    saveProviderApiKey: async (providerId, apiKey) => {
         const trimmed = apiKey.trim();
         if (!trimmed) {
             set({ statusMessage: 'APIキーを入力してください' });
             return;
         }
         try {
-            await window.litelizard.saveApiKey(trimmed);
-            set({ apiKeyConfigured: true, statusMessage: 'APIキーを保存しました' });
+            await window.litelizard.saveProviderApiKey(providerId, trimmed);
+            set((state) => ({
+                analysisSettings: {
+                    ...state.analysisSettings,
+                    providers: {
+                        ...state.analysisSettings.providers,
+                        [providerId]: {
+                            ...state.analysisSettings.providers[providerId],
+                            apiKeyConfigured: true,
+                        },
+                    },
+                },
+                statusMessage: `${providerId === 'openai' ? 'OpenAI' : 'Anthropic'} APIキーを保存しました`,
+            }));
         }
         catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             set({ statusMessage: `APIキー保存に失敗しました: ${message}` });
         }
     },
-    clearApiKey: async () => {
+    clearProviderApiKey: async (providerId) => {
         try {
-            await window.litelizard.clearApiKey();
-            set({ apiKeyConfigured: false, statusMessage: 'APIキーを削除しました' });
+            await window.litelizard.clearProviderApiKey(providerId);
+            set((state) => ({
+                analysisSettings: {
+                    ...state.analysisSettings,
+                    providers: {
+                        ...state.analysisSettings.providers,
+                        [providerId]: {
+                            ...state.analysisSettings.providers[providerId],
+                            apiKeyConfigured: false,
+                        },
+                    },
+                },
+                statusMessage: `${providerId === 'openai' ? 'OpenAI' : 'Anthropic'} APIキーを削除しました`,
+            }));
         }
         catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             set({ statusMessage: `APIキー削除に失敗しました: ${message}` });
+        }
+    },
+    saveAnalysisSettings: async (input) => {
+        try {
+            await window.litelizard.saveAnalysisSettings(input);
+            const current = get().analysisSettings;
+            const analysisSettings = {
+                ...current,
+                defaultProvider: input.defaultProvider,
+                providers: {
+                    openai: {
+                        ...current.providers.openai,
+                        defaultModel: input.providers.openai.defaultModel,
+                    },
+                    anthropic: {
+                        ...current.providers.anthropic,
+                        defaultModel: input.providers.anthropic.defaultModel,
+                    },
+                },
+                localLlm: {
+                    endpoint: input.localLlm.endpoint,
+                    defaultModel: input.localLlm.defaultModel,
+                    configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
+                },
+            };
+            set({ analysisSettings, statusMessage: '分析設定を保存しました' });
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            set({ statusMessage: `分析設定の保存に失敗しました: ${message}` });
+        }
+    },
+    testLocalLlmConnection: async (input) => {
+        try {
+            const result = await window.litelizard.testLocalLlmConnection(input);
+            if (!result.ok) {
+                set({ statusMessage: result.message });
+                return { ok: false, message: result.message };
+            }
+            const message = result.model
+                ? `ローカル LLM に接続できました: ${result.model}`
+                : 'ローカル LLM に接続できました';
+            set({ statusMessage: message });
+            return { ok: true, message };
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            const nextMessage = `接続テストに失敗しました: ${message}`;
+            set({ statusMessage: nextMessage });
+            return { ok: false, message: nextMessage };
         }
     },
 }));

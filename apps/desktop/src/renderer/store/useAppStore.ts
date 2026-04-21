@@ -23,6 +23,37 @@ export type ViewScale = 'micro' | 'macro';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
 export type WorkspacePanel = 'editor' | 'settings';
 
+function getSelectedAnalysisProviderState(settings: AnalysisSettings) {
+  if (settings.defaultProvider === 'openai') {
+    return {
+      id: 'openai' as const,
+      label: 'OpenAI',
+      runnable: settings.providers.openai.apiKeyConfigured,
+      reason: settings.providers.openai.apiKeyConfigured
+        ? null
+        : 'OpenAI API キーが未設定です。設定画面で保存してください。',
+    };
+  }
+
+  if (settings.defaultProvider === 'anthropic') {
+    return {
+      id: 'anthropic' as const,
+      label: 'Anthropic',
+      runnable: settings.providers.anthropic.apiKeyConfigured,
+      reason: settings.providers.anthropic.apiKeyConfigured
+        ? null
+        : 'Anthropic API キーが未設定です。設定画面で保存してください。',
+    };
+  }
+
+  return {
+    id: 'local-llm' as const,
+    label: 'Local LLM',
+    runnable: false,
+    reason: 'ローカル LLM は未対応です。設定を OpenAI または Anthropic に変更してください。',
+  };
+}
+
 function cloneAnalysisSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
 }
@@ -112,6 +143,14 @@ function titleFromPath(filePath: string) {
   const normalized = filePath.replace(/\\/g, '/');
   const fileName = normalized.split('/').pop() ?? filePath;
   return fileName.replace(/\.(md|lzl)$/i, '');
+}
+
+function toAnalysisParagraphInput(document: LiteLizardDocument) {
+  return document.paragraphs.map((paragraph) => ({
+    paragraphId: paragraph.id,
+    order: paragraph.order,
+    text: paragraph.light.text,
+  }));
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -318,7 +357,9 @@ export const useAppStore = create<AppState>((set, get) => ({
                     ...document,
                     title: remapped === result.path ? titleFromPath(remapped) : document.title,
                     updatedAt: document.updatedAt,
-                    source: { ...document.source, originPath: remapped },
+                    source: document.source
+                      ? { ...document.source, format: document.source.format, originPath: remapped }
+                      : { format: 'litelizard-json', originPath: remapped },
                   }
                 : document,
           });
@@ -481,8 +522,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    if (!analysisSettings.providers.openai.apiKeyConfigured) {
-      set({ statusMessage: 'OpenAI API キーを設定すると解析を実行できます。' });
+    const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+    if (!selectedProvider.runnable) {
+      set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
       return;
     }
 
@@ -514,6 +556,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         order: paragraph.order,
         text: paragraph.light.text,
       })),
+      documentParagraphs: toAnalysisParagraphInput(document),
     };
 
     try {
@@ -577,7 +620,13 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   runAnalysisFor: async (paragraphId: string) => {
     const { document, analysisSettings } = get();
-    if (!document || !analysisSettings.providers.openai.apiKeyConfigured) return;
+    if (!document) return;
+
+    const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+    if (!selectedProvider.runnable) {
+      set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
+      return;
+    }
 
     const paragraph = document.paragraphs.find((p) => p.id === paragraphId);
     if (!paragraph) return;
@@ -597,6 +646,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       personaMode: document.personaMode,
       promptVersion: 'v1.0.0',
       paragraphs: [{ paragraphId: paragraph.id, order: paragraph.order, text: paragraph.light.text }],
+      documentParagraphs: toAnalysisParagraphInput(document),
     };
 
     try {

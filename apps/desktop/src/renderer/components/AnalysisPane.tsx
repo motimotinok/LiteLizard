@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { LiteLizardDocument } from '@litelizard/shared';
+import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
 import { reorderByKey } from '../utils/arrayUtils.js';
 import { useAppStore } from '../store/useAppStore.js';
 
@@ -71,6 +71,41 @@ function formatAnalyzedAt(value: string) {
   });
 }
 
+function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
+  if (analysisSettings.defaultProvider === 'openai') {
+    const configured = analysisSettings.providers.openai.apiKeyConfigured;
+    return {
+      label: 'OpenAI',
+      configured,
+      runnable: configured,
+      missingTitle: 'OpenAI API キーを設定すると解析を開始できます。',
+      missingBody: '歯車アイコンから設定画面を開き、OpenAI のキーを保存してください。',
+      disabledTitle: 'OpenAI API キーが未設定です',
+    };
+  }
+
+  if (analysisSettings.defaultProvider === 'anthropic') {
+    const configured = analysisSettings.providers.anthropic.apiKeyConfigured;
+    return {
+      label: 'Anthropic',
+      configured,
+      runnable: configured,
+      missingTitle: 'Anthropic API キーを設定すると解析を開始できます。',
+      missingBody: '歯車アイコンから設定画面を開き、Anthropic のキーを保存してください。',
+      disabledTitle: 'Anthropic API キーが未設定です',
+    };
+  }
+
+  return {
+    label: 'Local LLM',
+    configured: false,
+    runnable: false,
+    missingTitle: 'ローカル LLM はまだ解析実行に対応していません。',
+    missingBody: '現時点では OpenAI または Anthropic を既定 provider に選んでください。',
+    disabledTitle: 'ローカル LLM は未対応です',
+  };
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
@@ -82,11 +117,11 @@ export function AnalysisPane({
   const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const analysisSettings = useAppStore((s) => s.analysisSettings);
-  const openAiConfigured = analysisSettings.providers.openai.apiKeyConfigured;
+  const providerUi = getAnalysisProviderUiState(analysisSettings);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-  const generateAllDisabled = staleCount === 0 || hasPending || !openAiConfigured;
+  const generateAllDisabled = staleCount === 0 || hasPending || !providerUi.runnable;
 
   const [analysisMode, setAnalysisMode] = useState<'paragraph' | 'chapter-summary' | 'theme'>('paragraph');
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
@@ -148,8 +183,8 @@ export function AnalysisPane({
           onClick={runAnalysis}
           disabled={generateAllDisabled}
           title={
-            !openAiConfigured
-              ? 'OpenAI API キーが未設定です'
+            !providerUi.runnable
+              ? providerUi.disabledTitle
               : hasPending
                 ? '解析実行中です'
                 : staleCount === 0
@@ -174,11 +209,11 @@ export function AnalysisPane({
         <div className="analysis-empty">ドキュメントを開くと分析カードが表示されます。</div>
       ) : (
         <div className="analysis-scroll">
-          {!openAiConfigured ? (
+          {!providerUi.runnable ? (
             <div className="analysis-settings-callout">
               <div>
-                <strong>OpenAI API キーを設定すると解析を開始できます。</strong>
-                <p>歯車アイコンから設定画面を開き、OpenAI のキーを保存してください。</p>
+                <strong>{providerUi.missingTitle}</strong>
+                <p>{providerUi.missingBody}</p>
               </div>
               <button type="button" className="analysis-settings-link" onClick={() => openSettingsPanel()}>
                 設定を開く
@@ -234,7 +269,7 @@ export function AnalysisPane({
                           event.stopPropagation();
                           runAnalysisFor(paragraph.id);
                         }}
-                        disabled={paragraph.lizard.status === 'pending' || hasPending || !openAiConfigured}
+                        disabled={paragraph.lizard.status === 'pending' || hasPending || !providerUi.runnable}
                         title="この段落だけ再解析"
                         aria-label={`P${index + 1} を再解析`}
                       >

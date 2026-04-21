@@ -15,6 +15,7 @@ import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
 import { createAnalysisSettingsStore, mergeAnalysisSettings } from './analysisSettingsStore.js';
+import { resolveAnalysisProvider } from './analysisProvider.js';
 import {
   appendParagraphPattern,
   createGeneration,
@@ -378,11 +379,16 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.runAnalysis, async (_, input: AnalysisRunInput) => {
-    const apiKey = await apiKeyVault.load('openai');
-    if (!apiKey) {
-      throw new Error('API key is not configured. Open Settings and save your API key.');
-    }
-    return runAnalysis(input, apiKey);
+    const [savedSettings, secrets] = await Promise.all([
+      analysisSettingsStore.load(),
+      apiKeyVault.loadAll(),
+    ]);
+    const analysisSettings = mergeAnalysisSettings(savedSettings, {
+      openai: Boolean(secrets.openai?.trim()),
+      anthropic: Boolean(secrets.anthropic?.trim()),
+    });
+    const provider = resolveAnalysisProvider(analysisSettings, secrets);
+    return runAnalysis(input, provider);
   });
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysis, async (_, projectRoot: string, documentId: string, filePath?: string) => {

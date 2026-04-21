@@ -1,19 +1,25 @@
-import type { FileNode, LiteLizardDocument } from '@litelizard/shared';
+import { type AnalysisSettings, type AnalysisSettingsInput, type FileNode, type LiteLizardDocument } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
+export type StartupState = 'loading' | 'needs-project' | 'ready';
+export type WorkspacePanel = 'editor' | 'settings';
 interface AppState {
+    startupState: StartupState;
     rootPath: string | null;
     tree: FileNode[];
     currentFilePath: string | null;
     document: LiteLizardDocument | null;
     revision: number;
     dirty: boolean;
-    apiKeyConfigured: boolean;
+    analysisSettings: AnalysisSettings;
+    activeWorkspacePanel: WorkspacePanel;
     editorMode: EditorMode;
     viewScale: ViewScale;
     analysisLayerOpen: boolean;
     statusMessage: string;
+    hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
+    restoreLastProject: () => Promise<void>;
     openFolder: () => Promise<void>;
     createDocument: (title: string, parentPath?: string) => Promise<void>;
     createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
@@ -23,6 +29,7 @@ interface AppState {
     updateParagraph: (paragraphId: string, text: string) => void;
     reorderParagraphs: (orderedIds: string[]) => void;
     reorderChapters: (orderedIds: string[]) => void;
+    deleteChapter: (chapterId: string) => void;
     replaceParagraphs: (paragraphTexts: string[]) => void;
     syncDocumentStructure: (input: DocumentStructureInput) => void;
     saveNow: () => Promise<void>;
@@ -32,11 +39,21 @@ interface AppState {
     setViewScale: (viewScale: ViewScale) => void;
     toggleViewScale: () => void;
     cycleEditorMode: () => void;
+    openSettingsPanel: () => void;
+    openEditorPanel: () => void;
     setAnalysisLayerOpen: (open: boolean) => void;
     toggleAnalysisLayer: () => void;
-    bootstrapApiKeyStatus: () => Promise<void>;
-    saveApiKey: (apiKey: string) => Promise<void>;
-    clearApiKey: () => Promise<void>;
+    bootstrapAnalysisSettings: () => Promise<void>;
+    saveProviderApiKey: (providerId: 'openai' | 'anthropic', apiKey: string) => Promise<void>;
+    clearProviderApiKey: (providerId: 'openai' | 'anthropic') => Promise<void>;
+    saveAnalysisSettings: (input: AnalysisSettingsInput) => Promise<void>;
+    testLocalLlmConnection: (input: {
+        endpoint: string;
+        model: string;
+    }) => Promise<{
+        ok: boolean;
+        message: string;
+    }>;
 }
 export declare const useAppStore: import("zustand").UseBoundStore<import("zustand").StoreApi<AppState>>;
 export {};

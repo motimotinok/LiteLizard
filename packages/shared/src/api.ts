@@ -22,6 +22,7 @@ export const AnalysisRequestSchema = z.object({
   personaMode: z.enum(['friendly', 'editor', 'general-reader']).default('general-reader'),
   promptVersion: z.string().min(1),
   paragraphs: z.array(AnalysisParagraphSchema).min(1).max(20),
+  documentParagraphs: z.array(AnalysisParagraphSchema).min(1),
 });
 
 export const AnalysisResultSchema = z.object({

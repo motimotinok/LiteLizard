@@ -1,6 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
-export function useResizablePanel(initialWidth, min, max) {
-    const getEffectiveMax = useCallback(() => Math.max(min, Math.min(max, window.innerWidth * 0.5)), [min, max]);
+export function getEffectivePanelMaxWidth(min, max, viewportWidth) {
+    return Math.max(min, Math.min(max, viewportWidth * 0.5));
+}
+export function useResizablePanel(initialWidth, min, max, options) {
+    const disabled = options?.disabled ?? false;
+    const getEffectiveMax = useCallback(() => getEffectivePanelMaxWidth(min, max, window.innerWidth), [min, max]);
     const [width, setWidth] = useState(() => Math.min(initialWidth, getEffectiveMax()));
     useEffect(() => {
         const onResize = () => {
@@ -10,6 +14,9 @@ export function useResizablePanel(initialWidth, min, max) {
         return () => window.removeEventListener('resize', onResize);
     }, [getEffectiveMax]);
     const onMouseDown = useCallback((e, growDirection = 1) => {
+        if (disabled) {
+            return;
+        }
         e.preventDefault();
         const startX = e.clientX;
         const startWidth = width;
@@ -27,7 +34,7 @@ export function useResizablePanel(initialWidth, min, max) {
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
-    }, [width, min, getEffectiveMax]);
+    }, [disabled, width, min, getEffectiveMax]);
     return { width, onMouseDown };
 }
 //# sourceMappingURL=useResizablePanel.js.map

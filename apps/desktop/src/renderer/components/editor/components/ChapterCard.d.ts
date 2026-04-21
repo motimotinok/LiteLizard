@@ -5,6 +5,7 @@ interface Props {
     chapter: Chapter;
     index: number;
     paragraphs: Paragraph[];
+    onDelete?: () => void;
 }
-export declare function ChapterCard({ chapter, index, paragraphs }: Props): import("react/jsx-runtime").JSX.Element;
+export declare function ChapterCard({ chapter, index, paragraphs, onDelete }: Props): import("react/jsx-runtime").JSX.Element;
 export {};
