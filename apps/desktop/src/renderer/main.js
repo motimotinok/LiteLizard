@@ -3,16 +3,12 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import './styles.css';
-import { createMockPreloadApi } from '../preload/preloadMockApi.js';
-import { mockRootPath } from '../preload/preloadMockData.js';
-import { useAppStore } from './store/useAppStore.js';
-if (!window.litelizard) {
-    window.litelizard = createMockPreloadApi();
-    void (async () => {
-        const { openFolder, loadDocument } = useAppStore.getState();
-        await openFolder();
-        await loadDocument(`${mockRootPath}/pakira.md`);
-    })();
+async function bootstrap() {
+    if (!window.litelizard) {
+        const { createMockPreloadApi } = await import('../preload/preloadMockApi.js');
+        window.litelizard = createMockPreloadApi();
+    }
+    createRoot(document.getElementById('root')).render(_jsx(React.StrictMode, { children: _jsx(App, {}) }));
 }
-createRoot(document.getElementById('root')).render(_jsx(React.StrictMode, { children: _jsx(App, {}) }));
+void bootstrap();
 //# sourceMappingURL=main.js.map

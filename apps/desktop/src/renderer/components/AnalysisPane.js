@@ -55,13 +55,47 @@ function formatAnalyzedAt(value) {
         minute: '2-digit',
     });
 }
+function getAnalysisProviderUiState(analysisSettings) {
+    if (analysisSettings.defaultProvider === 'openai') {
+        const configured = analysisSettings.providers.openai.apiKeyConfigured;
+        return {
+            label: 'OpenAI',
+            configured,
+            runnable: configured,
+            missingTitle: 'OpenAI API キーを設定すると解析を開始できます。',
+            missingBody: '歯車アイコンから設定画面を開き、OpenAI のキーを保存してください。',
+            disabledTitle: 'OpenAI API キーが未設定です',
+        };
+    }
+    if (analysisSettings.defaultProvider === 'anthropic') {
+        const configured = analysisSettings.providers.anthropic.apiKeyConfigured;
+        return {
+            label: 'Anthropic',
+            configured,
+            runnable: configured,
+            missingTitle: 'Anthropic API キーを設定すると解析を開始できます。',
+            missingBody: '歯車アイコンから設定画面を開き、Anthropic のキーを保存してください。',
+            disabledTitle: 'Anthropic API キーが未設定です',
+        };
+    }
+    return {
+        label: 'Local LLM',
+        configured: false,
+        runnable: false,
+        missingTitle: 'ローカル LLM はまだ解析実行に対応していません。',
+        missingBody: '現時点では OpenAI または Anthropic を既定 provider に選んでください。',
+        disabledTitle: 'ローカル LLM は未対応です',
+    };
+}
 export function AnalysisPane({ document, activeParagraphId, onSetActiveParagraphId, onReorderParagraphs, onRequestScrollToParagraph, }) {
     const runAnalysis = useAppStore((s) => s.runAnalysis);
     const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
-    const apiKeyConfigured = useAppStore((s) => s.apiKeyConfigured);
+    const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
+    const analysisSettings = useAppStore((s) => s.analysisSettings);
+    const providerUi = getAnalysisProviderUiState(analysisSettings);
     const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
     const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-    const generateAllDisabled = staleCount === 0 || hasPending || !apiKeyConfigured;
+    const generateAllDisabled = staleCount === 0 || hasPending || !providerUi.runnable;
     const [analysisMode, setAnalysisMode] = useState('paragraph');
     const [expandedByParagraphId, setExpandedByParagraphId] = useState({});
     const [draggingParagraphId, setDraggingParagraphId] = useState(null);
@@ -98,73 +132,73 @@ export function AnalysisPane({ document, activeParagraphId, onSetActiveParagraph
         }
         onReorderParagraphs(nextOrder);
     };
-    return (_jsxs("section", { className: "analysis-shell analysis-shell-chat", children: [_jsxs("header", { className: "analysis-header", children: [_jsxs("div", { className: "analysis-title-wrap", children: [_jsx("span", { className: "analysis-title-icon", "aria-hidden": true, children: "\u00B6" }), _jsxs("div", { children: [_jsx("h2", { className: "analysis-title", children: "\u6BB5\u843D\u89E3\u6790" }), _jsx("p", { className: "analysis-subtitle", children: "\u5404\u6BB5\u843D\u306E\u611F\u60C5\u30FB\u30C6\u30FC\u30DE\u30FB\u89E3\u91C8" })] })] }), _jsx("button", { type: "button", className: "analysis-generate-btn", onClick: runAnalysis, disabled: generateAllDisabled, title: !apiKeyConfigured
-                            ? 'APIキーが未設定です'
+    return (_jsxs("section", { className: "analysis-shell analysis-shell-chat", children: [_jsxs("header", { className: "analysis-header", children: [_jsxs("div", { className: "analysis-title-wrap", children: [_jsx("span", { className: "analysis-title-icon", "aria-hidden": true, children: "\u00B6" }), _jsxs("div", { children: [_jsx("h2", { className: "analysis-title", children: "\u6BB5\u843D\u89E3\u6790" }), _jsx("p", { className: "analysis-subtitle", children: "\u5404\u6BB5\u843D\u306E\u611F\u60C5\u30FB\u30C6\u30FC\u30DE\u30FB\u89E3\u91C8" })] })] }), _jsx("button", { type: "button", className: "analysis-generate-btn", onClick: runAnalysis, disabled: generateAllDisabled, title: !providerUi.runnable
+                            ? providerUi.disabledTitle
                             : hasPending
                                 ? '解析実行中です'
                                 : staleCount === 0
                                     ? '再解析が必要な段落はありません'
-                                    : `${staleCount}件の段落を解析`, children: "\u751F\u6210" }), _jsxs("select", { className: "analysis-mode-select", value: analysisMode, onChange: (e) => setAnalysisMode(e.target.value), children: [_jsx("option", { value: "paragraph", children: "\u6BB5\u843D\u89E3\u6790" }), _jsx("option", { value: "chapter-summary", children: "\u7AE0\u30B5\u30DE\u30EA\u30FC" }), _jsx("option", { value: "theme", children: "\u30C6\u30FC\u30DE\u5206\u6790" })] })] }), !document ? (_jsx("div", { className: "analysis-empty", children: "\u30C9\u30AD\u30E5\u30E1\u30F3\u30C8\u3092\u958B\u304F\u3068\u5206\u6790\u30AB\u30FC\u30C9\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002" })) : (_jsx("div", { className: "analysis-scroll", children: _jsx("div", { className: "analysis-card-list", children: document.paragraphs.map((paragraph, index) => {
-                        const expanded = Boolean(expandedByParagraphId[paragraph.id]);
-                        const active = paragraph.id === activeParagraphId;
-                        const isDragging = draggingParagraphId === paragraph.id;
-                        const isDropTarget = dropTargetParagraphId === paragraph.id;
-                        const isComplete = paragraph.lizard.status === 'complete';
-                        const analyzedAt = paragraph.lizard.analyzedAt
-                            ? formatAnalyzedAt(paragraph.lizard.analyzedAt)
-                            : null;
-                        const confidence = typeof paragraph.lizard.confidence === 'number'
-                            ? `${Math.round(paragraph.lizard.confidence * 100)}%`
-                            : null;
-                        const statusText = statusLabel(paragraph.lizard.status);
-                        const tags = [
-                            ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' })),
-                            ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' })),
-                        ];
-                        return (_jsxs("article", { className: [
-                                'analysis-card',
-                                active ? 'analysis-card-active' : '',
-                                isDragging ? 'analysis-card-dragging' : '',
-                                isDropTarget ? 'analysis-card-drop-target' : '',
-                            ]
-                                .filter(Boolean)
-                                .join(' '), onClick: () => {
-                                onSetActiveParagraphId?.(paragraph.id);
-                                onRequestScrollToParagraph?.(paragraph.id);
-                            }, children: [_jsxs("header", { className: "analysis-card-header", children: [_jsx("div", { className: "analysis-card-heading", children: _jsxs("span", { className: "analysis-card-index", children: ["P", String(index + 1).padStart(2, '0')] }) }), _jsxs("div", { className: "analysis-card-actions", children: [_jsx("button", { type: "button", className: "analysis-card-regen-btn", onClick: (event) => {
-                                                        event.stopPropagation();
-                                                        runAnalysisFor(paragraph.id);
-                                                    }, disabled: paragraph.lizard.status === 'pending' || hasPending || !apiKeyConfigured, title: "\u3053\u306E\u6BB5\u843D\u3060\u3051\u518D\u89E3\u6790", "aria-label": `P${index + 1} を再解析`, children: "\u21BA" }), _jsx("button", { type: "button", className: "analysis-card-toggle", onClick: (event) => {
-                                                        event.stopPropagation();
-                                                        setExpandedByParagraphId((current) => ({
-                                                            ...current,
-                                                            [paragraph.id]: !current[paragraph.id],
-                                                        }));
-                                                    }, children: expanded ? '折りたたむ' : '全文' }), _jsx("button", { type: "button", className: "analysis-card-drag-handle", draggable: true, onClick: (event) => event.stopPropagation(), onDragStart: (event) => {
-                                                        event.dataTransfer.setData('text/plain', paragraph.id);
-                                                        event.dataTransfer.effectAllowed = 'move';
-                                                        setDraggingParagraphId(paragraph.id);
-                                                        setDropTargetParagraphId(null);
-                                                    }, onDragOver: (event) => {
-                                                        event.preventDefault();
-                                                        setDropTargetParagraphId(paragraph.id);
-                                                    }, onDrop: (event) => {
-                                                        event.preventDefault();
-                                                        const draggedId = event.dataTransfer.getData('text/plain');
-                                                        if (!draggedId || draggedId === paragraph.id) {
+                                    : `${staleCount}件の段落を解析`, children: "\u751F\u6210" }), _jsxs("select", { className: "analysis-mode-select", value: analysisMode, onChange: (e) => setAnalysisMode(e.target.value), children: [_jsx("option", { value: "paragraph", children: "\u6BB5\u843D\u89E3\u6790" }), _jsx("option", { value: "chapter-summary", children: "\u7AE0\u30B5\u30DE\u30EA\u30FC" }), _jsx("option", { value: "theme", children: "\u30C6\u30FC\u30DE\u5206\u6790" })] })] }), !document ? (_jsx("div", { className: "analysis-empty", children: "\u30C9\u30AD\u30E5\u30E1\u30F3\u30C8\u3092\u958B\u304F\u3068\u5206\u6790\u30AB\u30FC\u30C9\u304C\u8868\u793A\u3055\u308C\u307E\u3059\u3002" })) : (_jsxs("div", { className: "analysis-scroll", children: [!providerUi.runnable ? (_jsxs("div", { className: "analysis-settings-callout", children: [_jsxs("div", { children: [_jsx("strong", { children: providerUi.missingTitle }), _jsx("p", { children: providerUi.missingBody })] }), _jsx("button", { type: "button", className: "analysis-settings-link", onClick: () => openSettingsPanel(), children: "\u8A2D\u5B9A\u3092\u958B\u304F" })] })) : null, _jsx("div", { className: "analysis-card-list", children: document.paragraphs.map((paragraph, index) => {
+                            const expanded = Boolean(expandedByParagraphId[paragraph.id]);
+                            const active = paragraph.id === activeParagraphId;
+                            const isDragging = draggingParagraphId === paragraph.id;
+                            const isDropTarget = dropTargetParagraphId === paragraph.id;
+                            const isComplete = paragraph.lizard.status === 'complete';
+                            const analyzedAt = paragraph.lizard.analyzedAt
+                                ? formatAnalyzedAt(paragraph.lizard.analyzedAt)
+                                : null;
+                            const confidence = typeof paragraph.lizard.confidence === 'number'
+                                ? `${Math.round(paragraph.lizard.confidence * 100)}%`
+                                : null;
+                            const statusText = statusLabel(paragraph.lizard.status);
+                            const tags = [
+                                ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' })),
+                                ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' })),
+                            ];
+                            return (_jsxs("article", { className: [
+                                    'analysis-card',
+                                    active ? 'analysis-card-active' : '',
+                                    isDragging ? 'analysis-card-dragging' : '',
+                                    isDropTarget ? 'analysis-card-drop-target' : '',
+                                ]
+                                    .filter(Boolean)
+                                    .join(' '), onClick: () => {
+                                    onSetActiveParagraphId?.(paragraph.id);
+                                    onRequestScrollToParagraph?.(paragraph.id);
+                                }, children: [_jsxs("header", { className: "analysis-card-header", children: [_jsx("div", { className: "analysis-card-heading", children: _jsxs("span", { className: "analysis-card-index", children: ["P", String(index + 1).padStart(2, '0')] }) }), _jsxs("div", { className: "analysis-card-actions", children: [_jsx("button", { type: "button", className: "analysis-card-regen-btn", onClick: (event) => {
+                                                            event.stopPropagation();
+                                                            runAnalysisFor(paragraph.id);
+                                                        }, disabled: paragraph.lizard.status === 'pending' || hasPending || !providerUi.runnable, title: "\u3053\u306E\u6BB5\u843D\u3060\u3051\u518D\u89E3\u6790", "aria-label": `P${index + 1} を再解析`, children: "\u21BA" }), _jsx("button", { type: "button", className: "analysis-card-toggle", onClick: (event) => {
+                                                            event.stopPropagation();
+                                                            setExpandedByParagraphId((current) => ({
+                                                                ...current,
+                                                                [paragraph.id]: !current[paragraph.id],
+                                                            }));
+                                                        }, children: expanded ? '折りたたむ' : '全文' }), _jsx("button", { type: "button", className: "analysis-card-drag-handle", draggable: true, onClick: (event) => event.stopPropagation(), onDragStart: (event) => {
+                                                            event.dataTransfer.setData('text/plain', paragraph.id);
+                                                            event.dataTransfer.effectAllowed = 'move';
+                                                            setDraggingParagraphId(paragraph.id);
+                                                            setDropTargetParagraphId(null);
+                                                        }, onDragOver: (event) => {
+                                                            event.preventDefault();
+                                                            setDropTargetParagraphId(paragraph.id);
+                                                        }, onDrop: (event) => {
+                                                            event.preventDefault();
+                                                            const draggedId = event.dataTransfer.getData('text/plain');
+                                                            if (!draggedId || draggedId === paragraph.id) {
+                                                                setDraggingParagraphId(null);
+                                                                setDropTargetParagraphId(null);
+                                                                return;
+                                                            }
+                                                            onDropReorder(draggedId, paragraph.id);
                                                             setDraggingParagraphId(null);
                                                             setDropTargetParagraphId(null);
-                                                            return;
-                                                        }
-                                                        onDropReorder(draggedId, paragraph.id);
-                                                        setDraggingParagraphId(null);
-                                                        setDropTargetParagraphId(null);
-                                                    }, onDragEnd: () => {
-                                                        setDraggingParagraphId(null);
-                                                        setDropTargetParagraphId(null);
-                                                    }, "aria-label": `P${index + 1} をドラッグ`, title: "\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u4E26\u3073\u66FF\u3048", children: "\u22EE\u22EE" })] })] }), isComplete ? (_jsxs(_Fragment, { children: [tags.length > 0 ? (_jsx("ul", { className: "analysis-tag-list", children: tags.map((tag, tagIndex) => (_jsx("li", { className: `analysis-tag analysis-tag-${tag.kind}`, style: tag.kind === 'emotion' ? getEmotionStyle(tag.value) : undefined, children: tag.value }, `${paragraph.id}-${tag.kind}-${tag.value}-${tagIndex}`))) })) : null, confidence || analyzedAt ? (_jsxs("div", { className: "analysis-card-meta", children: [confidence ? _jsxs("span", { children: ["\u4FE1\u983C\u5EA6 ", confidence] }) : _jsx("span", { children: "\u4FE1\u983C\u5EA6 -" }), analyzedAt ? _jsx("span", { children: analyzedAt }) : null] })) : null, _jsx("p", { className: expanded ? 'analysis-card-body analysis-card-body-expanded' : 'analysis-card-body', children: paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。' })] })) : (_jsxs("p", { className: "analysis-card-status", children: [statusText, paragraph.lizard.status === 'failed' && paragraph.lizard.error?.message
-                                            ? ` (${paragraph.lizard.error.message})`
-                                            : ''] }))] }, paragraph.id));
-                    }) }) }))] }));
+                                                        }, onDragEnd: () => {
+                                                            setDraggingParagraphId(null);
+                                                            setDropTargetParagraphId(null);
+                                                        }, "aria-label": `P${index + 1} をドラッグ`, title: "\u30C9\u30E9\u30C3\u30B0\u3057\u3066\u4E26\u3073\u66FF\u3048", children: "\u22EE\u22EE" })] })] }), isComplete ? (_jsxs(_Fragment, { children: [tags.length > 0 ? (_jsx("ul", { className: "analysis-tag-list", children: tags.map((tag, tagIndex) => (_jsx("li", { className: `analysis-tag analysis-tag-${tag.kind}`, style: tag.kind === 'emotion' ? getEmotionStyle(tag.value) : undefined, children: tag.value }, `${paragraph.id}-${tag.kind}-${tag.value}-${tagIndex}`))) })) : null, confidence || analyzedAt ? (_jsxs("div", { className: "analysis-card-meta", children: [confidence ? _jsxs("span", { children: ["\u4FE1\u983C\u5EA6 ", confidence] }) : _jsx("span", { children: "\u4FE1\u983C\u5EA6 -" }), analyzedAt ? _jsx("span", { children: analyzedAt }) : null] })) : null, _jsx("p", { className: expanded ? 'analysis-card-body analysis-card-body-expanded' : 'analysis-card-body', children: paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。' })] })) : (_jsxs("p", { className: "analysis-card-status", children: [statusText, paragraph.lizard.status === 'failed' && paragraph.lizard.error?.message
+                                                ? ` (${paragraph.lizard.error.message})`
+                                                : ''] }))] }, paragraph.id));
+                        }) })] }))] }));
 }
 //# sourceMappingURL=AnalysisPane.js.map

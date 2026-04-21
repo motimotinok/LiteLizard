@@ -67,4 +67,44 @@ describe('createMockPreloadApi', () => {
     expect(settings.defaultProvider).toBe('local-llm');
     expect(settings.localLlm.configured).toBe(true);
   });
+
+  it('Anthropic を既定 provider として保持できる', async () => {
+    const api = createMockPreloadApi();
+
+    await api.saveProviderApiKey('anthropic', 'sk-ant-test');
+    await api.saveAnalysisSettings({
+      defaultProvider: 'anthropic',
+      providers: {
+        openai: { defaultModel: 'gpt-4.1-mini' },
+        anthropic: { defaultModel: 'claude-3-7-sonnet-latest' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.2',
+      },
+    });
+
+    const settings = await api.loadAnalysisSettings();
+
+    expect(settings.defaultProvider).toBe('anthropic');
+    expect(settings.providers.anthropic.apiKeyConfigured).toBe(true);
+  });
+
+  it('runAnalysis は documentParagraphs 付き payload を受け取れる', async () => {
+    const api = createMockPreloadApi();
+
+    const result = await api.runAnalysis({
+      documentId: 'doc-1',
+      personaMode: 'general-reader',
+      promptVersion: 'v1.0.0',
+      paragraphs: [{ paragraphId: 'p2', order: 2, text: 'second' }],
+      documentParagraphs: [
+        { paragraphId: 'p1', order: 1, text: 'first' },
+        { paragraphId: 'p2', order: 2, text: 'second' },
+      ],
+    });
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0]?.paragraphId).toBe('p2');
+  });
 });

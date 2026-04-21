@@ -2,7 +2,7 @@ import { jsx as _jsx } from "react/jsx-runtime";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove, } from '@dnd-kit/sortable';
 import { ChapterCard } from './components/ChapterCard.js';
-export function MacroView({ document, onReorderChapters }) {
+export function MacroView({ document, onReorderChapters, onDeleteChapter }) {
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
     const sortedChapters = [...document.chapters].sort((a, b) => a.order - b.order);
     function handleDragEnd(event) {
@@ -18,7 +18,7 @@ export function MacroView({ document, onReorderChapters }) {
                     const paragraphs = document.paragraphs
                         .filter((p) => p.chapterId === chapter.id)
                         .sort((a, b) => a.order - b.order);
-                    return _jsx(ChapterCard, { chapter: chapter, index: index, paragraphs: paragraphs }, chapter.id);
+                    return (_jsx(ChapterCard, { chapter: chapter, index: index, paragraphs: paragraphs, onDelete: onDeleteChapter ? () => onDeleteChapter(chapter.id) : undefined }, chapter.id));
                 }) }) }) }));
 }
 //# sourceMappingURL=MacroView.js.map

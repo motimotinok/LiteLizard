@@ -15,8 +15,9 @@ interface Props {
     onSyncStructure: (input: DocumentStructureInput) => void;
     onReorderParagraphs?: (orderedIds: string[]) => void;
     onReorderChapters?: (orderedIds: string[]) => void;
+    onDeleteChapter?: (chapterId: string) => void;
     onCreateEssay: () => void;
     onOpenFolder: () => void;
 }
-export declare function EditorPane({ isExpanded, document, dirty, viewScale, activeParagraphId, scrollRequest, setActiveParagraphId, onSetViewScale, onSyncStructure, onReorderParagraphs, onReorderChapters, onCreateEssay, onOpenFolder, }: Props): import("react/jsx-runtime").JSX.Element;
+export declare function EditorPane({ isExpanded, document, dirty, viewScale, activeParagraphId, scrollRequest, setActiveParagraphId, onSetViewScale, onSyncStructure, onReorderParagraphs, onReorderChapters, onDeleteChapter, onCreateEssay, onOpenFolder, }: Props): import("react/jsx-runtime").JSX.Element;
 export {};

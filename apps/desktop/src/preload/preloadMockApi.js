@@ -1,3 +1,4 @@
+import { DEFAULT_ANALYSIS_SETTINGS, } from '@litelizard/shared';
 import { initialMockApiKeyConfigured, initialMockDocuments, initialMockTree, mockRootPath, } from './preloadMockData.js';
 function clone(value) {
     return structuredClone(value);
@@ -190,10 +191,22 @@ export function createMockPreloadApi() {
         tree: clone(initialMockTree),
         documents: new Map(Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])),
         revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
-        apiKeyConfigured: initialMockApiKeyConfigured,
+        analysisSettings: {
+            ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
+            providers: {
+                ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers),
+                openai: {
+                    ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers.openai),
+                    apiKeyConfigured: initialMockApiKeyConfigured,
+                },
+            },
+        },
     };
     return {
         openFolder: async () => mockRootPath,
+        getLastOpenedFolder: async () => mockRootPath,
+        setLastOpenedFolder: async () => ({ ok: true }),
+        onRequestOpenFolder: () => () => { },
         listTree: async (_root) => clone(state.tree),
         createEntry: async (root, type, name) => {
             const safeName = sanitizeName(name);
@@ -332,18 +345,64 @@ export function createMockPreloadApi() {
                 }),
             };
         },
-        getApiKeyStatus: async () => ({ configured: state.apiKeyConfigured }),
-        saveApiKey: async (apiKey) => {
+        loadAnalysisSettings: async () => clone(state.analysisSettings),
+        saveProviderApiKey: async (providerId, apiKey) => {
             if (!apiKey.trim()) {
                 throw new Error('API key must not be empty.');
             }
-            state.apiKeyConfigured = true;
+            if (providerId === 'openai' || providerId === 'anthropic') {
+                state.analysisSettings.providers[providerId].apiKeyConfigured = true;
+            }
             return { ok: true };
         },
-        clearApiKey: async () => {
-            state.apiKeyConfigured = false;
+        clearProviderApiKey: async (providerId) => {
+            if (providerId === 'openai' || providerId === 'anthropic') {
+                state.analysisSettings.providers[providerId].apiKeyConfigured = false;
+            }
             return { ok: true };
+        },
+        saveAnalysisSettings: async (input) => {
+            state.analysisSettings = {
+                ...state.analysisSettings,
+                defaultProvider: input.defaultProvider,
+                providers: {
+                    openai: {
+                        ...state.analysisSettings.providers.openai,
+                        defaultModel: input.providers.openai.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel,
+                    },
+                    anthropic: {
+                        ...state.analysisSettings.providers.anthropic,
+                        defaultModel: input.providers.anthropic.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel,
+                    },
+                },
+                localLlm: {
+                    endpoint: input.localLlm.endpoint.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.endpoint,
+                    defaultModel: input.localLlm.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.defaultModel,
+                    configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
+                },
+            };
+            return { ok: true };
+        },
+        testLocalLlmConnection: async (input) => {
+            if (!input.endpoint.trim()) {
+                return { ok: false, message: 'エンドポイント URL を入力してください。' };
+            }
+            if (!input.model.trim()) {
+                return { ok: false, message: 'モデル名を入力してください。' };
+            }
+            if (/fail/i.test(input.endpoint) || /missing/i.test(input.model)) {
+                return { ok: false, message: '接続できましたが、指定モデルは見つかりませんでした。' };
+            }
+            return { ok: true, model: input.model.trim() };
+        },
+        loadAnalysis: async (_projectRoot, _documentId, _filePath) => {
+            return null;
+        },
+        saveAnalysisResult: async (_projectRoot, _documentId, _paragraphId, _pattern) => {
+            // mock: no-op
+        },
+        createAnalysisGeneration: async (_projectRoot, _documentId) => {
+            return 1;
         },
     };
 }
-//# sourceMappingURL=preloadMockApi.js.map
