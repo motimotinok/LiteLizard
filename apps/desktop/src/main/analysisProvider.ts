@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import OpenAI, { AuthenticationError, RateLimitError } from 'openai';
 import type { AnalysisResult, AnalysisRunInput } from '@litelizard/shared';
 import type { AnalysisProviderId, AnalysisSettings, PersonaMode } from '@litelizard/shared';
 
@@ -114,30 +114,41 @@ export function createOpenAiAnalysisProvider(apiKey: string): AnalysisProvider {
     id: 'openai',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
       const system = buildSystemPrompt(input.personaMode, input.contextTexts);
-      const completion = await client.responses.create({
-        model: input.model,
-        input: [
-          { role: 'system', content: system },
-          { role: 'user', content: input.text },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'litelizard_analysis',
-            schema: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
-              properties: {
-                emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-                theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-                deepMeaning: { type: 'string', maxLength: 1000 },
-                confidence: { type: 'number', minimum: 0, maximum: 1 },
+      let completion: Awaited<ReturnType<typeof client.responses.create>>;
+      try {
+        completion = await client.responses.create({
+          model: input.model,
+          input: [
+            { role: 'system', content: system },
+            { role: 'user', content: input.text },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'litelizard_analysis',
+              schema: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
+                properties: {
+                  emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+                  theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+                  deepMeaning: { type: 'string', maxLength: 1000 },
+                  confidence: { type: 'number', minimum: 0, maximum: 1 },
+                },
               },
             },
           },
-        },
-      });
+        });
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          throw new Error('OpenAI API キーが無効です。設定画面で再入力してください。');
+        }
+        if (error instanceof RateLimitError) {
+          throw new Error('OpenAI のレート制限に達しました。しばらく待ってから再試行してください。');
+        }
+        throw error;
+      }
 
       const parsed = JSON.parse(completion.output_text) as {
         emotion?: unknown;
@@ -183,7 +194,13 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
 
       if (!response.ok) {
         const raw = await response.text();
-        throw new Error(`Anthropic API request failed (${response.status}): ${raw.slice(0, 200)}`);
+        if (response.status === 401) {
+          throw new Error('Anthropic API キーが無効です。設定画面で再入力してください。');
+        }
+        if (response.status === 429) {
+          throw new Error('Anthropic のレート制限に達しました。しばらく待ってから再試行してください。');
+        }
+        throw new Error(`Anthropic API エラー (${response.status}): ${raw.slice(0, 200)}`);
       }
 
       const payload = await response.json() as {
