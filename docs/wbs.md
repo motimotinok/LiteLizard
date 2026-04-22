@@ -134,7 +134,7 @@
 | L-01 | API キー設定 UI（renderer: 設定画面） | E-01 ✅ | P1 | M | ✅ | Codex | |
 | L-02 | API キー暗号化保存（main: safeStorage） | E-01 ✅ | P1 | M | ✅ | | |
 | L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ✅ | Codex | |
-| L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ⬜ | | |
+| L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ✅ | Claude | claude/next-task-F7SoK |
 | L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ⬜ | | |
 | L-06 | 解析結果の保存・UI 反映 | L-05, E-06 ✅ | P1 | M | ⬜ | | |
 | L-07 | API キー未設定時の UI 制御（設定導線表示） | L-01 | P1 | S | ✅ | Codex | |
@@ -156,6 +156,14 @@
 - **対象**: Strategy パターンでプロバイダーを切り替え。将来のクラウド方式もこのインターフェースに乗る
 - **完了条件**: `AnalysisProvider` インターフェースが定義され、外部 API / ローカル LLM / クラウド（将来）を差し替え可能
 - **完了**: 2026-04-21。main 側に `AnalysisProvider` 抽象層と provider resolver を追加し、OpenAI / Anthropic の実行切替、未対応 provider の明示エラー、文書全体順序ベースの context 構築、関連テストを実装
+
+#### L-04: 外部 API 方式の解析リクエスト実装 ✅
+- **完了**: 2026-04-22。L-03 で実装済みだった OpenAI Responses API / Anthropic raw fetch の API 呼び出し層を検証・修正し、以下を追加実装した
+  - `apiBridge.ts`: `[[FAIL]]` テストフックを本番コードから除去
+  - `analysisProvider.ts`: OpenAI SDK の `AuthenticationError`/`RateLimitError`、Anthropic の HTTP 401/429 を日本語エラーメッセージに分類
+  - `useAppStore.ts` `loadDocument`: `.lzl` ファイルを開く際に `.litelizard/analysis/` から世代ファイルを読み込んで `lizard` フィールドに復元
+  - `useAppStore.ts` `runAnalysis`/`runAnalysisFor`: 解析成功後に `saveAnalysisResult` IPC を呼び出して結果を世代ファイルに永続化（`Promise.allSettled` で保存失敗は UI をブロックしない）
+  - `packages/shared/tsconfig.json`: `types: ["node"]` を追加し `AnalysisResult` が `any` 推論されていた問題を修正
 
 #### L-05: 解析結果の IPC ストリーミング
 - **対象**: `webContents.send` で段落ごとの分析結果を renderer に逐次送信
