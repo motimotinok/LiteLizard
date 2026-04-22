@@ -11,10 +11,6 @@ export async function runAnalysis(
     const results: AnalysisResult[] = [];
 
     for (const paragraph of input.paragraphs) {
-      if (paragraph.text.includes('[[FAIL]]')) {
-        throw new Error('Forced failure for testing');
-      }
-
       const analyzed = await resolvedProvider.provider.analyzeParagraph({
         paragraphId: paragraph.paragraphId,
         text: paragraph.text,
