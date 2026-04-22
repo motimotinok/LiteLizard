@@ -88,6 +88,10 @@ function applyAnalysisToDocument(
       const latest = history?.patterns.at(-1);
       if (!latest) return paragraph;
       const r = latest.result as Record<string, unknown>;
+      // sourceText が保存されていて現在テキストと一致しない場合は stale のまま
+      if (typeof r.sourceText === 'string' && r.sourceText !== paragraph.light.text) {
+        return paragraph;
+      }
       return {
         ...paragraph,
         lizard: {
@@ -631,6 +635,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const rootPath = get().rootPath;
       if (rootPath && document.source?.format === 'lzl-v1') {
+        const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
         await Promise.allSettled(
           result.results.map((analyzed) =>
             window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, {
@@ -641,6 +646,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 deepMeaning: analyzed.deepMeaning,
                 confidence: analyzed.confidence,
                 model: analyzed.model,
+                sourceText: staleTextMap.get(analyzed.paragraphId) ?? '',
               },
             })
           )
@@ -725,6 +731,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                 deepMeaning: analyzed.deepMeaning,
                 confidence: analyzed.confidence,
                 model: analyzed.model,
+                sourceText: paragraph.light.text,
               },
             }),
           ]);
