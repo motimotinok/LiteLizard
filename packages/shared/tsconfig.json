@@ -4,7 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "composite": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "types": ["node"]
   },
   "include": ["src/**/*.ts", "../../LiteLizard_schema_v1.json"],
   "exclude": ["src/**/*.test.ts"]

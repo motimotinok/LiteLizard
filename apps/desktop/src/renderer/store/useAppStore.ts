@@ -5,6 +5,7 @@ import {
   type AnalysisSettings,
   type AnalysisSettingsInput,
   type FileNode,
+  type GenerationalAnalysisFile,
   type LiteLizardDocument,
 } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
@@ -73,6 +74,33 @@ function toAnalysisSettingsInput(settings: AnalysisSettings): AnalysisSettingsIn
       endpoint: settings.localLlm.endpoint,
       defaultModel: settings.localLlm.defaultModel,
     },
+  };
+}
+
+function applyAnalysisToDocument(
+  document: LiteLizardDocument,
+  analysisFile: GenerationalAnalysisFile,
+): LiteLizardDocument {
+  return {
+    ...document,
+    paragraphs: document.paragraphs.map((paragraph) => {
+      const history = analysisFile.paragraphs[paragraph.id];
+      const latest = history?.patterns.at(-1);
+      if (!latest) return paragraph;
+      const r = latest.result as Record<string, unknown>;
+      return {
+        ...paragraph,
+        lizard: {
+          status: 'complete' as const,
+          emotion: Array.isArray(r.emotion) ? (r.emotion as string[]) : [],
+          theme: Array.isArray(r.theme) ? (r.theme as string[]) : [],
+          deepMeaning: typeof r.deepMeaning === 'string' ? r.deepMeaning : '',
+          confidence: typeof r.confidence === 'number' ? r.confidence : 0,
+          model: typeof r.model === 'string' ? r.model : '',
+          analyzedAt: latest.analyzedAt,
+        },
+      };
+    }),
   };
 }
 
@@ -403,9 +431,23 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadDocument: async (filePath: string) => {
     try {
       const document = await window.litelizard.loadDocument(filePath);
+
+      let resolvedDoc = document;
+      if (document.source?.format === 'lzl-v1') {
+        const rootPath = get().rootPath;
+        if (rootPath) {
+          const analysisFile = await window.litelizard
+            .loadAnalysis(rootPath, document.documentId, filePath)
+            .catch(() => null);
+          if (analysisFile) {
+            resolvedDoc = applyAnalysisToDocument(document, analysisFile);
+          }
+        }
+      }
+
       set({
         currentFilePath: filePath,
-        document,
+        document: resolvedDoc,
         revision: 0,
         dirty: false,
         statusMessage: 'ドキュメントを読み込みました',
@@ -587,6 +629,24 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       };
 
+      const rootPath = get().rootPath;
+      if (rootPath && document.source?.format === 'lzl-v1') {
+        await Promise.allSettled(
+          result.results.map((analyzed) =>
+            window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, {
+              analyzedAt: analyzed.analyzedAt,
+              result: {
+                emotion: analyzed.emotion,
+                theme: analyzed.theme,
+                deepMeaning: analyzed.deepMeaning,
+                confidence: analyzed.confidence,
+                model: analyzed.model,
+              },
+            })
+          )
+        );
+      }
+
       set({
         document: {
           ...nextDoc,
@@ -607,7 +667,7 @@ export const useAppStore = create<AppState>((set, get) => ({
                   status: 'failed',
                   error: {
                     code: 'ANALYSIS_ABORTED',
-                    message: 'At least one paragraph failed. No results were applied.',
+                    message,
                   },
                 },
               }
@@ -652,6 +712,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await window.litelizard.runAnalysis(payload);
       const analyzed = result.results.find((r) => r.paragraphId === paragraphId);
+
+      if (analyzed) {
+        const rootPath = get().rootPath;
+        if (rootPath && document.source?.format === 'lzl-v1') {
+          await Promise.allSettled([
+            window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, {
+              analyzedAt: analyzed.analyzedAt,
+              result: {
+                emotion: analyzed.emotion,
+                theme: analyzed.theme,
+                deepMeaning: analyzed.deepMeaning,
+                confidence: analyzed.confidence,
+                model: analyzed.model,
+              },
+            }),
+          ]);
+        }
+      }
 
       set((state) => {
         if (!state.document || !analyzed) return {};
