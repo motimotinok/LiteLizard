@@ -129,6 +129,7 @@ interface AppState {
   createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
   renameEntry: (targetPath: string, nextName: string) => Promise<void>;
   deleteEntry: (targetPath: string) => Promise<void>;
+  importTextFile: (createParent: string) => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
@@ -429,6 +430,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `削除に失敗しました: ${message}` });
+    }
+  },
+
+  importTextFile: async (createParent: string) => {
+    try {
+      const result = await window.litelizard.importTextFile(createParent);
+      if (!result) return;
+
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      const document = await window.litelizard.loadDocument(result.filePath);
+      set({
+        currentFilePath: result.filePath,
+        document,
+        revision: 0,
+        dirty: false,
+        statusMessage: 'テキストをインポートしました',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      if (message.includes('IMPORT_FILE_ALREADY_EXISTS')) {
+        set({ statusMessage: '同名の .lzl ファイルが既に存在します' });
+        return;
+      }
+      set({ statusMessage: `インポートに失敗しました: ${message}` });
     }
   },
 

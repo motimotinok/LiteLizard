@@ -2,11 +2,13 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain } from 'electron';
 import {
+  buildImportedDocument,
   createChapterId,
   createDocumentId,
   createParagraphId,
   IPC_CHANNELS,
   type AnalysisProgressEvent,
+  parseTextToImportResult,
   type AnalysisRunInput,
   type AnalysisSettingsInput,
   type LiteLizardDocument,
@@ -433,6 +435,40 @@ export function registerIpcHandlers() {
     } catch (error) {
       console.error('[IPC analysis:newGeneration] failed', error);
       throw new Error(`CREATE_GENERATION_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.importTextFile, async (_, createParent: string) => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        filters: [{ name: 'Text Files', extensions: ['txt', 'md'] }],
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+
+      const sourceFilePath = result.filePaths[0];
+      const rawText = await fs.readFile(sourceFilePath, 'utf8');
+      const baseName = path.basename(sourceFilePath);
+      const title = baseName.replace(/\.[^.]+$/, '') || baseName;
+      const importResult = parseTextToImportResult(rawText, title);
+
+      const destFileName = ensureLzlFileName(sanitizeFileStem(title));
+      const destFilePath = path.join(createParent, destFileName);
+
+      if (await fileExists(destFilePath)) {
+        throw new Error(`IMPORT_FILE_ALREADY_EXISTS: ${destFileName}`);
+      }
+
+      const document = buildImportedDocument(importResult, destFilePath);
+      await fileService.createDocument(destFilePath, document);
+
+      return { ok: true as const, filePath: destFilePath, document };
+    } catch (error) {
+      console.error('[IPC doc:importText] failed', error);
+      throw new Error(`IMPORT_TEXT_FAILED: ${getErrorMessage(error)}`);
     }
   });
 }

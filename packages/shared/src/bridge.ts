@@ -57,6 +57,9 @@ export interface BridgeApi {
     input: { endpoint: string; model: string }
   ): Promise<{ ok: true; model?: string } | { ok: false; message: string }>;
   onAnalysisProgress(listener: (event: AnalysisProgressEvent) => void): () => void;
+  importTextFile(
+    createParent: string,
+  ): Promise<{ ok: true; filePath: string; document: LiteLizardDocument } | null>;
 }
 
 /**
@@ -86,5 +89,7 @@ export const IPC_CHANNELS = {
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
   analysisProgress: 'analysis:progress',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
+  importTextFile: 'doc:importText',
+} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
