@@ -1,3 +1,6 @@
+[2026/04/23]L-06 解析結果の保存・履歴UI・世代同期
+解析履歴の保持と切替 UI、構造変更後の generation 再同期、進行中解析のガード、shared schema export 分離による desktop build 修正を実装した
+
 [2026/04/23]L-05/R-05/R-06 解析ストリーミング・エクスプローラーフィルタ
 L-05: 解析を段落ごとに逐次返却するIPC ストリーミング（analysis:progressチャンネル）を実装し、UI がリアルタイムに更新されるようになった。R-05: walk()に.litelizardスキップを追加しエクスプローラーに表示されなくなった。R-06: E-06実装時にipc.tsのdeleteEntryがdeleteAnalysisFilesを呼び出す形で既に完了済みだったためWBSを更新した。
 

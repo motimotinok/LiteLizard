@@ -1348,6 +1348,38 @@ textarea {
   cursor: grabbing;
 }
 
+.analysis-card-history-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.analysis-card-history-btn {
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 4px;
+  cursor: pointer;
+}
+
+.analysis-card-history-btn:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+}
+
+.analysis-card-history-index {
+  min-width: 34px;
+  text-align: center;
+  font-size: 10px;
+  color: #6b7280;
+}
+
 .analysis-card-meta {
   margin-top: 8px;
   display: flex;

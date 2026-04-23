@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
 import { reorderByKey } from '../utils/arrayUtils.js';
 import { useAppStore } from '../store/useAppStore.js';
+import {
+  getVisiblePatternIndices,
+  resolveDisplayedPatternIndex,
+} from '../store/analysisHistory.js';
 
 interface Props {
   document: LiteLizardDocument | null;
@@ -117,6 +121,9 @@ export function AnalysisPane({
   const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const analysisSettings = useAppStore((s) => s.analysisSettings);
+  const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
+  const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
+  const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
@@ -239,6 +246,19 @@ export function AnalysisPane({
                 ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' as const })),
                 ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' as const })),
               ];
+              const history = analysisHistoriesByParagraphId[paragraph.id];
+              const visiblePatternIndices = getVisiblePatternIndices(history, paragraph.light.text);
+              const activePatternIndex = resolveDisplayedPatternIndex(
+                history,
+                paragraph.light.text,
+                selectedPatternIndexByParagraphId[paragraph.id],
+              );
+              const activePatternPosition =
+                activePatternIndex === null ? 0 : visiblePatternIndices.indexOf(activePatternIndex) + 1;
+              const canMoveToPreviousPattern = activePatternPosition > 1;
+              const canMoveToNextPattern =
+                activePatternIndex !== null && activePatternPosition < visiblePatternIndices.length;
+              const showHistoryNavigation = visiblePatternIndices.length > 1;
 
               return (
                 <article
@@ -289,6 +309,51 @@ export function AnalysisPane({
                       >
                         {expanded ? '折りたたむ' : '全文'}
                       </button>
+
+                      {showHistoryNavigation ? (
+                        <div
+                          className="analysis-card-history-nav"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="analysis-card-history-btn"
+                            disabled={!canMoveToPreviousPattern}
+                            onClick={() => {
+                              if (!canMoveToPreviousPattern || activePatternIndex === null) {
+                                return;
+                              }
+                              selectAnalysisPatternIndex(
+                                paragraph.id,
+                                visiblePatternIndices[activePatternPosition - 2],
+                              );
+                            }}
+                            aria-label={`P${index + 1} の前の解析結果を表示`}
+                          >
+                            &lt;
+                          </button>
+                          <span className="analysis-card-history-index">
+                            {activePatternPosition} / {visiblePatternIndices.length}
+                          </span>
+                          <button
+                            type="button"
+                            className="analysis-card-history-btn"
+                            disabled={!canMoveToNextPattern}
+                            onClick={() => {
+                              if (!canMoveToNextPattern || activePatternIndex === null) {
+                                return;
+                              }
+                              selectAnalysisPatternIndex(
+                                paragraph.id,
+                                visiblePatternIndices[activePatternPosition],
+                              );
+                            }}
+                            aria-label={`P${index + 1} の次の解析結果を表示`}
+                          >
+                            &gt;
+                          </button>
+                        </div>
+                      ) : null}
 
                       <button
                         type="button"
