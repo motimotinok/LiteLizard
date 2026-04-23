@@ -54,5 +54,7 @@ export function createIpcBridge(): BridgeApi {
         ipcRenderer.removeListener(IPC_CHANNELS.analysisProgress, wrapped);
       };
     },
+    importTextFile: (createParent) =>
+      ipcRenderer.invoke(IPC_CHANNELS.importTextFile, createParent),
   };
 }
