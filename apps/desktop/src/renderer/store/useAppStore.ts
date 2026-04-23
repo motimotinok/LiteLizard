@@ -605,82 +605,87 @@ export const useAppStore = create<AppState>((set, get) => ({
       documentParagraphs: toAnalysisParagraphInput(document),
     };
 
-    try {
-      const result = await window.litelizard.runAnalysis(payload);
-      const resultMap = new Map(result.results.map((r) => [r.paragraphId, r]));
+    const rootPath = get().rootPath;
+    const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
 
-      const nextDoc: LiteLizardDocument = {
-        ...pendingDoc,
-        paragraphs: pendingDoc.paragraphs.map((paragraph) => {
-          const analyzed = resultMap.get(paragraph.id);
-          if (!analyzed) {
-            return paragraph;
-          }
-
-          return {
-            ...paragraph,
-            lizard: {
-              status: 'complete',
-              emotion: analyzed.emotion,
-              theme: analyzed.theme,
-              deepMeaning: analyzed.deepMeaning,
-              confidence: analyzed.confidence,
-              model: analyzed.model,
-              requestId: result.requestId,
-              analyzedAt: analyzed.analyzedAt,
-            },
-          };
-        }),
-      };
-
-      const rootPath = get().rootPath;
+    const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
       if (rootPath && document.source?.format === 'lzl-v1') {
-        const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
-        await Promise.allSettled(
-          result.results.map((analyzed) =>
-            window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, {
-              analyzedAt: analyzed.analyzedAt,
-              result: {
-                emotion: analyzed.emotion,
-                theme: analyzed.theme,
-                deepMeaning: analyzed.deepMeaning,
-                confidence: analyzed.confidence,
-                model: analyzed.model,
-                sourceText: staleTextMap.get(analyzed.paragraphId) ?? '',
-              },
-            })
-          )
-        );
+        window.litelizard.saveAnalysisResult(rootPath, document.documentId, paragraphId, {
+          analyzedAt: result.analyzedAt,
+          result: {
+            emotion: result.emotion,
+            theme: result.theme,
+            deepMeaning: result.deepMeaning,
+            confidence: result.confidence,
+            model: result.model,
+            sourceText: staleTextMap.get(paragraphId) ?? '',
+          },
+        }).catch(() => {});
       }
 
-      set({
-        document: {
-          ...nextDoc,
-          updatedAt: new Date().toISOString(),
-        },
-        dirty: true,
-        statusMessage: '全体解析が完了しました',
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.id === paragraphId
+                ? {
+                    ...p,
+                    lizard: {
+                      status: 'complete',
+                      emotion: result.emotion,
+                      theme: result.theme,
+                      deepMeaning: result.deepMeaning,
+                      confidence: result.confidence,
+                      model: result.model,
+                      analyzedAt: result.analyzedAt,
+                    },
+                  }
+                : p
+            ),
+          },
+        };
+      });
+    });
+
+    try {
+      const result = await window.litelizard.runAnalysis(payload);
+      set((state) => {
+        if (!state.document) return {};
+        const targetIds = new Set(payload.paragraphs.map((p) => p.paragraphId));
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              targetIds.has(p.id) && p.lizard.status === 'complete'
+                ? { ...p, lizard: { ...p.lizard, requestId: result.requestId } }
+                : p
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          dirty: true,
+          statusMessage: '全体解析が完了しました',
+        };
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed';
-      const failedDoc: LiteLizardDocument = {
-        ...pendingDoc,
-        paragraphs: pendingDoc.paragraphs.map((paragraph) =>
-          paragraph.lizard.status === 'pending'
-            ? {
-                ...paragraph,
-                lizard: {
-                  status: 'failed',
-                  error: {
-                    code: 'ANALYSIS_ABORTED',
-                    message,
-                  },
-                },
-              }
-            : paragraph
-        ),
-      };
-      set({ document: failedDoc, statusMessage: `解析に失敗しました: ${message}` });
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.lizard.status === 'pending'
+                ? { ...p, lizard: { status: 'failed', error: { code: 'ANALYSIS_ABORTED', message } } }
+                : p
+            ),
+          },
+          statusMessage: `解析に失敗しました: ${message}`,
+        };
+      });
+    } finally {
+      unsubscribe();
     }
   },
 

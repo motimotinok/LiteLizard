@@ -6,6 +6,7 @@ import {
   createDocumentId,
   createParagraphId,
   IPC_CHANNELS,
+  type AnalysisProgressEvent,
   type AnalysisRunInput,
   type AnalysisSettingsInput,
   type LiteLizardDocument,
@@ -378,7 +379,7 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.runAnalysis, async (_, input: AnalysisRunInput) => {
+  ipcMain.handle(IPC_CHANNELS.runAnalysis, async (event, input: AnalysisRunInput) => {
     const [savedSettings, secrets] = await Promise.all([
       analysisSettingsStore.load(),
       apiKeyVault.loadAll(),
@@ -388,7 +389,12 @@ export function registerIpcHandlers() {
       anthropic: Boolean(secrets.anthropic?.trim()),
     });
     const provider = resolveAnalysisProvider(analysisSettings, secrets);
-    return runAnalysis(input, provider);
+    return runAnalysis(input, provider, (result) => {
+      event.sender.send(IPC_CHANNELS.analysisProgress, {
+        paragraphId: result.paragraphId,
+        result,
+      } satisfies AnalysisProgressEvent);
+    });
   });
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysis, async (_, projectRoot: string, documentId: string, filePath?: string) => {
