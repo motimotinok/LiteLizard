@@ -136,7 +136,7 @@
 | L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ✅ | Codex | |
 | L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ✅ | Claude | claude/next-task-F7SoK |
 | L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ✅ | Claude | claude/review-task-checklist-ygfSP |
-| L-06 | 解析結果の保存・UI 反映 | L-05, E-06 ✅ | P1 | M | ⬜ | | |
+| L-06 | 解析結果の保存・UI 反映 | L-05, E-06 ✅ | P1 | M | ✅ | Codex | |
 | L-07 | API キー未設定時の UI 制御（設定導線表示） | L-01 | P1 | S | ✅ | Codex | |
 | L-08 | ローカル LLM 接続（Ollama 等） | L-03 | P2 | M | ⬜ | | |
 
@@ -168,6 +168,10 @@
 #### L-05: 解析結果の IPC ストリーミング ✅
 - **完了**: 2026-04-23。`analysis:progress` IPC チャンネルを追加し、main が段落を1件解析するたびに `event.sender.send` で renderer に逐次送信する。renderer 側は `onAnalysisProgress` リスナーで受け取り段落カードをリアルタイム更新。`saveAnalysisResult` も progress ハンドラー内で非ブロック呼び出しに変更。invoke 完了後に `requestId` を後付け付与。
 - **変更ファイル**: `packages/shared/src/bridge.ts`（型・チャンネル追加）、`apiBridge.ts`（onProgress コールバック）、`ipc.ts`（event.sender.send）、`preload/ipcBridge.ts`（リスナー実装）、`useAppStore.ts`（ストリーミング対応）
+
+#### L-06: 解析結果の保存・UI 反映 ✅
+- **完了**: 2026-04-23。renderer store に解析履歴状態を追加し、`.lzl` 読み込み時の世代ファイル復元、段落カードの履歴切替 UI、構造変更後の generation 再同期、保存前 generation 作成の抑制、構造変更後の in-flight progress 無視を実装した
+- **変更ファイル**: `useAppStore.ts`（履歴状態・generation 同期・解析ガード）、`AnalysisPane.tsx`/`styles.css`（履歴ナビゲーション UI）、`analysisHistory.ts`（履歴投影 helper）、`preloadMockApi.ts`（mock 追従）、`packages/shared/src/index.ts`/`package.json`（schema export 分離）
 
 ---
 

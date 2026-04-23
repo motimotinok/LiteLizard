@@ -8,7 +8,9 @@ import {
   type AnalysisSettingsInput,
   type BridgeApi,
   type FileNode,
+  type GenerationalAnalysisFile,
   type LiteLizardDocument,
+  type ParagraphAnalysisPattern,
 } from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
@@ -21,6 +23,7 @@ interface MockState {
   tree: FileNode[];
   documents: Map<string, LiteLizardDocument>;
   revisions: Map<string, number>;
+  analysisFiles: Map<string, GenerationalAnalysisFile>;
   analysisSettings: AnalysisSettings;
 }
 
@@ -248,6 +251,38 @@ function paragraphAnalysisFromText(text: string) {
   };
 }
 
+function analysisFileKey(documentId: string) {
+  return documentId;
+}
+
+function appendAnalysisPattern(
+  state: MockState,
+  documentId: string,
+  paragraphId: string,
+  pattern: ParagraphAnalysisPattern,
+) {
+  const key = analysisFileKey(documentId);
+  const current = state.analysisFiles.get(key);
+  const now = new Date().toISOString();
+  const nextFile: GenerationalAnalysisFile = current
+    ? clone(current)
+    : {
+        version: 1,
+        documentId,
+        generation: 1,
+        createdAt: now,
+        updatedAt: now,
+        paragraphs: {},
+      };
+
+  const history = nextFile.paragraphs[paragraphId]?.patterns ?? [];
+  nextFile.paragraphs[paragraphId] = {
+    patterns: [...history, clone(pattern)],
+  };
+  nextFile.updatedAt = now;
+  state.analysisFiles.set(key, nextFile);
+}
+
 export function createMockPreloadApi(): BridgeApi {
   const state: MockState = {
     tree: clone(initialMockTree),
@@ -255,6 +290,7 @@ export function createMockPreloadApi(): BridgeApi {
       Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])
     ),
     revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
+    analysisFiles: new Map(),
     analysisSettings: {
       ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
       providers: {
@@ -495,21 +531,35 @@ export function createMockPreloadApi(): BridgeApi {
       return { ok: true as const, model: input.model.trim() };
     },
 
+    onAnalysisProgress: () => () => {},
+
     loadAnalysis: async (_projectRoot: string, _documentId: string, _filePath?: string) => {
-      return null;
+      return clone(state.analysisFiles.get(analysisFileKey(_documentId)) ?? null);
     },
 
     saveAnalysisResult: async (
       _projectRoot: string,
       _documentId: string,
       _paragraphId: string,
-      _pattern: import('@litelizard/shared').ParagraphAnalysisPattern,
+      _pattern: ParagraphAnalysisPattern,
     ) => {
-      // mock: no-op
+      appendAnalysisPattern(state, _documentId, _paragraphId, _pattern);
     },
 
     createAnalysisGeneration: async (_projectRoot: string, _documentId: string) => {
-      return 1;
+      const key = analysisFileKey(_documentId);
+      const current = state.analysisFiles.get(key);
+      const generation = (current?.generation ?? 0) + 1;
+      const now = new Date().toISOString();
+      state.analysisFiles.set(key, {
+        version: 1,
+        documentId: _documentId,
+        generation,
+        createdAt: now,
+        updatedAt: now,
+        paragraphs: {},
+      });
+      return generation;
     },
 
     importTextFile: async (createParent: string) => {

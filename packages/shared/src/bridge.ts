@@ -88,8 +88,7 @@ export const IPC_CHANNELS = {
   saveAnalysisSettings: 'settings:analysis:save',
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
   analysisProgress: 'analysis:progress',
-} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
   importTextFile: 'doc:importText',
-} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
+} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];
