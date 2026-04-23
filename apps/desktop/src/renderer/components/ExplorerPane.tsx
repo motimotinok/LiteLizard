@@ -10,6 +10,7 @@ interface Props {
   onRenameEntry: (targetPath: string, nextName: string) => void;
   onDeleteEntry: (targetPath: string) => void;
   onSelectFile: (path: string) => void;
+  onImportTextFile: (createParent: string) => void;
 }
 
 interface InlineCreateState {
@@ -68,6 +69,29 @@ function FileIcon() {
     <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
       <path
         d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Zm6 1.8V9h3.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
+      <path
+        d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Zm6 1.8V9h3.7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M12 12v5m-2-2 2 2 2-2"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.6"
@@ -291,6 +315,7 @@ export function ExplorerPane({
   onRenameEntry,
   onDeleteEntry,
   onSelectFile,
+  onImportTextFile,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<string> | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -430,6 +455,15 @@ export function ExplorerPane({
             >
               <span className="explorer-icon-wrap"><FolderIcon /><span className="explorer-add-plus">+</span></span>
             </button>
+            <button
+              className="icon-button explorer-add-btn"
+              onClick={() => onImportTextFile(createParent)}
+              disabled={!canCreate}
+              title="テキストをインポート"
+              aria-label="テキストをインポート"
+            >
+              <ImportIcon />
+            </button>
           </div>
         </div>
 
@@ -491,6 +525,16 @@ export function ExplorerPane({
             }}
           >
             新規フォルダ
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              const parentPath = resolveCreateParent(contextMenu);
+              onImportTextFile(parentPath);
+              setContextMenu(null);
+            }}
+          >
+            テキストをインポート
           </button>
           <button
             className="menu-item"

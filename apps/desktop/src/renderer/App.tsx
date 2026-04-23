@@ -40,6 +40,7 @@ function WorkspaceShell() {
     createEntry,
     renameEntry,
     deleteEntry,
+    importTextFile,
     loadDocument,
     reorderParagraphs,
     reorderChapters,
@@ -190,6 +191,7 @@ function WorkspaceShell() {
               onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
               onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
               onSelectFile={(path) => void loadDocument(path)}
+              onImportTextFile={(createParent) => void importTextFile(createParent)}
             />
           )}
           {explorerOpen && !isCompactLayout && (

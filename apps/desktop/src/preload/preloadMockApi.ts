@@ -1,5 +1,7 @@
 import {
+  buildImportedDocument,
   DEFAULT_ANALYSIS_SETTINGS,
+  parseTextToImportResult,
   type AnalysisRunInput,
   type AnalysisRunResult,
   type AnalysisSettings,
@@ -508,6 +510,25 @@ export function createMockPreloadApi(): BridgeApi {
 
     createAnalysisGeneration: async (_projectRoot: string, _documentId: string) => {
       return 1;
+    },
+
+    importTextFile: async (createParent: string) => {
+      const sampleText = `# サンプル章\n\nサンプル段落1。\n\nサンプル段落2。`;
+      const fileName = withLzlExtension('imported-sample');
+      const filePath = joinPath(createParent, fileName);
+
+      if (pathExists(state.tree, filePath)) {
+        throw new Error(`IMPORT_FILE_ALREADY_EXISTS: ${filePath}`);
+      }
+
+      const importResult = parseTextToImportResult(sampleText, 'imported-sample');
+      const document = buildImportedDocument(importResult, filePath);
+      const children = findDirectoryChildren(state, createParent);
+      children.push({ path: filePath, name: fileName, type: 'file' });
+      state.documents.set(normalizePath(filePath), document);
+      state.revisions.set(normalizePath(filePath), 0);
+
+      return { ok: true as const, filePath, document: clone(document) };
     },
   };
 }
