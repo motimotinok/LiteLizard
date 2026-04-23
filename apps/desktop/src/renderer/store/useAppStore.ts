@@ -651,17 +651,37 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     try {
       const result = await window.litelizard.runAnalysis(payload);
+      const resultMap = new Map(result.results.map((r) => [r.paragraphId, r]));
       set((state) => {
         if (!state.document) return {};
-        const targetIds = new Set(payload.paragraphs.map((p) => p.paragraphId));
         return {
           document: {
             ...state.document,
-            paragraphs: state.document.paragraphs.map((p) =>
-              targetIds.has(p.id) && p.lizard.status === 'complete'
-                ? { ...p, lizard: { ...p.lizard, requestId: result.requestId } }
-                : p
-            ),
+            paragraphs: state.document.paragraphs.map((p) => {
+              const analyzed = resultMap.get(p.id);
+              if (!analyzed) return p;
+              // progress で既に complete になった段落は requestId だけ付与
+              if (p.lizard.status === 'complete') {
+                return { ...p, lizard: { ...p.lizard, requestId: result.requestId } };
+              }
+              // リトライで progress が来なかった pending 段落に最終結果を適用
+              if (p.lizard.status === 'pending') {
+                return {
+                  ...p,
+                  lizard: {
+                    status: 'complete',
+                    emotion: analyzed.emotion,
+                    theme: analyzed.theme,
+                    deepMeaning: analyzed.deepMeaning,
+                    confidence: analyzed.confidence,
+                    model: analyzed.model,
+                    requestId: result.requestId,
+                    analyzedAt: analyzed.analyzedAt,
+                  },
+                };
+              }
+              return p;
+            }),
             updatedAt: new Date().toISOString(),
           },
           dirty: true,
@@ -681,6 +701,8 @@ export const useAppStore = create<AppState>((set, get) => ({
                 : p
             ),
           },
+          // progress で complete になった段落があれば保存が必要
+          dirty: true,
           statusMessage: `解析に失敗しました: ${message}`,
         };
       });
