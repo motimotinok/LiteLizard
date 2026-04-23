@@ -51,6 +51,9 @@ export interface BridgeApi {
   testLocalLlmConnection(
     input: { endpoint: string; model: string }
   ): Promise<{ ok: true; model?: string } | { ok: false; message: string }>;
+  importTextFile(
+    createParent: string,
+  ): Promise<{ ok: true; filePath: string; document: LiteLizardDocument } | null>;
 }
 
 /**
@@ -78,6 +81,7 @@ export const IPC_CHANNELS = {
   clearProviderApiKey: 'settings:analysis:clearProviderApiKey',
   saveAnalysisSettings: 'settings:analysis:save',
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
+  importTextFile: 'doc:importText',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

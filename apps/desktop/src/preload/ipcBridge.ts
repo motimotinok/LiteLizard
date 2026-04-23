@@ -47,5 +47,7 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.saveAnalysisSettings, input),
     testLocalLlmConnection: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.testLocalLlmConnection, input),
+    importTextFile: (createParent) =>
+      ipcRenderer.invoke(IPC_CHANNELS.importTextFile, createParent),
   };
 }
