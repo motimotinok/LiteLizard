@@ -1,5 +1,5 @@
 import { ipcRenderer } from 'electron';
-import type { BridgeApi } from '@litelizard/shared';
+import type { AnalysisProgressEvent, BridgeApi } from '@litelizard/shared';
 import { IPC_CHANNELS } from '@litelizard/shared';
 
 export function createIpcBridge(): BridgeApi {
@@ -47,6 +47,13 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.saveAnalysisSettings, input),
     testLocalLlmConnection: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.testLocalLlmConnection, input),
+    onAnalysisProgress: (listener) => {
+      const wrapped = (_: unknown, event: AnalysisProgressEvent) => listener(event);
+      ipcRenderer.on(IPC_CHANNELS.analysisProgress, wrapped);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.analysisProgress, wrapped);
+      };
+    },
     importTextFile: (createParent) =>
       ipcRenderer.invoke(IPC_CHANNELS.importTextFile, createParent),
   };

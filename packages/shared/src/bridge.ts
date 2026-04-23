@@ -6,7 +6,12 @@ import type {
   LiteLizardDocument,
   ParagraphAnalysisPattern,
 } from './types.js';
-import type { AnalysisRunInput, AnalysisRunResult } from './api.js';
+import type { AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
+
+export interface AnalysisProgressEvent {
+  paragraphId: string;
+  result: AnalysisResult;
+}
 
 /**
  * Renderer → Main プロセス間の API 契約。
@@ -51,6 +56,7 @@ export interface BridgeApi {
   testLocalLlmConnection(
     input: { endpoint: string; model: string }
   ): Promise<{ ok: true; model?: string } | { ok: false; message: string }>;
+  onAnalysisProgress(listener: (event: AnalysisProgressEvent) => void): () => void;
   importTextFile(
     createParent: string,
   ): Promise<{ ok: true; filePath: string; document: LiteLizardDocument } | null>;
@@ -81,6 +87,8 @@ export const IPC_CHANNELS = {
   clearProviderApiKey: 'settings:analysis:clearProviderApiKey',
   saveAnalysisSettings: 'settings:analysis:save',
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
+  analysisProgress: 'analysis:progress',
+} as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
   importTextFile: 'doc:importText',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder'> | 'requestOpenFolder', string>;
 

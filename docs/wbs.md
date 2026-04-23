@@ -1,7 +1,7 @@
 # LiteLizard WBS（Work Breakdown Structure）
 
 > **目的**: 仕様 v003 → 製品完成までの全タスクを網羅し、Codex 並列開発を可能にする
-> **最終更新**: 2026-04-21
+> **最終更新**: 2026-04-23
 > **仕様参照**: `docs/LiteLizard_spec_v003.md`
 
 ---
@@ -135,7 +135,7 @@
 | L-02 | API キー暗号化保存（main: safeStorage） | E-01 ✅ | P1 | M | ✅ | | |
 | L-03 | LLM プロバイダー抽象化層（main: provider interface） | L-02 | P1 | L | ✅ | Codex | |
 | L-04 | 外部 API 方式の解析リクエスト実装（main → OpenAI/Anthropic） | L-03 | P1 | M | ✅ | Claude | claude/next-task-F7SoK |
-| L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ⬜ | | |
+| L-05 | 解析結果の IPC ストリーミング（main → renderer） | L-04, E-01 ✅ | P1 | M | ✅ | Claude | claude/review-task-checklist-ygfSP |
 | L-06 | 解析結果の保存・UI 反映 | L-05, E-06 ✅ | P1 | M | ⬜ | | |
 | L-07 | API キー未設定時の UI 制御（設定導線表示） | L-01 | P1 | S | ✅ | Codex | |
 | L-08 | ローカル LLM 接続（Ollama 等） | L-03 | P2 | M | ⬜ | | |
@@ -165,9 +165,9 @@
   - `useAppStore.ts` `runAnalysis`/`runAnalysisFor`: 解析成功後に `saveAnalysisResult` IPC を呼び出して結果を世代ファイルに永続化（`Promise.allSettled` で保存失敗は UI をブロックしない）
   - `packages/shared/tsconfig.json`: `types: ["node"]` を追加し `AnalysisResult` が `any` 推論されていた問題を修正
 
-#### L-05: 解析結果の IPC ストリーミング
-- **対象**: `webContents.send` で段落ごとの分析結果を renderer に逐次送信
-- **注**: SSE ではなく IPC イベントで逐次返却
+#### L-05: 解析結果の IPC ストリーミング ✅
+- **完了**: 2026-04-23。`analysis:progress` IPC チャンネルを追加し、main が段落を1件解析するたびに `event.sender.send` で renderer に逐次送信する。renderer 側は `onAnalysisProgress` リスナーで受け取り段落カードをリアルタイム更新。`saveAnalysisResult` も progress ハンドラー内で非ブロック呼び出しに変更。invoke 完了後に `requestId` を後付け付与。
+- **変更ファイル**: `packages/shared/src/bridge.ts`（型・チャンネル追加）、`apiBridge.ts`（onProgress コールバック）、`ipc.ts`（event.sender.send）、`preload/ipcBridge.ts`（リスナー実装）、`useAppStore.ts`（ストリーミング対応）
 
 ---
 
@@ -195,8 +195,8 @@
 | R-02 | Backspace での段落統合 | S-07 ✅ | P1 | M | ✅ | Claude | feat/R-02 |
 | R-03 | 構造操作の Undo/Redo | S-08 ✅ | P2 | L | ⬜ | | |
 | R-04 | エクスプローラー: .lzl 拡張子非表示 + 自動付与 | E-02 | P1 | S | ✅ | 2026-04-17 | |
-| R-05 | エクスプローラー: .litelizard/ 非表示 | E-05 ✅ | P1 | S | ⬜ | | |
-| R-06 | エクスプローラー: 削除時に解析 JSON 連動削除 | E-06 ✅ | P1 | S | ⬜ | | |
+| R-05 | エクスプローラー: .litelizard/ 非表示 | E-05 ✅ | P1 | S | ✅ | Claude | claude/review-task-checklist-ygfSP |
+| R-06 | エクスプローラー: 削除時に解析 JSON 連動削除 | E-06 ✅ | P1 | S | ✅ | | (E-06 実装時に完了済み) |
 | R-07 | 章サマリー解析表示（マクロ視点時の分析ペイン） | L-06 | P2 | M | ⛔ | | |
 | R-08 | 全体解析の成功/失敗件数表示 | L-06 | P2 | S | ⛔ | | |
 | R-09 | sourceHash による stale 検出・表示 | L-06 | P1 | S | ⛔ | | |

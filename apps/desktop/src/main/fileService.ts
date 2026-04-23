@@ -346,6 +346,7 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
     const absolutePath = path.join(root, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name === '.litelizard') continue;
       const children = await walk(absolutePath);
       nodes.push({
         path: absolutePath,
