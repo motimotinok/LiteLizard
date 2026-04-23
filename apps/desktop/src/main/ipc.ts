@@ -445,7 +445,8 @@ export function registerIpcHandlers() {
 
       const sourceFilePath = result.filePaths[0];
       const rawText = await fs.readFile(sourceFilePath, 'utf8');
-      const title = toTitleFromFileName(path.basename(sourceFilePath));
+      const baseName = path.basename(sourceFilePath);
+      const title = baseName.replace(/\.[^.]+$/, '') || baseName;
       const importResult = parseTextToImportResult(rawText, title);
 
       const destFileName = ensureLzlFileName(sanitizeFileStem(title));
