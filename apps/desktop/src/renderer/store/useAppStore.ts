@@ -635,82 +635,109 @@ export const useAppStore = create<AppState>((set, get) => ({
       documentParagraphs: toAnalysisParagraphInput(document),
     };
 
+    const rootPath = get().rootPath;
+    const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
+
+    const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
+      if (rootPath && document.source?.format === 'lzl-v1') {
+        window.litelizard.saveAnalysisResult(rootPath, document.documentId, paragraphId, {
+          analyzedAt: result.analyzedAt,
+          result: {
+            emotion: result.emotion,
+            theme: result.theme,
+            deepMeaning: result.deepMeaning,
+            confidence: result.confidence,
+            model: result.model,
+            sourceText: staleTextMap.get(paragraphId) ?? '',
+          },
+        }).catch(() => {});
+      }
+
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.id === paragraphId
+                ? {
+                    ...p,
+                    lizard: {
+                      status: 'complete',
+                      emotion: result.emotion,
+                      theme: result.theme,
+                      deepMeaning: result.deepMeaning,
+                      confidence: result.confidence,
+                      model: result.model,
+                      analyzedAt: result.analyzedAt,
+                    },
+                  }
+                : p
+            ),
+          },
+        };
+      });
+    });
+
     try {
       const result = await window.litelizard.runAnalysis(payload);
       const resultMap = new Map(result.results.map((r) => [r.paragraphId, r]));
-
-      const nextDoc: LiteLizardDocument = {
-        ...pendingDoc,
-        paragraphs: pendingDoc.paragraphs.map((paragraph) => {
-          const analyzed = resultMap.get(paragraph.id);
-          if (!analyzed) {
-            return paragraph;
-          }
-
-          return {
-            ...paragraph,
-            lizard: {
-              status: 'complete',
-              emotion: analyzed.emotion,
-              theme: analyzed.theme,
-              deepMeaning: analyzed.deepMeaning,
-              confidence: analyzed.confidence,
-              model: analyzed.model,
-              requestId: result.requestId,
-              analyzedAt: analyzed.analyzedAt,
-            },
-          };
-        }),
-      };
-
-      const rootPath = get().rootPath;
-      if (rootPath && document.source?.format === 'lzl-v1') {
-        const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
-        await Promise.allSettled(
-          result.results.map((analyzed) =>
-            window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, {
-              analyzedAt: analyzed.analyzedAt,
-              result: {
-                emotion: analyzed.emotion,
-                theme: analyzed.theme,
-                deepMeaning: analyzed.deepMeaning,
-                confidence: analyzed.confidence,
-                model: analyzed.model,
-                sourceText: staleTextMap.get(analyzed.paragraphId) ?? '',
-              },
-            })
-          )
-        );
-      }
-
-      set({
-        document: {
-          ...nextDoc,
-          updatedAt: new Date().toISOString(),
-        },
-        dirty: true,
-        statusMessage: '全体解析が完了しました',
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) => {
+              const analyzed = resultMap.get(p.id);
+              if (!analyzed) return p;
+              // progress で既に complete になった段落は requestId だけ付与
+              if (p.lizard.status === 'complete') {
+                return { ...p, lizard: { ...p.lizard, requestId: result.requestId } };
+              }
+              // リトライで progress が来なかった pending 段落に最終結果を適用
+              if (p.lizard.status === 'pending') {
+                return {
+                  ...p,
+                  lizard: {
+                    status: 'complete',
+                    emotion: analyzed.emotion,
+                    theme: analyzed.theme,
+                    deepMeaning: analyzed.deepMeaning,
+                    confidence: analyzed.confidence,
+                    model: analyzed.model,
+                    requestId: result.requestId,
+                    analyzedAt: analyzed.analyzedAt,
+                  },
+                };
+              }
+              return p;
+            }),
+            updatedAt: new Date().toISOString(),
+          },
+          dirty: true,
+          statusMessage: '全体解析が完了しました',
+        };
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed';
-      const failedDoc: LiteLizardDocument = {
-        ...pendingDoc,
-        paragraphs: pendingDoc.paragraphs.map((paragraph) =>
-          paragraph.lizard.status === 'pending'
-            ? {
-                ...paragraph,
-                lizard: {
-                  status: 'failed',
-                  error: {
-                    code: 'ANALYSIS_ABORTED',
-                    message,
-                  },
-                },
-              }
-            : paragraph
-        ),
-      };
-      set({ document: failedDoc, statusMessage: `解析に失敗しました: ${message}` });
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              p.lizard.status === 'pending'
+                ? { ...p, lizard: { status: 'failed', error: { code: 'ANALYSIS_ABORTED', message } } }
+                : p
+            ),
+          },
+          // progress で complete になった段落があれば保存が必要
+          dirty: true,
+          statusMessage: `解析に失敗しました: ${message}`,
+        };
+      });
+    } finally {
+      unsubscribe();
     }
   },
 

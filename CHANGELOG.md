@@ -1,3 +1,6 @@
+[2026/04/23]L-05/R-05/R-06 解析ストリーミング・エクスプローラーフィルタ
+L-05: 解析を段落ごとに逐次返却するIPC ストリーミング（analysis:progressチャンネル）を実装し、UI がリアルタイムに更新されるようになった。R-05: walk()に.litelizardスキップを追加しエクスプローラーに表示されなくなった。R-06: E-06実装時にipc.tsのdeleteEntryがdeleteAnalysisFilesを呼び出す形で既に完了済みだったためWBSを更新した。
+
 [2026/04/22]L-04 外部API解析リクエストと永続化
 テストフック除去・OpenAI/Anthropicエラー日本語化・.lzl解析結果の世代ファイル永続化（再起動後も復元）・AnalysisResult型がanyに落ちていたshared tsconfig修正
 

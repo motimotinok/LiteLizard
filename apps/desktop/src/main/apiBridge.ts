@@ -6,8 +6,9 @@ import type { ResolvedAnalysisProvider } from './analysisProvider.js';
 export async function runAnalysis(
   input: AnalysisRunInput,
   resolvedProvider: ResolvedAnalysisProvider,
+  onProgress?: (result: AnalysisResult) => void,
 ): Promise<AnalysisRunResult> {
-  const execute = async () => {
+  const execute = async (progressCallback?: (result: AnalysisResult) => void) => {
     const results: AnalysisResult[] = [];
 
     for (const paragraph of input.paragraphs) {
@@ -19,6 +20,7 @@ export async function runAnalysis(
         model: resolvedProvider.model,
         contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId),
       });
+      progressCallback?.(analyzed);
       results.push(analyzed);
     }
 
@@ -32,8 +34,9 @@ export async function runAnalysis(
   };
 
   try {
-    return await execute();
+    return await execute(onProgress);
   } catch {
+    // リトライ時は onProgress を渡さない（重複発火・重複保存を防ぐ）
     return execute();
   }
 }
