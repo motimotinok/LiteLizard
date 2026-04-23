@@ -6,6 +6,7 @@ import type { ResolvedAnalysisProvider } from './analysisProvider.js';
 export async function runAnalysis(
   input: AnalysisRunInput,
   resolvedProvider: ResolvedAnalysisProvider,
+  onProgress?: (result: AnalysisResult) => void,
 ): Promise<AnalysisRunResult> {
   const execute = async () => {
     const results: AnalysisResult[] = [];
@@ -19,6 +20,7 @@ export async function runAnalysis(
         model: resolvedProvider.model,
         contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId),
       });
+      onProgress?.(analyzed);
       results.push(analyzed);
     }
 
