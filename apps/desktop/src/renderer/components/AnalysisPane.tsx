@@ -47,15 +47,20 @@ function getEmotionStyle(emotion: string): TagStyle {
   return EMOTION_COLOR_MAP[emotion] ?? FALLBACK_PALETTE[hashString(emotion) % FALLBACK_PALETTE.length];
 }
 
-function statusLabel(document: LiteLizardDocument['paragraphs'][number]['lizard']['status']) {
-  if (document === 'pending') {
+function statusLabel(
+  status: LiteLizardDocument['paragraphs'][number]['lizard']['status'],
+  hasPreviousAnalysis: boolean,
+) {
+  if (status === 'pending') {
     return '解析中です。完了後に生成結果が表示されます。';
   }
-  if (document === 'failed') {
+  if (status === 'failed') {
     return '解析に失敗しました。再実行してください。';
   }
-  if (document === 'stale') {
-    return '本文更新により再解析待ちです。';
+  if (status === 'stale') {
+    return hasPreviousAnalysis
+      ? '本文が更新されました。再解析してください。'
+      : 'まだ解析されていません。';
   }
   return '生成結果はまだありません。';
 }
@@ -241,12 +246,16 @@ export function AnalysisPane({
                 typeof paragraph.lizard.confidence === 'number'
                   ? `${Math.round(paragraph.lizard.confidence * 100)}%`
                   : null;
-              const statusText = statusLabel(paragraph.lizard.status);
+              const history = analysisHistoriesByParagraphId[paragraph.id];
+              const hasHistory = Array.isArray(history) && history.length > 0;
+              const hasPreviousAnalysis = hasHistory || Boolean(paragraph.lizard.analyzedAt);
+              const isStaleWithPreviousAnalysis =
+                paragraph.lizard.status === 'stale' && hasPreviousAnalysis;
+              const statusText = statusLabel(paragraph.lizard.status, hasPreviousAnalysis);
               const tags = [
                 ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' as const })),
                 ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' as const })),
               ];
-              const history = analysisHistoriesByParagraphId[paragraph.id];
               const visiblePatternIndices = getVisiblePatternIndices(history, paragraph.light.text);
               const activePatternIndex = resolveDisplayedPatternIndex(
                 history,
@@ -268,6 +277,7 @@ export function AnalysisPane({
                     active ? 'analysis-card-active' : '',
                     isDragging ? 'analysis-card-dragging' : '',
                     isDropTarget ? 'analysis-card-drop-target' : '',
+                    isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -279,6 +289,14 @@ export function AnalysisPane({
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
                       <span className="analysis-card-index">P{String(index + 1).padStart(2, '0')}</span>
+                      {isStaleWithPreviousAnalysis ? (
+                        <span
+                          className="analysis-card-stale-badge"
+                          title="本文が更新されました。再解析してください。"
+                        >
+                          要再解析
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="analysis-card-actions">
