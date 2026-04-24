@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { $getRoot, $isParagraphNode, type ParagraphNode } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { deleteChapterNodeInLexical } from './ChapterCommandPlugin.js';
+import { useAppStore } from '../../../store/useAppStore.js';
 
 interface Position {
   top: number;
@@ -98,6 +99,14 @@ export function ChapterDeletePlugin({ chapterNodeKeys, chapterNodeKeySetRef, con
   }, [editor, chapterNodeKeys, containerRef]);
 
   function handleDelete(nodeKey: string) {
+    const store = useAppStore.getState();
+    const doc = store.document;
+    if (doc) {
+      store.pushUndo({
+        lexicalStateJson: JSON.stringify(editor.getEditorState().toJSON()),
+        documentSnapshot: doc,
+      });
+    }
     editor.update(() => {
       const children = $getRoot().getChildren();
       const node = children.find(
@@ -106,7 +115,7 @@ export function ChapterDeletePlugin({ chapterNodeKeys, chapterNodeKeySetRef, con
       if (node) {
         deleteChapterNodeInLexical(node, chapterNodeKeySetRef);
       }
-    });
+    }, { tag: 'structural' });
   }
 
   const container = containerRef.current;

@@ -10,7 +10,7 @@ import {
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
+import { UndoPlugin } from './plugins/UndoPlugin.js';
 import { LexicalErrorBoundary, type LexicalErrorBoundaryProps } from '@lexical/react/LexicalErrorBoundary';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -29,6 +29,7 @@ import {
   type StructureSnapshot,
 } from './utils/structureBuilder.js';
 import { mergeChapterIdByNodeKey, mergeParagraphIdByNodeKey } from './utils/nodeKeyMapping.js';
+import { useAppStore } from '../../store/useAppStore.js';
 
 const RichTextErrorBoundary: React.ComponentType<LexicalErrorBoundaryProps> = LexicalErrorBoundary;
 
@@ -82,6 +83,7 @@ export function MicroEditorView({
     chapterNodeKeySetRef.current = new Set();
     consumedScrollRequestNonceRef.current = null;
     initialBaselineCapturedRef.current = false;
+    useAppStore.getState().clearUndoStacks();
   }, [document.documentId]);
 
   // nodeKey ↔ ID マッピングの同期
@@ -331,7 +333,7 @@ export function MicroEditorView({
               containerRef={containerRef}
             />
 
-            <HistoryPlugin />
+            <UndoPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
 
             <RichTextPlugin
               contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
