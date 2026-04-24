@@ -4,6 +4,16 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { buildApp } from './app.js';
 import { resetRateLimitState } from './services/rateLimit.js';
 
+function analysisPayload(paragraphs: Array<{ paragraphId: string; text: string }>) {
+  return {
+    documentId: 'doc_xxxxxx',
+    promptVersion: 'v1.0.0',
+    personaMode: 'general-reader' as const,
+    paragraphs,
+    documentParagraphs: paragraphs,
+  };
+}
+
 async function createSession(app: ReturnType<typeof buildApp>) {
   const email = 'test@example.com';
   const requestResult = await app.inject({
@@ -43,12 +53,7 @@ describe('API integration', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/v1/analysis/paragraphs',
-      payload: {
-        documentId: 'doc_xxxxxx',
-        promptVersion: 'v1.0.0',
-        personaMode: 'general-reader',
-        paragraphs: [{ paragraphId: 'p_xxxxxx', text: 'hello' }],
-      },
+      payload: analysisPayload([{ paragraphId: 'p_xxxxxx', text: 'hello' }]),
     });
 
     expect(res.statusCode).toBe(401);
@@ -62,12 +67,7 @@ describe('API integration', () => {
         method: 'POST',
         url: '/v1/analysis/paragraphs',
         headers: { Authorization: `Bearer ${accessToken}` },
-        payload: {
-          documentId: 'doc_xxxxxx',
-          promptVersion: 'v1.0.0',
-          personaMode: 'general-reader',
-          paragraphs: [{ paragraphId: `p_xxxxxx${i}`, text: 'hello' }],
-        },
+        payload: analysisPayload([{ paragraphId: `p_xxxxxx${i}`, text: 'hello' }]),
       });
       expect(ok.statusCode).toBe(200);
     }
@@ -76,12 +76,7 @@ describe('API integration', () => {
       method: 'POST',
       url: '/v1/analysis/paragraphs',
       headers: { Authorization: `Bearer ${accessToken}` },
-      payload: {
-        documentId: 'doc_xxxxxx',
-        promptVersion: 'v1.0.0',
-        personaMode: 'general-reader',
-        paragraphs: [{ paragraphId: 'p_over', text: 'hello' }],
-      },
+      payload: analysisPayload([{ paragraphId: 'p_over', text: 'hello' }]),
     });
 
     expect(blocked.statusCode).toBe(429);
@@ -94,15 +89,10 @@ describe('API integration', () => {
       method: 'POST',
       url: '/v1/analysis/paragraphs',
       headers: { Authorization: `Bearer ${accessToken}` },
-      payload: {
-        documentId: 'doc_xxxxxx',
-        promptVersion: 'v1.0.0',
-        personaMode: 'general-reader',
-        paragraphs: [
-          { paragraphId: 'p_ok', text: 'hello' },
-          { paragraphId: 'p_fail', text: '[[FAIL]]' },
-        ],
-      },
+      payload: analysisPayload([
+        { paragraphId: 'p_ok', text: 'hello' },
+        { paragraphId: 'p_fail', text: '[[FAIL]]' },
+      ]),
     });
 
     expect(response.statusCode).toBe(500);
@@ -117,12 +107,7 @@ describe('API integration', () => {
       method: 'POST',
       url: '/v1/analysis/paragraphs',
       headers: { Authorization: `Bearer ${accessToken}` },
-      payload: {
-        documentId: 'doc_xxxxxx',
-        promptVersion: 'v1.0.0',
-        personaMode: 'general-reader',
-        paragraphs: [{ paragraphId: 'p_01abcd', text: 'hello world' }],
-      },
+      payload: analysisPayload([{ paragraphId: 'p_01abcd', text: 'hello world' }]),
     });
 
     const usageResponse = await app.inject({

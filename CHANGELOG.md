@@ -1,3 +1,12 @@
+[2026/04/24]R-14 既存テキストインポート
+既存 .txt/.md 原稿を .lzl として取り込む導線について、見出し分割・空ファイル・再読込までテストで完了確認した
+
+[2026/04/24]T-01 .lzl parser/serializerテスト
+既存の parser/serializer/validator テストに加え、インポート文書の serialize/parse 往復確認を追加して .lzl 品質タスクを完了扱いにした
+
+[2026/04/24]T-03 documentId重複検出テスト
+プロジェクト内で後から開いた .lzl の documentId 重複を自動再採番して永続化する最小修復と回帰テストを追加した
+
 [2026/04/24]R-03 構造操作の Undo/Redo
 Zustand 統合スタックと UndoPlugin を追加し、章追加・削除、章タイトル Enter、Backspace による格下げ・段落統合を Undo/Redo 対象にした。DnD 並び替えの Undo は残課題。
 
