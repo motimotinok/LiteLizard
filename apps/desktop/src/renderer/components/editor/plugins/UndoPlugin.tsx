@@ -18,7 +18,7 @@ export function UndoPlugin({
   useEffect(() => {
     // テキスト編集のスナップショットキャプチャ (500ms debounce)
     // structural/undo/redo タグが付いた更新はスキップして debounce をクリアする
-    const unregisterUpdate = editor.registerUpdateListener(({ editorState, tags }) => {
+    const unregisterUpdate = editor.registerUpdateListener(({ prevEditorState, tags }) => {
       if (tags.has('undo') || tags.has('redo') || tags.has('structural')) {
         if (debounceTimerRef.current !== null) {
           clearTimeout(debounceTimerRef.current);
@@ -28,14 +28,19 @@ export function UndoPlugin({
         return;
       }
 
-      // 最初の更新のみスナップショット確保（タイピング開始直前の状態を保存）
+      const store = useAppStore.getState();
+
+      // 最初の更新のみ「変更直前」状態をスナップショット確保
+      // prevEditorState = この更新が適用される前の状態 = Undo で戻るべき状態
       if (pendingSnapshotRef.current === null) {
-        const doc = useAppStore.getState().document;
+        const doc = store.document;
         if (doc) {
           pendingSnapshotRef.current = {
-            lexicalStateJson: JSON.stringify(editorState.toJSON()),
+            lexicalStateJson: JSON.stringify(prevEditorState.toJSON()),
             documentSnapshot: doc,
           };
+          // 編集開始時点で Redo 履歴を即時クリア（500ms 待ちだと Ctrl+Y で古い Redo が実行される）
+          store.clearRedoStack();
         }
       }
 
@@ -53,9 +58,12 @@ export function UndoPlugin({
     });
 
     // Ctrl+Z / Ctrl+Y のグローバルキーハンドラ
+    // エディタのルート要素にフォーカスがある場合のみ処理する（入力欄での誤作動を防ぐ）
     const handleKeyDown = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
+      const rootElement = editor.getRootElement();
+      if (!rootElement || !rootElement.contains(document.activeElement)) return;
       const key = e.key.toLowerCase();
       if (key === 'z' && !e.shiftKey) {
         e.preventDefault();

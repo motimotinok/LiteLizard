@@ -114,6 +114,7 @@ interface AppState {
   redoWithCurrentSnapshot: (current: UndoSnapshot) => UndoSnapshot | null;
   restoreSnapshot: (snapshot: UndoSnapshot) => void;
   clearUndoStacks: () => void;
+  clearRedoStack: () => void;
   hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
   restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
@@ -488,6 +489,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
   clearUndoStacks: () => {
     set({ undoStack: [], redoStack: [] });
+  },
+
+  clearRedoStack: () => {
+    set({ redoStack: [] });
   },
 
   hydrateProject: async (rootPath, source) => {
