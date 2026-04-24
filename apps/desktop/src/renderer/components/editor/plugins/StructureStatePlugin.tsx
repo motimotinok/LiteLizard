@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { $getRoot, $getSelection, $isParagraphNode, $isRangeSelection, type ParagraphNode } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import type { StructureSnapshot } from '../utils/structureBuilder.js';
@@ -15,9 +15,20 @@ export function StructureStatePlugin({
   onActiveElement: (active: { nodeKey: string | null; type: 'chapter' | 'paragraph' | null }) => void;
 }) {
   const [editor] = useLexicalComposerContext();
+  const skipNextRef = useRef(false);
 
   useEffect(() => {
-    return editor.registerUpdateListener(({ editorState }) => {
+    return editor.registerUpdateListener(({ editorState, tags }) => {
+      // undo/redo 復元直後は store の document が既に復元済みのため同期をスキップ
+      if (tags.has('undo') || tags.has('redo')) {
+        skipNextRef.current = true;
+        return;
+      }
+      // undo/redo 直後の最初のタグなし更新もスキップ（nodeKey 再構築で同期が走るのを防ぐ）
+      if (skipNextRef.current) {
+        skipNextRef.current = false;
+        return;
+      }
       editorState.read(() => {
         const root = $getRoot();
         const topLevelParagraphs = root.getChildren().filter((node): node is ParagraphNode => $isParagraphNode(node));
