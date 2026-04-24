@@ -31,6 +31,11 @@ export type ViewScale = 'micro' | 'macro';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
 export type WorkspacePanel = 'editor' | 'settings';
 
+export interface UndoSnapshot {
+  lexicalStateJson: string;
+  documentSnapshot: LiteLizardDocument;
+}
+
 function getSelectedAnalysisProviderState(settings: AnalysisSettings) {
   if (settings.defaultProvider === 'openai') {
     return {
@@ -102,6 +107,14 @@ interface AppState {
   viewScale: ViewScale;
   analysisLayerOpen: boolean;
   statusMessage: string;
+  undoStack: UndoSnapshot[];
+  redoStack: UndoSnapshot[];
+  pushUndo: (snapshot: UndoSnapshot) => void;
+  undoWithCurrentSnapshot: (current: UndoSnapshot) => UndoSnapshot | null;
+  redoWithCurrentSnapshot: (current: UndoSnapshot) => UndoSnapshot | null;
+  restoreSnapshot: (snapshot: UndoSnapshot) => void;
+  clearUndoStacks: () => void;
+  clearRedoStack: () => void;
   hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
   restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
@@ -259,6 +272,11 @@ export const useAppStore = create<AppState>((set, get) => {
     generationSyncPending: false,
   });
 
+  const resetUndoState = () => ({
+    undoStack: [] as UndoSnapshot[],
+    redoStack: [] as UndoSnapshot[],
+  });
+
   const nextGenerationSyncRequestId = () => {
     generationSyncRequestSeq += 1;
     latestGenerationSyncRequestId = generationSyncRequestSeq;
@@ -409,12 +427,73 @@ export const useAppStore = create<AppState>((set, get) => {
     revision: 0,
     dirty: false,
     ...resetAnalysisState(),
+    ...resetUndoState(),
     analysisSettings: cloneAnalysisSettings(),
     activeWorkspacePanel: 'editor',
     editorMode: 'writing',
     viewScale: 'micro',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
+
+  pushUndo: (snapshot) => {
+    set((state) => {
+      const next = [...state.undoStack, snapshot];
+      return {
+        undoStack: next.length > 50 ? next.slice(next.length - 50) : next,
+        redoStack: [],
+      };
+    });
+  },
+
+  undoWithCurrentSnapshot: (current) => {
+    const { undoStack } = get();
+    if (undoStack.length === 0) return null;
+    const target = undoStack[undoStack.length - 1];
+    set((state) => ({
+      undoStack: state.undoStack.slice(0, -1),
+      redoStack: [...state.redoStack, current],
+    }));
+    return target;
+  },
+
+  redoWithCurrentSnapshot: (current) => {
+    const { redoStack } = get();
+    if (redoStack.length === 0) return null;
+    const target = redoStack[redoStack.length - 1];
+    set((state) => ({
+      redoStack: state.redoStack.slice(0, -1),
+      undoStack: [...state.undoStack, current],
+    }));
+    return target;
+  },
+
+  restoreSnapshot: (snapshot) => {
+    const managed = isGenerationManagedDocument(snapshot.documentSnapshot, get().rootPath);
+    if (managed) {
+      nextGenerationSyncRequestId();
+    }
+    set({
+      document: snapshot.documentSnapshot,
+      dirty: true,
+      statusMessage: '編集中',
+      ...(managed
+        ? {
+            currentAnalysisGeneration: null,
+            analysisHistoriesByParagraphId: {},
+            selectedPatternIndexByParagraphId: {},
+            generationSyncPending: true,
+          }
+        : {}),
+    });
+  },
+
+  clearUndoStacks: () => {
+    set({ undoStack: [], redoStack: [] });
+  },
+
+  clearRedoStack: () => {
+    set({ redoStack: [] });
+  },
 
   hydrateProject: async (rootPath, source) => {
     try {
@@ -429,6 +508,7 @@ export const useAppStore = create<AppState>((set, get) => {
         revision: 0,
         dirty: false,
         ...resetAnalysisState(),
+        ...resetUndoState(),
         statusMessage:
           source === 'restore'
             ? `前回のフォルダを復元しました: ${rootPath}`
@@ -454,6 +534,7 @@ export const useAppStore = create<AppState>((set, get) => {
         revision: 0,
         dirty: false,
         ...resetAnalysisState(),
+        ...resetUndoState(),
         statusMessage:
           source === 'restore'
             ? `前回のフォルダを復元できませんでした: ${message}`
@@ -548,6 +629,7 @@ export const useAppStore = create<AppState>((set, get) => {
         revision: 0,
         dirty: false,
         ...resetAnalysisState(),
+        ...resetUndoState(),
         statusMessage: 'ドキュメントを作成しました',
       });
     } catch (error) {
@@ -573,6 +655,7 @@ export const useAppStore = create<AppState>((set, get) => {
           revision: 0,
           dirty: false,
           ...resetAnalysisState(),
+          ...resetUndoState(),
           statusMessage: '新規ファイルを作成しました',
         });
         return;
@@ -671,6 +754,7 @@ export const useAppStore = create<AppState>((set, get) => {
         revision: 0,
         dirty: false,
         ...resetAnalysisState(),
+        ...resetUndoState(),
         statusMessage: 'テキストをインポートしました',
       });
     } catch (error) {
@@ -707,6 +791,7 @@ export const useAppStore = create<AppState>((set, get) => {
         analysisHistoriesByParagraphId,
         selectedPatternIndexByParagraphId,
         generationSyncPending: false,
+        ...resetUndoState(),
         statusMessage: 'ドキュメントを読み込みました',
       });
     } catch {
