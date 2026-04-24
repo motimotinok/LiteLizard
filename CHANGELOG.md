@@ -1,3 +1,6 @@
+[2026/04/24]R-09 sourceHash による stale 検出・表示
+段落カードの stale 表示を「未解析」と「テキスト変更後の陳腐化」で分岐し、後者に amber 左ボーダーと「要再解析」バッジを追加した。履歴が読み込まれない文書形式でも lizard.analyzedAt で既解析を判定する
+
 [2026/04/23]L-06 解析結果の保存・履歴UI・世代同期
 解析履歴の保持と切替 UI、構造変更後の generation 再同期、進行中解析のガード、shared schema export 分離による desktop build 修正を実装した
 
