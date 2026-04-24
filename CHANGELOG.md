@@ -1,3 +1,6 @@
+[2026/04/24]R-03 構造操作の Undo/Redo
+Zustand 統合スタックと UndoPlugin を追加し、章追加・削除、章タイトル Enter、Backspace による格下げ・段落統合を Undo/Redo 対象にした。DnD 並び替えの Undo は残課題。
+
 [2026/04/24]R-09 sourceHash による stale 検出・表示
 段落カードの stale 表示を「未解析」と「テキスト変更後の陳腐化」で分岐し、後者に amber 左ボーダーと「要再解析」バッジを追加した。履歴が読み込まれない文書形式でも lizard.analyzedAt で既解析を判定する
 
