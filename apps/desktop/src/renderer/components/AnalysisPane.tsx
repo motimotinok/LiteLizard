@@ -49,7 +49,7 @@ function getEmotionStyle(emotion: string): TagStyle {
 
 function statusLabel(
   status: LiteLizardDocument['paragraphs'][number]['lizard']['status'],
-  hasHistory: boolean,
+  hasPreviousAnalysis: boolean,
 ) {
   if (status === 'pending') {
     return '解析中です。完了後に生成結果が表示されます。';
@@ -58,7 +58,7 @@ function statusLabel(
     return '解析に失敗しました。再実行してください。';
   }
   if (status === 'stale') {
-    return hasHistory
+    return hasPreviousAnalysis
       ? '本文が更新されました。再解析してください。'
       : 'まだ解析されていません。';
   }
@@ -248,8 +248,10 @@ export function AnalysisPane({
                   : null;
               const history = analysisHistoriesByParagraphId[paragraph.id];
               const hasHistory = Array.isArray(history) && history.length > 0;
-              const isStaleWithHistory = paragraph.lizard.status === 'stale' && hasHistory;
-              const statusText = statusLabel(paragraph.lizard.status, hasHistory);
+              const hasPreviousAnalysis = hasHistory || Boolean(paragraph.lizard.analyzedAt);
+              const isStaleWithPreviousAnalysis =
+                paragraph.lizard.status === 'stale' && hasPreviousAnalysis;
+              const statusText = statusLabel(paragraph.lizard.status, hasPreviousAnalysis);
               const tags = [
                 ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' as const })),
                 ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' as const })),
@@ -275,7 +277,7 @@ export function AnalysisPane({
                     active ? 'analysis-card-active' : '',
                     isDragging ? 'analysis-card-dragging' : '',
                     isDropTarget ? 'analysis-card-drop-target' : '',
-                    isStaleWithHistory ? 'analysis-card-stale' : '',
+                    isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -287,7 +289,7 @@ export function AnalysisPane({
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
                       <span className="analysis-card-index">P{String(index + 1).padStart(2, '0')}</span>
-                      {isStaleWithHistory ? (
+                      {isStaleWithPreviousAnalysis ? (
                         <span
                           className="analysis-card-stale-badge"
                           title="本文が更新されました。再解析してください。"
