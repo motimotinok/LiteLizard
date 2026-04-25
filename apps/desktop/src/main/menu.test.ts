@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-const buildFromTemplate = vi.fn((template) => ({ template }));
+const menuMock = vi.hoisted(() => ({
+  buildFromTemplate: vi.fn((template) => ({ template })),
+}));
 
 vi.mock('electron', () => ({
   Menu: {
-    buildFromTemplate,
+    buildFromTemplate: menuMock.buildFromTemplate,
   },
   app: {
     name: 'LiteLizard',

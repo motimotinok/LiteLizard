@@ -1,21 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const readFile = vi.fn();
-const mkdir = vi.fn();
-const writeFile = vi.fn();
-const getPath = vi.fn(() => '/tmp/litelizard-user-data');
+const appStoreMock = vi.hoisted(() => ({
+  readFile: vi.fn(),
+  mkdir: vi.fn(),
+  writeFile: vi.fn(),
+  getPath: vi.fn(() => '/tmp/litelizard-user-data'),
+}));
 
 vi.mock('node:fs/promises', () => ({
   default: {
-    readFile,
-    mkdir,
-    writeFile,
+    readFile: appStoreMock.readFile,
+    mkdir: appStoreMock.mkdir,
+    writeFile: appStoreMock.writeFile,
   },
 }));
 
 vi.mock('electron', () => ({
   app: {
-    getPath,
+    getPath: appStoreMock.getPath,
   },
 }));
 
@@ -27,25 +29,25 @@ describe('appStore', () => {
   });
 
   it('保存済み lastOpenedFolder を返す', async () => {
-    readFile.mockResolvedValue(JSON.stringify({ lastOpenedFolder: '/projects/novel' }));
+    appStoreMock.readFile.mockResolvedValue(JSON.stringify({ lastOpenedFolder: '/projects/novel' }));
 
     await expect(getLastOpenedFolder()).resolves.toBe('/projects/novel');
   });
 
   it('ストアが無い場合は null を返す', async () => {
-    readFile.mockRejectedValue(new Error('missing'));
+    appStoreMock.readFile.mockRejectedValue(new Error('missing'));
 
     await expect(getLastOpenedFolder()).resolves.toBeNull();
   });
 
   it('lastOpenedFolder を保存する', async () => {
-    writeFile.mockResolvedValue(undefined);
-    mkdir.mockResolvedValue(undefined);
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
 
     await setLastOpenedFolder('/projects/story');
 
-    expect(mkdir).toHaveBeenCalledWith('/tmp/litelizard-user-data', { recursive: true });
-    expect(writeFile).toHaveBeenCalledWith(
+    expect(appStoreMock.mkdir).toHaveBeenCalledWith('/tmp/litelizard-user-data', { recursive: true });
+    expect(appStoreMock.writeFile).toHaveBeenCalledWith(
       '/tmp/litelizard-user-data/app-store.json',
       JSON.stringify({ lastOpenedFolder: '/projects/story' }, null, 2),
       'utf8'
