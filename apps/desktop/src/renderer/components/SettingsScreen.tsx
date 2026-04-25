@@ -1,40 +1,43 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { AnalysisProviderId } from '@litelizard/shared';
 import { useAppStore } from '../store/useAppStore.js';
+import { AuxShell } from './ui/AuxShell.js';
+import { CenteredHeader } from './ui/CenteredHeader.js';
+import { toKanjiIndex } from './ui/kanji.js';
+import type { LeftIconRailPanel } from './LeftIconRail.js';
 
-const PROVIDER_META: Array<{
-  id: 'openai' | 'anthropic';
+interface SettingsTab {
+  id: 'analysis' | 'agents' | 'editor' | 'appearance' | 'keyboard' | 'about';
   label: string;
-  description: string;
-  placeholder: string;
-}> = [
-  {
-    id: 'openai',
-    label: 'OpenAI',
-    description: '既存の解析実行は現時点では OpenAI 接続を使用します。',
-    placeholder: 'sk-...',
-  },
-  {
-    id: 'anthropic',
-    label: 'Anthropic',
-    description: '既定 provider に選ぶと Anthropic で解析を実行します。',
-    placeholder: 'sk-ant-...',
-  },
+  comingSoon?: boolean;
+}
+
+const TABS: SettingsTab[] = [
+  { id: 'analysis', label: '分析エンジン' },
+  { id: 'agents', label: 'エージェント', comingSoon: true },
+  { id: 'editor', label: 'エディタ', comingSoon: true },
+  { id: 'appearance', label: '外観', comingSoon: true },
+  { id: 'keyboard', label: 'キーボード', comingSoon: true },
+  { id: 'about', label: 'LiteLizard について', comingSoon: true },
 ];
 
-const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string; hint: string }> = [
-  { value: 'openai', label: 'OpenAI', hint: '現行の解析実行に使用' },
-  { value: 'anthropic', label: 'Anthropic', hint: '現行の解析実行に使用' },
-  { value: 'local-llm', label: 'Local LLM', hint: '設定保持のみ。実行は後続対応' },
+const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string }> = [
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'local-llm', label: 'Local LLM' },
 ];
 
 export function SettingsScreen() {
+  const openEditorPanel = useAppStore((s) => s.openEditorPanel);
+  const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
+  const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const analysisSettings = useAppStore((s) => s.analysisSettings);
   const saveProviderApiKey = useAppStore((s) => s.saveProviderApiKey);
   const clearProviderApiKey = useAppStore((s) => s.clearProviderApiKey);
   const saveAnalysisSettings = useAppStore((s) => s.saveAnalysisSettings);
   const testLocalLlmConnection = useAppStore((s) => s.testLocalLlmConnection);
 
+  const [activeTab, setActiveTab] = useState<SettingsTab['id']>('analysis');
   const [draftKeys, setDraftKeys] = useState<Record<'openai' | 'anthropic', string>>({
     openai: '',
     anthropic: '',
@@ -48,7 +51,7 @@ export function SettingsScreen() {
   });
   const [localLlmStatus, setLocalLlmStatus] = useState<string>('未接続');
 
-  React.useEffect(() => {
+  useEffect(() => {
     setSettingsDraft({
       defaultProvider: analysisSettings.defaultProvider,
       openaiModel: analysisSettings.providers.openai.defaultModel,
@@ -58,20 +61,26 @@ export function SettingsScreen() {
     });
   }, [analysisSettings]);
 
-  const providerStatus = useMemo(() => {
-    return {
+  const providerStatus = useMemo(
+    () => ({
       openai: analysisSettings.providers.openai.apiKeyConfigured ? '保存済み' : '未設定',
       anthropic: analysisSettings.providers.anthropic.apiKeyConfigured ? '保存済み' : '未設定',
-    };
-  }, [analysisSettings]);
+    }),
+    [analysisSettings],
+  );
 
   const saveDraftSettings = async () => {
     await saveAnalysisSettings({
       defaultProvider: settingsDraft.defaultProvider,
       providers: {
-        openai: { defaultModel: settingsDraft.openaiModel.trim() || analysisSettings.providers.openai.defaultModel },
+        openai: {
+          defaultModel:
+            settingsDraft.openaiModel.trim() || analysisSettings.providers.openai.defaultModel,
+        },
         anthropic: {
-          defaultModel: settingsDraft.anthropicModel.trim() || analysisSettings.providers.anthropic.defaultModel,
+          defaultModel:
+            settingsDraft.anthropicModel.trim() ||
+            analysisSettings.providers.anthropic.defaultModel,
         },
       },
       localLlm: {
@@ -81,137 +90,162 @@ export function SettingsScreen() {
     });
   };
 
+  const handleSelectPanel = (panel: LeftIconRailPanel) => {
+    if (panel === 'editor') openEditorPanel();
+    else if (panel === 'agents') openAgentsPanel();
+    else if (panel === 'settings') openSettingsPanel();
+  };
+
+  const sidebar = (
+    <>
+      <div className="sidebar-section-header">
+        <span className="sidebar-section-label">設定</span>
+      </div>
+      <div className="settings-sidebar-list">
+        {TABS.map((tab, index) => (
+          <button
+            key={tab.id}
+            type="button"
+            className={
+              activeTab === tab.id
+                ? 'settings-sidebar-tab is-active'
+                : 'settings-sidebar-tab'
+            }
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <span className="settings-sidebar-kanji">{toKanjiIndex(index + 1)}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
+  const titlebar = (
+    <div className="workspace-titlebar" aria-hidden>
+      <span className="workspace-titlebar-spacer" />
+      <span className="workspace-titlebar-center">設定</span>
+      <span className="workspace-titlebar-actions" />
+    </div>
+  );
+
   return (
-    <section className="settings-screen">
-      <header className="settings-hero">
-        <div>
-          <p className="settings-eyebrow">Workspace Settings</p>
-          <h1 className="settings-title">分析エンジンの設定</h1>
-        </div>
-        <p className="settings-lead">
-          API キー、既定モデル、ローカル LLM 接続をここで管理します。キー本体は再表示せず、状態だけを保持します。
-        </p>
-      </header>
+    <AuxShell
+      activePanel="settings"
+      onSelectPanel={handleSelectPanel}
+      sidebar={sidebar}
+      titlebar={titlebar}
+    >
+      <div className="aux-content">
+        {activeTab === 'analysis' ? (
+          <>
+            <CenteredHeader
+              overline="settings"
+              title="分析エンジンの設定"
+              subtitle={
+                <>
+                  API キー、既定モデル、ローカル LLM の接続をここで管理します。
+                  <br />
+                  キー本体は再表示せず、状態だけを保持します。
+                </>
+              }
+            />
 
-      <div className="settings-grid">
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <div>
-              <p className="settings-section-kicker">Secrets</p>
-              <h2>API キー設定</h2>
-            </div>
-            <p>保存済み 여부のみ表示します。更新時は新しいキーを入力してください。</p>
-          </div>
-
-          <div className="settings-provider-list">
-            {PROVIDER_META.map((provider) => (
-              <article key={provider.id} className="settings-provider-row">
-                <div className="settings-provider-copy">
-                  <div className="settings-provider-title-row">
-                    <h3>{provider.label}</h3>
-                    <span
-                      className={
-                        analysisSettings.providers[provider.id].apiKeyConfigured
-                          ? 'settings-status-chip is-ready'
-                          : 'settings-status-chip'
-                      }
-                    >
-                      {providerStatus[provider.id]}
-                    </span>
-                  </div>
-                  <p>{provider.description}</p>
-                </div>
-
-                <div className="settings-provider-actions">
-                  <label className="settings-field">
-                    <span>API キー</span>
-                    <input
-                      type="password"
-                      value={draftKeys[provider.id]}
-                      placeholder={provider.placeholder}
-                      onChange={(event) =>
-                        setDraftKeys((current) => ({
-                          ...current,
-                          [provider.id]: event.target.value,
-                        }))
-                      }
-                    />
-                  </label>
-                  <div className="settings-inline-actions">
-                    <button
-                      type="button"
-                      className="settings-primary-button"
-                      onClick={() => saveProviderApiKey(provider.id, draftKeys[provider.id])}
-                    >
-                      保存
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-secondary-button"
-                      onClick={() => {
-                        setDraftKeys((current) => ({ ...current, [provider.id]: '' }));
-                        void clearProviderApiKey(provider.id);
-                      }}
-                    >
-                      削除
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="settings-section">
-          <div className="settings-section-heading">
-            <div>
-              <p className="settings-section-kicker">Defaults</p>
-              <h2>分析モデル設定</h2>
-            </div>
-            <p>既定 provider を選ぶと解析実行時の接続先が切り替わります。Local LLM はまだ設定保持のみです。</p>
-          </div>
-
-          <div className="settings-stack">
-            <label className="settings-field">
-              <span>既定 provider</span>
-              <select
-                value={settingsDraft.defaultProvider}
-                onChange={(event) =>
-                  setSettingsDraft((current) => ({
-                    ...current,
-                    defaultProvider: event.target.value as AnalysisProviderId,
-                  }))
-                }
+            <Section label={toKanjiIndex(1)} title="API キー">
+              <Row
+                label="OpenAI"
+                status={providerStatus.openai}
+                statusReady={analysisSettings.providers.openai.apiKeyConfigured}
               >
-                {PROVIDER_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <input
+                  type="password"
+                  className="settings-input"
+                  value={draftKeys.openai}
+                  placeholder="sk-..."
+                  onChange={(event) =>
+                    setDraftKeys((current) => ({ ...current, openai: event.target.value }))
+                  }
+                />
+                <div className="settings-actions-buttons" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveProviderApiKey('openai', draftKeys.openai)}
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    className="button-small"
+                    onClick={() => {
+                      setDraftKeys((current) => ({ ...current, openai: '' }));
+                      void clearProviderApiKey('openai');
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+              </Row>
 
-            <div className="settings-provider-pills">
-              {PROVIDER_OPTIONS.map((option) => (
-                <div
-                  key={option.value}
-                  className={
-                    settingsDraft.defaultProvider === option.value
-                      ? 'settings-provider-pill is-selected'
-                      : 'settings-provider-pill'
+              <Row
+                label="Anthropic"
+                status={providerStatus.anthropic}
+                statusReady={analysisSettings.providers.anthropic.apiKeyConfigured}
+              >
+                <input
+                  type="password"
+                  className="settings-input"
+                  value={draftKeys.anthropic}
+                  placeholder="sk-ant-..."
+                  onChange={(event) =>
+                    setDraftKeys((current) => ({ ...current, anthropic: event.target.value }))
+                  }
+                />
+                <div className="settings-actions-buttons" style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveProviderApiKey('anthropic', draftKeys.anthropic)}
+                  >
+                    保存
+                  </button>
+                  <button
+                    type="button"
+                    className="button-small"
+                    onClick={() => {
+                      setDraftKeys((current) => ({ ...current, anthropic: '' }));
+                      void clearProviderApiKey('anthropic');
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+              </Row>
+            </Section>
+
+            <Section label={toKanjiIndex(2)} title="既定の分析モデル">
+              <Row label="既定 provider">
+                <select
+                  className="settings-select"
+                  value={settingsDraft.defaultProvider}
+                  onChange={(event) =>
+                    setSettingsDraft((current) => ({
+                      ...current,
+                      defaultProvider: event.target.value as AnalysisProviderId,
+                    }))
                   }
                 >
-                  <strong>{option.label}</strong>
-                  <span>{option.hint}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="settings-two-column">
-              <label className="settings-field">
-                <span>OpenAI 既定モデル</span>
+                  {PROVIDER_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Row>
+              <Row label="OpenAI モデル">
                 <input
                   type="text"
+                  className="settings-input"
                   value={settingsDraft.openaiModel}
                   placeholder="gpt-4o-mini"
                   onChange={(event) =>
@@ -221,14 +255,13 @@ export function SettingsScreen() {
                     }))
                   }
                 />
-              </label>
-
-              <label className="settings-field">
-                <span>Anthropic 既定モデル</span>
+              </Row>
+              <Row label="Anthropic モデル">
                 <input
                   type="text"
+                  className="settings-input"
                   value={settingsDraft.anthropicModel}
-                  placeholder="claude-3-5-sonnet-latest"
+                  placeholder="claude-haiku-4-5"
                   onChange={(event) =>
                     setSettingsDraft((current) => ({
                       ...current,
@@ -236,26 +269,26 @@ export function SettingsScreen() {
                     }))
                   }
                 />
-              </label>
-            </div>
-          </div>
-        </section>
+              </Row>
+              <div className="settings-actions-row">
+                <span>変更後は保存ボタンで適用されます。</span>
+                <div className="settings-actions-buttons">
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveDraftSettings()}
+                  >
+                    設定を保存
+                  </button>
+                </div>
+              </div>
+            </Section>
 
-        <section className="settings-section settings-section-wide">
-          <div className="settings-section-heading">
-            <div>
-              <p className="settings-section-kicker">Local Runtime</p>
-              <h2>ローカル LLM</h2>
-            </div>
-            <p>Ollama を別途インストールし、接続先と既定モデルを登録します。モデルの pull や起動はアプリ外で行います。</p>
-          </div>
-
-          <div className="settings-local-grid">
-            <div className="settings-stack">
-              <label className="settings-field">
-                <span>Endpoint URL</span>
+            <Section label={toKanjiIndex(3)} title="ローカル LLM">
+              <Row label="Endpoint URL" hint="Ollama 等">
                 <input
                   type="url"
+                  className="settings-input settings-input-mono"
                   value={settingsDraft.localEndpoint}
                   placeholder="http://127.0.0.1:11434"
                   onChange={(event) =>
@@ -265,12 +298,11 @@ export function SettingsScreen() {
                     }))
                   }
                 />
-              </label>
-
-              <label className="settings-field">
-                <span>既定モデル</span>
+              </Row>
+              <Row label="既定モデル">
                 <input
                   type="text"
+                  className="settings-input"
                   value={settingsDraft.localModel}
                   placeholder="llama3.1:8b"
                   onChange={(event) =>
@@ -280,12 +312,23 @@ export function SettingsScreen() {
                     }))
                   }
                 />
-              </label>
-
-              <div className="settings-inline-actions">
+              </Row>
+              <div
+                className="settings-status-card"
+                style={{ marginTop: 16 }}
+              >
+                <span
+                  className={
+                    analysisSettings.localLlm.configured
+                      ? 'settings-status-card-dot is-ready'
+                      : 'settings-status-card-dot'
+                  }
+                />
+                <span className="settings-status-card-text">{localLlmStatus}</span>
+                <span className="settings-status-card-spacer" />
                 <button
                   type="button"
-                  className="settings-primary-button"
+                  className="button-small"
                   onClick={async () => {
                     const result = await testLocalLlmConnection({
                       endpoint: settingsDraft.localEndpoint,
@@ -294,45 +337,76 @@ export function SettingsScreen() {
                     setLocalLlmStatus(result.message);
                   }}
                 >
-                  接続テスト
-                </button>
-                <button
-                  type="button"
-                  className="settings-secondary-button"
-                  onClick={() => {
-                    void saveDraftSettings();
-                    setLocalLlmStatus('設定を保存しました');
-                  }}
-                >
-                  ローカル設定を保存
+                  接続を確認
                 </button>
               </div>
-            </div>
-
-            <div className="settings-local-aside">
-              <div className="settings-local-card">
-                <span className={analysisSettings.localLlm.configured ? 'settings-status-dot is-ready' : 'settings-status-dot'} />
-                <div>
-                  <strong>現在の状態</strong>
-                  <p>{localLlmStatus}</p>
-                </div>
-              </div>
-              <ol className="settings-setup-list">
-                <li>Ollama をインストールしてバックグラウンドで起動する</li>
-                <li>使用したいモデルを `ollama pull` で取得する</li>
-                <li>ここで URL とモデル名を保存し、接続テストを行う</li>
-              </ol>
-            </div>
-          </div>
-        </section>
+            </Section>
+          </>
+        ) : (
+          <>
+            <CenteredHeader
+              overline="settings"
+              title={TABS.find((tab) => tab.id === activeTab)?.label ?? '設定'}
+            />
+            <div className="settings-empty-tab">この項目は今後追加されます。</div>
+          </>
+        )}
       </div>
+    </AuxShell>
+  );
+}
 
-      <footer className="settings-footer">
-        <p>OpenAI / Anthropic は既定 provider に応じて解析実行へ反映されます。Local LLM は後続タスクで接続します。</p>
-        <button type="button" className="settings-primary-button" onClick={() => void saveDraftSettings()}>
-          全体設定を保存
-        </button>
-      </footer>
+interface SectionProps {
+  label: string;
+  title: string;
+  children: React.ReactNode;
+}
+
+function Section({ label, title, children }: SectionProps) {
+  return (
+    <section className="settings-section">
+      <div className="settings-section-heading">
+        <span className="settings-section-kanji">{label}</span>
+        <h2 className="settings-section-title">{title}</h2>
+      </div>
+      {children}
     </section>
+  );
+}
+
+interface RowProps {
+  label: string;
+  hint?: string;
+  status?: string;
+  statusReady?: boolean;
+  children: React.ReactNode;
+}
+
+function Row({ label, hint, status, statusReady, children }: RowProps) {
+  return (
+    <div className="settings-row">
+      <div>
+        <div className="settings-row-label">
+          {label}
+          {status ? (
+            <span
+              className="settings-row-status"
+              style={
+                statusReady
+                  ? undefined
+                  : {
+                      background: 'var(--paper-soft-strong)',
+                      color: 'var(--ink-3)',
+                    }
+              }
+            >
+              {status}
+            </span>
+          ) : null}
+        </div>
+        {hint ? <div className="settings-row-hint">{hint}</div> : null}
+      </div>
+      <div>{children}</div>
+    </div>
   );
 }

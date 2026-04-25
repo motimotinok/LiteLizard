@@ -23,9 +23,7 @@ interface Props {
 }
 
 export function EditorPane({
-  isExpanded,
   document,
-  dirty,
   viewScale,
   activeParagraphId,
   scrollRequest,
@@ -60,21 +58,17 @@ export function EditorPane({
   }, [onSetViewScale, editorBodyEl]);
 
   if (!document) {
-    return (
-      <EditorEmptyState
-        isExpanded={isExpanded}
-        onCreateEssay={onCreateEssay}
-        onOpenFolder={onOpenFolder}
-      />
-    );
+    return <EditorEmptyState onCreateEssay={onCreateEssay} onOpenFolder={onOpenFolder} />;
   }
 
-  const charCount = document.paragraphs.reduce((sum, paragraph) => sum + paragraph.light.text.length, 0);
-
   return (
-    <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
+    <section className="editor-shell">
       <div className="editor-frame">
         <div className="editor-body" ref={setEditorBodyEl}>
+          <header className="editor-title">
+            <h1 className="editor-title-name">{document.title}</h1>
+            <div className="editor-title-rule" />
+          </header>
           {viewScale === 'macro' ? (
             <MacroView document={document} onReorderChapters={onReorderChapters} onDeleteChapter={onDeleteChapter} />
           ) : (
@@ -88,12 +82,6 @@ export function EditorPane({
             />
           )}
         </div>
-
-        <footer className="editor-footer">
-          <div className="editor-footer-left">
-            <span>{charCount} 文字</span>
-          </div>
-        </footer>
       </div>
     </section>
   );

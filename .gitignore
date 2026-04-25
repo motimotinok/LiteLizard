@@ -9,6 +9,11 @@ apps/api/data
 .pnpm-store
 *.tsbuildinfo
 
+# Generated renderer JS/types (Vite handles compilation; tsc would emit here without noEmit)
+apps/desktop/src/renderer/**/*.js
+apps/desktop/src/renderer/**/*.d.ts
+!apps/desktop/src/renderer/global.d.ts
+
 # Temporary files (codex logs, etc.)
 tmp/
 

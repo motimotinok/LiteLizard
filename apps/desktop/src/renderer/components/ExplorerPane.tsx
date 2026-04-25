@@ -1,11 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { FileNode } from '@litelizard/shared';
+import {
+  IconChevronDown,
+  IconChevronRight,
+  IconFile,
+  IconFolder,
+  IconImport,
+  IconNewFile,
+  IconNewFolder,
+} from './ui/icons.js';
 
 interface Props {
   rootPath: string | null;
   tree: FileNode[];
   currentFilePath: string | null;
-  style?: React.CSSProperties;
   onCreateEntry: (parentPath: string, type: 'file' | 'folder', name: string) => void;
   onRenameEntry: (targetPath: string, nextName: string) => void;
   onDeleteEntry: (targetPath: string) => void;
@@ -50,58 +58,6 @@ interface InlineInputProps {
   onCancel: () => void;
 }
 
-function FolderIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
-      <path
-        d="M3.5 7.5a2 2 0 0 1 2-2h4l1.6 1.8h7.4a2 2 0 0 1 2 2v7.2a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2V7.5Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
-      <path
-        d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Zm6 1.8V9h3.7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ImportIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden>
-      <path
-        d="M7 3.5h7l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5.5 19V5A1.5 1.5 0 0 1 7 3.5Zm6 1.8V9h3.7"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M12 12v5m-2-2 2 2 2-2"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function baseName(targetPath: string) {
   const normalized = targetPath.replace(/\\/g, '/');
   const parts = normalized.split('/');
@@ -123,6 +79,18 @@ function displayName(node: FileNode) {
   return node.name;
 }
 
+function countFiles(nodes: FileNode[]): number {
+  let total = 0;
+  for (const node of nodes) {
+    if (node.type === 'file') {
+      total += 1;
+    } else if (node.children) {
+      total += countFiles(node.children);
+    }
+  }
+  return total;
+}
+
 function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineInputProps) {
   const ref = useRef<HTMLInputElement>(null);
   const confirmed = useRef(false);
@@ -140,7 +108,7 @@ function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineI
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      if (e.nativeEvent.isComposing) return; // IME変換中は無視
+      if (e.nativeEvent.isComposing) return;
       const trimmed = value.trim();
       if (trimmed) {
         confirmed.current = true;
@@ -160,7 +128,7 @@ function InlineInput({ type, depth, defaultValue, onConfirm, onCancel }: InlineI
   return (
     <div className="explorer-inline-input-row" style={{ paddingLeft: `${paddingLeft}px` }}>
       <span className="explorer-node-icon" aria-hidden>
-        {type === 'directory' ? <FolderIcon /> : <FileIcon />}
+        {type === 'directory' ? <IconFolder size={13} /> : <IconFile size={13} />}
       </span>
       <input
         ref={ref}
@@ -211,14 +179,17 @@ function Tree({
           return (
             <div key={node.path}>
               <button
-                className="explorer-tree-item explorer-tree-item-folder"
-                style={{ paddingLeft: `${depth * 14 + 10}px` }}
+                type="button"
+                className="explorer-tree-item"
+                style={{ paddingLeft: `${depth * 14 + 8}px` }}
                 onClick={() => onToggle(node.path)}
                 onContextMenu={(event) => onOpenContextMenu(event, node)}
               >
-                <span className="explorer-chevron">{isExpanded ? '▾' : '▸'}</span>
+                <span className="explorer-chevron" aria-hidden>
+                  {isExpanded ? <IconChevronDown size={11} /> : <IconChevronRight size={11} />}
+                </span>
                 <span className="explorer-node-icon" aria-hidden>
-                  <FolderIcon />
+                  <IconFolder size={13} />
                 </span>
                 <span className="explorer-node-label">{displayName(node)}</span>
               </button>
@@ -273,17 +244,18 @@ function Tree({
         return (
           <button
             key={node.path}
+            type="button"
             className={
               isSelected
                 ? 'explorer-tree-item explorer-tree-item-file active'
                 : 'explorer-tree-item explorer-tree-item-file'
             }
-            style={{ paddingLeft: `${depth * 14 + 32}px` }}
+            style={{ paddingLeft: `${depth * 14 + 26}px` }}
             onClick={() => onSelectFile(node.path)}
             onContextMenu={(event) => onOpenContextMenu(event, node)}
           >
             <span className="explorer-node-icon" aria-hidden>
-              <FileIcon />
+              <IconFile size={13} />
             </span>
             <span className="explorer-node-label">{displayName(node)}</span>
           </button>
@@ -310,7 +282,6 @@ export function ExplorerPane({
   rootPath,
   tree,
   currentFilePath,
-  style,
   onCreateEntry,
   onRenameEntry,
   onDeleteEntry,
@@ -325,6 +296,8 @@ export function ExplorerPane({
 
   const defaultExpanded = useMemo(() => new Set(collectDirectoryPaths(tree)), [tree]);
   const expandedFolders = expanded ?? defaultExpanded;
+  const fileCount = useMemo(() => countFiles(tree), [tree]);
+  const rootName = useMemo(() => (rootPath ? baseName(rootPath) : null), [rootPath]);
 
   useEffect(() => {
     const close = () => setContextMenu(null);
@@ -345,12 +318,6 @@ export function ExplorerPane({
     });
   };
 
-  const handleFileClick = (path: string) => {
-    onSelectFile(path);
-  };
-
-  // currentFilePath が変わったとき（自動展開・ファイルクリック・新規作成後）に sync
-  // null になった場合（ファイル削除・フォルダ削除）はリセットして rootPath フォールバックに任せる
   useEffect(() => {
     if (currentFilePath) {
       setSelectedFolderPath(dirName(currentFilePath));
@@ -359,12 +326,10 @@ export function ExplorerPane({
     }
   }, [currentFilePath]);
 
-  // rootPath 変更時にリセット
   useEffect(() => {
     setSelectedFolderPath(null);
   }, [rootPath]);
 
-  // tree 更新後にパス存在チェック → rootPath へフォールバック
   useEffect(() => {
     if (selectedFolderPath === null) return;
     const dirs = new Set(collectDirectoryPaths(tree));
@@ -433,36 +398,40 @@ export function ExplorerPane({
   const createParent = selectedFolderPath ?? rootPath ?? '';
 
   return (
-    <aside className="explorer-layout" style={style} data-testid="file-browser-pane">
-      <div className="explorer-panel">
-        <div className="explorer-panel-toolbar">
-          <div className="explorer-toolbar-actions">
+    <>
+      <div className="explorer-layout" data-testid="file-browser-pane">
+        <div className="sidebar-section-header">
+          <span className="sidebar-section-label">Workspace</span>
+          <div className="sidebar-section-actions">
             <button
-              className="icon-button explorer-add-btn"
+              type="button"
+              className="sidebar-icon-button"
               onClick={() => openInlineCreate(createParent, 'file')}
               disabled={!canCreate}
               title="新規ファイル"
               aria-label="新規ファイル"
             >
-              <span className="explorer-icon-wrap"><FileIcon /><span className="explorer-add-plus">+</span></span>
+              <IconNewFile size={13} />
             </button>
             <button
-              className="icon-button explorer-add-btn"
+              type="button"
+              className="sidebar-icon-button"
               onClick={() => openInlineCreate(createParent, 'folder')}
               disabled={!canCreate}
               title="新規フォルダ"
               aria-label="新規フォルダ"
             >
-              <span className="explorer-icon-wrap"><FolderIcon /><span className="explorer-add-plus">+</span></span>
+              <IconNewFolder size={13} />
             </button>
             <button
-              className="icon-button explorer-add-btn"
+              type="button"
+              className="sidebar-icon-button"
               onClick={() => onImportTextFile(createParent)}
               disabled={!canCreate}
               title="テキストをインポート"
               aria-label="テキストをインポート"
             >
-              <ImportIcon />
+              <IconImport size={13} />
             </button>
           </div>
         </div>
@@ -476,12 +445,17 @@ export function ExplorerPane({
             }
           }}
         >
+          {tree.length === 0 && !inlineCreate ? (
+            <div className="explorer-tree-empty">
+              {rootPath ? 'ファイルがありません' : 'フォルダが開かれていません'}
+            </div>
+          ) : null}
           <Tree
             nodes={tree}
             currentFilePath={currentFilePath}
             expanded={expandedFolders}
             onToggle={toggleFolder}
-            onSelectFile={handleFileClick}
+            onSelectFile={onSelectFile}
             onOpenContextMenu={onOpenContextMenu}
             inlineCreate={inlineCreate}
             inlineRename={inlineRename}
@@ -500,6 +474,13 @@ export function ExplorerPane({
             />
           )}
         </div>
+
+        {rootPath ? (
+          <div className="sidebar-footer-meta">
+            <span>{rootName}</span>
+            <span>{fileCount} files</span>
+          </div>
+        ) : null}
       </div>
 
       {contextMenu ? (
@@ -509,6 +490,7 @@ export function ExplorerPane({
           onClick={(event) => event.stopPropagation()}
         >
           <button
+            type="button"
             className="menu-item"
             onClick={() => {
               const parentPath = resolveCreateParent(contextMenu);
@@ -518,6 +500,7 @@ export function ExplorerPane({
             新規ファイル
           </button>
           <button
+            type="button"
             className="menu-item"
             onClick={() => {
               const parentPath = resolveCreateParent(contextMenu);
@@ -527,6 +510,7 @@ export function ExplorerPane({
             新規フォルダ
           </button>
           <button
+            type="button"
             className="menu-item"
             onClick={() => {
               const parentPath = resolveCreateParent(contextMenu);
@@ -537,6 +521,7 @@ export function ExplorerPane({
             テキストをインポート
           </button>
           <button
+            type="button"
             className="menu-item"
             onClick={() => {
               openInlineRename(contextMenu.targetPath);
@@ -545,6 +530,7 @@ export function ExplorerPane({
             リネーム
           </button>
           <button
+            type="button"
             className="menu-item menu-item-danger"
             onClick={() => {
               runDelete(contextMenu.targetPath);
@@ -555,6 +541,6 @@ export function ExplorerPane({
           </button>
         </div>
       ) : null}
-    </aside>
+    </>
   );
 }

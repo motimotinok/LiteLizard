@@ -13,3 +13,4 @@
 | [analysis-api.md](analysis-api.md) | 解析 API エンドポイント（リクエスト・レスポンス・保存・コンテキストポリシー） | S-06, S-09, L-09 | revised（S-09 でローカル処理主軸に改訂、L-09 を将来拡張として追記） |
 | [chapter-paragraph-ops.md](chapter-paragraph-ops.md) | 章削除・段落統合エッジケース | S-07 | stable |
 | [undo-redo.md](undo-redo.md) | Undo/Redo 対象範囲・実装方針（Zustand 統合 Command スタック） | S-08 | stable |
+| [ui-redesign-minimal.md](ui-redesign-minimal.md) | UI リデザイン仕様（案 A Minimal） | R-16 | stable |

@@ -29,7 +29,7 @@ import {
 export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
-export type WorkspacePanel = 'editor' | 'settings';
+export type WorkspacePanel = 'editor' | 'settings' | 'agents';
 
 export interface UndoSnapshot {
   lexicalStateJson: string;
@@ -140,6 +140,7 @@ interface AppState {
   cycleEditorMode: () => void;
   openSettingsPanel: () => void;
   openEditorPanel: () => void;
+  openAgentsPanel: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
   bootstrapAnalysisSettings: () => Promise<void>;
@@ -1218,6 +1219,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
   openSettingsPanel: () => {
     set({ activeWorkspacePanel: 'settings', statusMessage: '設定を開きました' });
+  },
+  openAgentsPanel: () => {
+    set({ activeWorkspacePanel: 'agents', statusMessage: '分析エージェントを開きました' });
   },
 
   openEditorPanel: () => {

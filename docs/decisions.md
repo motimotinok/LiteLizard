@@ -6,6 +6,26 @@
 
 ---
 
+## [2026-04-25] UI 全面刷新（案 A Minimal を採用）
+
+- **決定**: Claude Design (claude.ai/design) で詰めた **案 A Minimal**（iA Writer 寄り、極めて静謐な執筆 UI）を renderer に取り込む。仕様詳細は [`docs/specs/ui-redesign-minimal.md`](specs/ui-redesign-minimal.md)
+- **構成変更点**:
+  - レイアウト: `44px (icon rail) / 232px (sidebar) / 1fr (main)` のグリッドに刷新。メイン内に絶対配置タイトルバー + 中央寄せ表題 + 漢数字段落番号
+  - macOS タイトルバー: `titleBarStyle: 'hiddenInset'` に変更し、トラフィックライト上に独自タイトルバーを重ねる（他 OS は `default` 維持）
+  - 配色: 古紙黄ばみ (`oklch(98% 0.012 88)` 系) + 藍 (`oklch(40% 0.10 250)`) アクセント一色
+  - タイポ: 本文は明朝固定 (Shippori Mincho) + UI フォントは system-ui ベース、メタは JetBrains Mono
+  - ステータスバー（モード/視点/ヒント）と editor-footer（保存ドット + 文字数）を撤去
+  - 分析パネル: Reading Agent ドロップダウン（モック 4 種）+ 主要ボタン「段落を読ませる」 + タグは下線のみ・色なし（emotion color hash を撤去）
+- **理由**: 既存 UI は装飾過多で「機能のための場」になっていた。執筆という内向作業のための静かな UI を最優先するため、案 A の合意済み方針をそのまま採用
+- **モック先行とした補助画面**: ウェルカムの最近リスト・分析エージェント管理画面は UI のみ実装し、永続化・プロンプト適用は別タスク (WBS 参照)
+- **却下した案**:
+  - 案 B Standard / 案 C Literary: 案 A の静謐さが本プロダクトのコンセプトに最も合うため
+  - Tweaks 機能（明朝/ゴシック切替・本文サイズ・行間・黄ばみ強度・パネル横並び/オーバーレイ）の同時実装: スコープが広すぎるため後続タスクへ
+  - フレームレス（`frame: false`）でトラフィックライトを完全自前描画: Win/Linux クロス OS 対応工数が増えすぎるため、`hiddenInset` で macOS のみカスタム化
+- **参照**: `apps/desktop/src/main/main.ts`, `apps/desktop/src/renderer/styles.css`, `apps/desktop/src/renderer/index.html`, `apps/desktop/src/renderer/components/`
+
+---
+
 ## [2026-04-13] 狭幅レイアウトでは固定パネル幅より縦積みを優先する (R-11)
 
 - **決定**: renderer の狭幅時 (`1180px` 以下) は explorer / analysis パネルのインライン固定幅とドラッグリサイズを無効化し、CSS の縦積みレイアウトを優先する
