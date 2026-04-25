@@ -1,0 +1,162 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_ANALYSIS_SETTINGS, IPC_CHANNELS, type AnalysisResult } from '@litelizard/shared';
+
+const electronMock = vi.hoisted(() => ({
+  handle: vi.fn(),
+  showOpenDialog: vi.fn(),
+  getPath: vi.fn(() => '/tmp/litelizard-user-data'),
+}));
+
+const fileServiceMock = vi.hoisted(() => ({
+  listTree: vi.fn(),
+  createDocument: vi.fn(),
+  load: vi.fn(),
+  save: vi.fn(),
+  toAnalysisPath: vi.fn((filePath: string) => `${filePath}.analysis.json`),
+  readSidecarAnalysis: vi.fn(),
+}));
+
+const apiKeyVaultMock = vi.hoisted(() => ({
+  loadAll: vi.fn(),
+  save: vi.fn(),
+  clear: vi.fn(),
+}));
+
+const analysisSettingsStoreMock = vi.hoisted(() => ({
+  load: vi.fn(),
+  save: vi.fn(),
+}));
+
+const analysisProviderMock = vi.hoisted(() => ({
+  resolveAnalysisProvider: vi.fn(),
+}));
+
+const apiBridgeMock = vi.hoisted(() => ({
+  runAnalysis: vi.fn(),
+}));
+
+vi.mock('electron', () => ({
+  app: {
+    getPath: electronMock.getPath,
+  },
+  dialog: {
+    showOpenDialog: electronMock.showOpenDialog,
+  },
+  ipcMain: {
+    handle: electronMock.handle,
+  },
+}));
+
+vi.mock('./fileService.js', () => ({
+  createFileService: () => fileServiceMock,
+}));
+
+vi.mock('./sessionVault.js', () => ({
+  createApiKeyVault: () => apiKeyVaultMock,
+}));
+
+vi.mock('./analysisSettingsStore.js', async () => {
+  const actual = await vi.importActual<typeof import('./analysisSettingsStore.js')>('./analysisSettingsStore.js');
+  return {
+    ...actual,
+    createAnalysisSettingsStore: () => analysisSettingsStoreMock,
+  };
+});
+
+vi.mock('./analysisProvider.js', () => analysisProviderMock);
+
+vi.mock('./apiBridge.js', () => apiBridgeMock);
+
+vi.mock('./analysisStore.js', () => ({
+  appendParagraphPattern: vi.fn(),
+  createGeneration: vi.fn(async () => ({ generation: 1 })),
+  deleteAnalysisFiles: vi.fn(),
+  loadLatestAnalysis: vi.fn(),
+  migrateFromV1: vi.fn(),
+}));
+
+vi.mock('./projectManager.js', () => ({
+  ensureProject: vi.fn(),
+}));
+
+vi.mock('./appStore.js', () => ({
+  getLastOpenedFolder: vi.fn(),
+  setLastOpenedFolder: vi.fn(),
+}));
+
+import { registerIpcHandlers } from './ipc.js';
+
+function getRegisteredHandlers() {
+  return new Map<string, (...args: never[]) => unknown>(electronMock.handle.mock.calls);
+}
+
+describe('registerIpcHandlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiKeyVaultMock.loadAll.mockResolvedValue({ openai: 'sk-openai' });
+    analysisSettingsStoreMock.load.mockResolvedValue(DEFAULT_ANALYSIS_SETTINGS);
+    analysisProviderMock.resolveAnalysisProvider.mockReturnValue({
+      id: 'openai',
+      label: 'OpenAI',
+      model: 'gpt-4.1-mini',
+      provider: { analyzeParagraph: vi.fn() },
+    });
+  });
+
+  it('registers all invoke-based IPC channels on ipcMain.handle', () => {
+    registerIpcHandlers();
+
+    const registeredChannels = electronMock.handle.mock.calls.map(([channel]) => channel);
+    const expectedInvokeChannels = Object.values(IPC_CHANNELS).filter(
+      (channel) => channel !== IPC_CHANNELS.requestOpenFolder && channel !== IPC_CHANNELS.analysisProgress,
+    );
+
+    expect(registeredChannels).toEqual(expect.arrayContaining(expectedInvokeChannels));
+    expect(registeredChannels).toHaveLength(expectedInvokeChannels.length);
+  });
+
+  it('sends analysis progress from the runAnalysis handler through the shared progress channel', async () => {
+    const progressResult: AnalysisResult = {
+      paragraphId: 'p_123',
+      emotion: [],
+      theme: [],
+      deepMeaning: '読者には静かな決意として届く',
+      confidence: 0.8,
+      model: 'gpt-4.1-mini',
+      analyzedAt: '2026-04-25T00:00:00.000Z',
+      promptVersion: 'v1.0.0',
+    };
+    apiBridgeMock.runAnalysis.mockImplementation(async (_input, _provider, onProgress) => {
+      onProgress(progressResult);
+      return { requestId: 'req_123', results: [progressResult] };
+    });
+
+    registerIpcHandlers();
+    const handlers = getRegisteredHandlers();
+    const runAnalysisHandler = handlers.get(IPC_CHANNELS.runAnalysis);
+    const send = vi.fn();
+
+    if (!runAnalysisHandler) {
+      throw new Error('runAnalysis handler was not registered');
+    }
+
+    const result = await runAnalysisHandler(
+      { sender: { send } },
+      {
+        documentId: 'd_123',
+        personaMode: 'general-reader',
+        promptVersion: 'v1.0.0',
+        paragraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
+        documentParagraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
+      },
+    );
+
+    expect(analysisProviderMock.resolveAnalysisProvider).toHaveBeenCalled();
+    expect(apiBridgeMock.runAnalysis).toHaveBeenCalled();
+    expect(send).toHaveBeenCalledWith(IPC_CHANNELS.analysisProgress, {
+      paragraphId: 'p_123',
+      result: progressResult,
+    });
+    expect(result).toEqual({ requestId: 'req_123', results: [progressResult] });
+  });
+});

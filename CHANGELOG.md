@@ -1,3 +1,9 @@
+[2026/04/25]T-06 GitHub Actions CI
+PR と dev/main への push で pnpm test と pnpm build を実行する GitHub Actions workflow を追加した
+
+[2026/04/25]T-02 IPCブリッジ統合テスト
+preload と main の IPC 契約テストを追加し、標準テストで main/preload/renderer のテストがまとめて走るようにした
+
 [2026/04/24]R-14 既存テキストインポート
 既存 .txt/.md 原稿を .lzl として取り込む導線について、見出し分割・空ファイル・再読込までテストで完了確認した
 
