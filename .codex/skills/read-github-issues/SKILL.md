@@ -1,0 +1,88 @@
+---
+name: read-github-issues
+description: "LiteLizard の GitHub Issue から次にやるタスク候補を探すスキル。ユーザーが「Issueから次タスクを探して」「Issueを見て優先度順に候補出して」「GitHub Issueから作業を選んで」など、Issue確認を明示したときだけ使う。open Issue を P0/P1/P2 優先で読み、blocked を除外し、WBS・仕様・実装済みコードと照合して候補を出す。"
+---
+
+# Read GitHub Issues
+
+GitHub Issue から LiteLizard の次タスク候補を探す。
+
+このスキルはユーザーが明示的に Issue 確認を依頼したときだけ使う。通常の「次のタスクどれ？」では、まず `docs/wbs.md`、関連仕様、実装済みコードを確認する。
+
+## 使う場面
+
+- 「Issueから次タスクを探して」
+- 「Issueを見て優先度順に候補出して」
+- 「GitHub Issueから作業を選んで」
+- 「open Issueを確認して」
+
+使わない場面:
+
+- ユーザーが Issue と言っていない通常のタスク選定
+- 現在の WBS タスクだけを確認したい場合
+- Issue 作成依頼（その場合は `create-github-issue`）
+
+## 標準フィルター
+
+標準では以下を見る。
+
+- open Issue
+- `blocked` ラベル付きは通常候補から除外
+- 優先順は `P0` → `P1` → `P2`
+
+基本コマンド:
+
+```bash
+gh issue list --state open --json number,title,labels,updatedAt,url
+```
+
+本文確認が必要な候補は個別に読む。
+
+```bash
+gh issue view <number> --json number,title,body,labels,state,updatedAt,url
+```
+
+## 候補選定の手順
+
+1. open Issue 一覧を取得する
+2. ラベルで `blocked` を通常候補から外す
+3. `P0`、`P1`、`P2` の順に並べる
+4. 候補Issueの本文を読み、背景・やること・完了条件を確認する
+5. 必要に応じて `docs/wbs.md`、関連 `docs/specs/*.md`、`docs/decisions.md` を確認する
+6. 実装済みの可能性がある場合は、関連コードと最近の `git log` を確認する
+7. 候補を「今やる候補」「まだ早い候補」「ブロック中/確認必要」に分ける
+
+Issue だけで実装判断を確定しない。Issue は古くなるため、WBS・仕様・コードで現在地を確認する。
+
+## 出力形式
+
+日本語で短く出す。
+
+```markdown
+おすすめは #123「タイトル」です。
+
+理由:
+- P1 で blocked ではない
+- WBS の L-09 と対応している
+- 関連仕様があり、実装範囲が明確
+
+次点:
+- #124「タイトル」: P2 なので後回しでよい
+
+確認が必要:
+- #125「タイトル」: 依存タスクが未完了の可能性があります
+```
+
+## 判断ルール
+
+- `P0`: 最優先。ただし再現不能なバグは確認が必要
+- `P1`: MVP/公開に必要なら強い候補
+- `P2`: 価値があっても、P1 が残っているなら通常は後回し
+- `blocked`: 標準候補から外し、ブロック理由だけ報告する
+- ラベルが不足している Issue は、本文から推定してよいが、推定であることを明記する
+
+## WBS との関係
+
+- Issueに WBS ID がある場合は、その行を確認する
+- WBSに未反映のIssueは、必要なら「WBS追加候補」として報告する
+- このスキルでは WBS を自動更新しない
