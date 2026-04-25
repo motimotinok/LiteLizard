@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { toKanjiIndex } from '../../ui/kanji.js';
 
 export function StructureChromePlugin({
   chapterNodeKeys,
@@ -23,7 +24,7 @@ export function StructureChromePlugin({
 
       element.classList.add('editor-chapter-row');
       element.classList.toggle('editor-chapter-row-active', active.type === 'chapter' && active.nodeKey === nodeKey);
-      element.setAttribute('data-chapter-index', `Chapter ${index + 1}`);
+      element.setAttribute('data-chapter-index', `第${toKanjiIndex(index + 1)}章`);
       element.setAttribute('data-testid', `editor-chapter-row-${index + 1}`);
     });
 
@@ -35,7 +36,7 @@ export function StructureChromePlugin({
 
       element.classList.add('editor-paragraph-row');
       element.classList.toggle('editor-paragraph-row-active', active.type === 'paragraph' && active.nodeKey === nodeKey);
-      element.setAttribute('data-paragraph-index', String(index + 1));
+      element.setAttribute('data-paragraph-index', toKanjiIndex(index + 1));
       element.setAttribute('data-testid', `editor-paragraph-row-${index + 1}`);
 
       const showHint = active.type === 'paragraph' && active.nodeKey === nodeKey && emptyParagraphNodeKeys.has(nodeKey);

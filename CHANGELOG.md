@@ -1,3 +1,6 @@
+[2026/04/25]R-16 UI 全面刷新（案 A Minimal 採用）
+Claude Design で詰めた案 A Minimal（iA Writer 寄りの極めて静謐な執筆 UI）を renderer に取り込んだ。トークン (古紙黄ばみ＋藍 1 色)、`44+232+1fr` グリッド、明朝 + 漢数字段落番号、中央寄せ表題、AnalysisPane の Reading Agent ドロップダウン + 「段落を読ませる」、感情カラー hash 撤去、ステータスバー / editor-footer 撤去、macOS hiddenInset、Welcome / 新規 AgentsScreen / SettingsScreen 漢数字タブ。Tweaks 切替・Reading Agent の永続化・Recent files 永続化・検索画面はモック先行で R-17〜R-22 に分割。仕様: docs/specs/ui-redesign-minimal.md
+
 [2026/04/25]T-06 GitHub Actions CI
 PR と dev/main への push で pnpm test と pnpm build を実行する GitHub Actions workflow を追加した
 

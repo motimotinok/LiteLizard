@@ -36,6 +36,9 @@ function createMainWindow() {
   const bounds = loadWindowBounds();
   mainWindow = new BrowserWindow({
     ...bounds,
+    backgroundColor: '#f6f1e7',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 14 } : undefined,
     webPreferences: {
       contextIsolation: true,
       // Keep sandbox on by default. Only disable explicitly for local debugging.
