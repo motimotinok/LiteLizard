@@ -50,4 +50,27 @@ test.describe('LiteLizard desktop UI check', () => {
     await expect(page.locator('.workspace-sidebar')).toBeVisible();
     await page.screenshot({ path: 'test-results/04-explorer.png', fullPage: true });
   });
+
+  test('05 - エディタ: ファイルを開いて段落番号(漢数字)が表示される', async () => {
+    const fileButton = page.locator('.explorer-tree-item-file').first();
+    await expect(fileButton).toBeVisible();
+    await fileButton.click();
+    await expect(page.locator('.editor-frame')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.editor-paragraph-row').first()).toBeVisible({ timeout: 10_000 });
+    await page.screenshot({ path: 'test-results/05-editor.png', fullPage: true });
+  });
+
+  test('06 - 分析パネル: 開閉できる', async () => {
+    const panel = page.locator('.analysis-shell');
+    await expect(panel).toBeVisible({ timeout: 5_000 });
+    await page.screenshot({ path: 'test-results/06-analysis-open.png', fullPage: true });
+
+    const toggle = page.getByRole('button', { name: '分析パネルを切り替え' });
+    await toggle.click();
+    await expect(panel).toBeHidden({ timeout: 5_000 });
+    await page.screenshot({ path: 'test-results/06-analysis-closed.png', fullPage: true });
+
+    await toggle.click();
+    await expect(panel).toBeVisible({ timeout: 5_000 });
+  });
 });
