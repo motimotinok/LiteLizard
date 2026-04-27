@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AnalysisResult, AnalysisRunInput } from '@litelizard/shared';
 import { runAnalysis } from './apiBridge.js';
-import { buildContextTexts, normalizeAnalysisPayload, resolveAnalysisProvider } from './analysisProvider.js';
+import {
+  buildContextTexts,
+  createLocalLlmAnalysisProvider,
+  normalizeAnalysisPayload,
+  resolveAnalysisProvider,
+} from './analysisProvider.js';
 import type { ResolvedAnalysisProvider } from './analysisProvider.js';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('resolveAnalysisProvider', () => {
   it('OpenAI を選択できる', () => {
@@ -67,24 +76,194 @@ describe('resolveAnalysisProvider', () => {
     ).toThrow('Anthropic API キーが未設定です');
   });
 
-  it('local-llm 選択時は未対応エラーにする', () => {
+  it('local-llm を選択できる', () => {
+    const resolved = resolveAnalysisProvider(
+      {
+        defaultProvider: 'local-llm',
+        providers: {
+          openai: { apiKeyConfigured: false, defaultModel: 'gpt-4.1-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-7-sonnet-latest' },
+        },
+        localLlm: {
+          endpoint: 'http://127.0.0.1:11434/',
+          defaultModel: 'llama3.2',
+          configured: true,
+        },
+      },
+      {},
+    );
+
+    expect(resolved.id).toBe('local-llm');
+    expect(resolved.label).toBe('Local LLM');
+    expect(resolved.model).toBe('llama3.2');
+  });
+
+  it('local-llm の endpoint 未設定なら明示エラーにする', () => {
     expect(() =>
       resolveAnalysisProvider(
         {
           defaultProvider: 'local-llm',
           providers: {
-            openai: { apiKeyConfigured: true, defaultModel: 'gpt-4.1-mini' },
-            anthropic: { apiKeyConfigured: true, defaultModel: 'claude-3-7-sonnet-latest' },
+            openai: { apiKeyConfigured: false, defaultModel: 'gpt-4.1-mini' },
+            anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-7-sonnet-latest' },
+          },
+          localLlm: {
+            endpoint: '',
+            defaultModel: 'llama3.2',
+            configured: false,
+          },
+        },
+        {},
+      ),
+    ).toThrow('Local LLM のエンドポイント URL が未設定です');
+  });
+
+  it('local-llm の model 未設定なら明示エラーにする', () => {
+    expect(() =>
+      resolveAnalysisProvider(
+        {
+          defaultProvider: 'local-llm',
+          providers: {
+            openai: { apiKeyConfigured: false, defaultModel: 'gpt-4.1-mini' },
+            anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-7-sonnet-latest' },
           },
           localLlm: {
             endpoint: 'http://127.0.0.1:11434',
-            defaultModel: 'llama3.2',
-            configured: true,
+            defaultModel: '',
+            configured: false,
           },
         },
-        { openai: 'sk-openai', anthropic: 'sk-ant' },
+        {},
       ),
-    ).toThrow('ローカル LLM は未対応です');
+    ).toThrow('Local LLM のモデル名が未設定です');
+  });
+});
+
+describe('createLocalLlmAnalysisProvider', () => {
+  it('Ollama generate API に keep_alive 30s の非ストリーミングリクエストを送る', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          response: JSON.stringify({
+            emotion: ['静けさ'],
+            theme: ['旅'],
+            deepMeaning: '出発前の不安が描かれている。',
+            confidence: 0.75,
+          }),
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createLocalLlmAnalysisProvider('http://127.0.0.1:11434/');
+    const result = await provider.analyzeParagraph({
+      paragraphId: 'p-1',
+      text: '旅立ちの朝、彼女はまだ扉の前にいた。',
+      personaMode: 'general-reader',
+      promptVersion: 'v1',
+      model: 'llama3.2',
+      contextTexts: ['前の段落'],
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:11434/api/generate',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      model: string;
+      prompt: string;
+      stream: boolean;
+      keep_alive: string;
+    };
+    expect(requestBody).toMatchObject({
+      model: 'llama3.2',
+      stream: false,
+      keep_alive: '30s',
+    });
+    expect(requestBody.prompt).toContain('Context paragraphs');
+    expect(requestBody.prompt).toContain('旅立ちの朝');
+    expect(result).toMatchObject({
+      paragraphId: 'p-1',
+      model: 'llama3.2',
+      promptVersion: 'v1',
+      emotion: ['静けさ'],
+      theme: ['旅'],
+      deepMeaning: '出発前の不安が描かれている。',
+      confidence: 0.75,
+    });
+  });
+
+  it('Ollama の fenced JSON レスポンスを正規化できる', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          response: '```json\n{"emotion":["期待"],"theme":["再会"],"deepMeaning":"再会への期待。","confidence":0.6}\n```',
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createLocalLlmAnalysisProvider('http://127.0.0.1:11434');
+    const result = await provider.analyzeParagraph({
+      paragraphId: 'p-2',
+      text: '駅の灯りが見えた。',
+      personaMode: 'friendly',
+      promptVersion: 'v1',
+      model: 'llama3.2',
+      contextTexts: [],
+    });
+
+    expect(result).toMatchObject({
+      paragraphId: 'p-2',
+      emotion: ['期待'],
+      theme: ['再会'],
+      deepMeaning: '再会への期待。',
+      confidence: 0.6,
+    });
+  });
+
+  it('Ollama がエラー応答を返したら状態コードつきエラーにする', async () => {
+    const fetchMock = vi.fn(async () => new Response('model not found', { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createLocalLlmAnalysisProvider('http://127.0.0.1:11434');
+
+    await expect(
+      provider.analyzeParagraph({
+        paragraphId: 'p-1',
+        text: '本文',
+        personaMode: 'general-reader',
+        promptVersion: 'v1',
+        model: 'missing-model',
+        contextTexts: [],
+      }),
+    ).rejects.toThrow('Local LLM API エラー (500): model not found');
+  });
+
+  it('Ollama に接続できない場合は接続失敗エラーにする', async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error('ECONNREFUSED');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createLocalLlmAnalysisProvider('http://127.0.0.1:11434');
+
+    await expect(
+      provider.analyzeParagraph({
+        paragraphId: 'p-1',
+        text: '本文',
+        personaMode: 'general-reader',
+        promptVersion: 'v1',
+        model: 'llama3.2',
+        contextTexts: [],
+      }),
+    ).rejects.toThrow('Local LLM 接続に失敗しました: ECONNREFUSED');
   });
 });
 
