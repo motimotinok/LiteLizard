@@ -219,6 +219,58 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
   };
 }
 
+export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvider {
+  const baseUrl = endpoint.trim().replace(/\/+$/, '');
+
+  return {
+    id: 'local-llm',
+    async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
+      const system = buildSystemPrompt(input.personaMode, input.contextTexts);
+      const prompt = [
+        system,
+        'Target paragraph:',
+        input.text,
+        'Return JSON only.',
+      ].join('\n\n');
+
+      let response: Response;
+      try {
+        response = await fetch(`${baseUrl}/api/generate`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: input.model,
+            prompt,
+            stream: false,
+            keep_alive: '30s',
+          }),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Local LLM 接続に失敗しました: ${message}`);
+      }
+
+      if (!response.ok) {
+        const raw = await response.text();
+        throw new Error(`Local LLM API エラー (${response.status}): ${raw.slice(0, 200)}`);
+      }
+
+      const payload = await response.json() as { response?: unknown };
+      const text = typeof payload.response === 'string' ? payload.response : '';
+      const parsed = JSON.parse(extractJsonText(text)) as {
+        emotion?: unknown;
+        theme?: unknown;
+        deepMeaning?: unknown;
+        confidence?: unknown;
+      };
+
+      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed);
+    },
+  };
+}
+
 function providerDisplayName(providerId: AnalysisProviderId): string {
   if (providerId === 'openai') return 'OpenAI';
   if (providerId === 'anthropic') return 'Anthropic';
@@ -230,7 +282,23 @@ export function resolveAnalysisProvider(
   secrets: SecretMap,
 ): ResolvedAnalysisProvider {
   if (settings.defaultProvider === 'local-llm') {
-    throw new Error('ローカル LLM は未対応です。設定を OpenAI または Anthropic に変更してください。');
+    const endpoint = settings.localLlm.endpoint.trim();
+    const model = settings.localLlm.defaultModel.trim();
+
+    if (!endpoint) {
+      throw new Error('Local LLM のエンドポイント URL が未設定です。設定画面で保存してください。');
+    }
+
+    if (!model) {
+      throw new Error('Local LLM のモデル名が未設定です。設定画面で保存してください。');
+    }
+
+    return {
+      id: 'local-llm',
+      label: providerDisplayName('local-llm'),
+      model,
+      provider: createLocalLlmAnalysisProvider(endpoint),
+    };
   }
 
   const providerId = settings.defaultProvider;
