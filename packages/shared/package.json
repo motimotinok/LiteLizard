@@ -14,12 +14,12 @@
       "default": "./dist/schema.js"
     },
     "./lzl": {
-      "types": "./src/lzl/index.ts",
-      "default": "./src/lzl/index.ts"
+      "types": "./dist/lzl/index.d.ts",
+      "default": "./dist/lzl/index.js"
     },
     "./lzl/ids": {
-      "types": "./src/lzl/ids.ts",
-      "default": "./src/lzl/ids.ts"
+      "types": "./dist/lzl/ids.d.ts",
+      "default": "./dist/lzl/ids.js"
     }
   },
   "scripts": {

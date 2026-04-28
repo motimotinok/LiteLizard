@@ -1,3 +1,6 @@
+[2026/04/28]Issue #58 shared パッケージ subpath exports 修正
+`@litelizard/shared/lzl` と `@litelizard/shared/lzl/ids` の package exports が `src/*.ts` を指していたため、ビルド済み成果物である `dist/*.js` / `dist/*.d.ts` を参照するよう修正した
+
 [2026/04/27]L-08 ローカル LLM 接続（Ollama）
 Ollama の generate API を local-llm provider として接続し、keep_alive 30秒の非ストリーミング解析と fetch モックの回帰テストを追加した
 

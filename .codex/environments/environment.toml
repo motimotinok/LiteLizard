@@ -12,3 +12,12 @@ pnpm install
 name = "デスクトップ起動"
 icon = "tool"
 command = "pnpm --filter @litelizard/desktop dev"
+
+[[actions]]
+name = "CIチェック"
+icon = "test"
+command = '''
+pnpm --filter @litelizard/shared build && \
+pnpm test && \
+pnpm build
+'''
