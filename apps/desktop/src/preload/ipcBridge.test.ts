@@ -49,6 +49,8 @@ describe('createIpcBridge', () => {
       name: '静かな読者',
       role: '情緒や余韻を中心に短く',
       systemPrompt: 'あなたは静かな読者として段落を読みます。',
+      model: null,
+      temperature: 0.7,
     });
     await api.deleteReadingAgent('reader-quiet');
     await api.resetReadingAgents();
@@ -85,6 +87,8 @@ describe('createIpcBridge', () => {
         name: '静かな読者',
         role: '情緒や余韻を中心に短く',
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
+        model: null,
+        temperature: 0.7,
       },
     );
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.deleteReadingAgent, 'reader-quiet');

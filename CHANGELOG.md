@@ -1,3 +1,6 @@
+[2026/05/02]Issue #75 R-18a ReadingAgent スキーマ拡張
+ReadingAgent / ReadingAgentInput と Zod schema に model: string | null と temperature: number を追加し、preloadMockApi の seed と upsert ロジックでも反映した
+
 [2026/05/02]Issue #55 filesystem IPC パストラバーサル対策
 main 側 IPC でプロジェクトルート外のパス、symlink 経由の外部参照、不正な解析 ID を拒否する検証を追加し、回帰テストで確認した
 

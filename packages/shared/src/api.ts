@@ -57,6 +57,8 @@ export const ReadingAgentInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   role: z.string().trim().min(1).max(240),
   systemPrompt: z.string().trim().min(1).max(8_000),
+  model: z.string().trim().min(1).max(120).nullable(),
+  temperature: z.number().min(0).max(1),
 });
 
 export const ReadingAgentSchema = ReadingAgentInputSchema.extend({

@@ -1,7 +1,7 @@
 # LiteLizard WBS（Work Breakdown Structure）
 
 > **目的**: 仕様 v003 → 製品完成までの全タスクを網羅し、Codex 並列開発を可能にする
-> **最終更新**: 2026-04-27
+> **最終更新**: 2026-05-02
 > **仕様参照**: `docs/LiteLizard_spec_v003.md`
 
 ---
