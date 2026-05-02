@@ -1,3 +1,6 @@
+[2026/05/02]Issue #60 parser.ts の冗長な代入を削除
+flushParagraph 内で `currentParagraphId.length === 0` 確認済みの早期 return 分岐にあった `currentParagraphId = ''` を削除した
+
 [2026/05/02]Issue #55 filesystem IPC パストラバーサル対策
 main 側 IPC でプロジェクトルート外のパス、symlink 経由の外部参照、不正な解析 ID を拒否する検証を追加し、回帰テストで確認した
 
