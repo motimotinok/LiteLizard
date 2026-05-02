@@ -42,6 +42,9 @@ const analysisSettingsStore = createAnalysisSettingsStore(app.getPath('userData'
 
 type FsEntryType = 'file' | 'folder';
 
+const DOCUMENT_ID_PATTERN = /^d_[a-z0-9]{10}$/;
+const PARAGRAPH_ID_PATTERN = /^p_[a-z0-9]{10}$/;
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message;
@@ -98,19 +101,87 @@ async function fileExists(filePath: string) {
   }
 }
 
+async function realpathIfExists(filePath: string): Promise<string | null> {
+  try {
+    return await fs.realpath(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function isInsideOrSamePath(root: string, targetPath: string) {
+  const relative = path.relative(root, targetPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function assertResolvedInsideProject(projectRoot: string, targetPath: string) {
+  const resolvedRoot = path.resolve(projectRoot);
+  const resolvedTarget = path.resolve(targetPath);
+  if (!isInsideOrSamePath(resolvedRoot, resolvedTarget)) {
+    throw new Error(`Path is outside the project root: ${targetPath}`);
+  }
+
+  const realRoot = await fs.realpath(resolvedRoot);
+  const realTarget = await realpathIfExists(resolvedTarget);
+  if (realTarget && !isInsideOrSamePath(realRoot, realTarget)) {
+    throw new Error(`Path resolves outside the project root: ${targetPath}`);
+  }
+}
+
 /** ファイルパスからプロジェクトルートを上方向に探す（.litelizard/config.json の有無で判定）。 */
-async function findProjectRoot(filePath: string): Promise<string | null> {
-  let current = path.dirname(filePath);
+async function findProjectRoot(filePath: string, options: { includeSelf?: boolean } = {}): Promise<string | null> {
+  let current = options.includeSelf ? filePath : path.dirname(filePath);
   const root = path.parse(current).root;
-  while (current !== root) {
+  while (true) {
     try {
       await fs.access(path.join(current, '.litelizard', 'config.json'));
       return current;
     } catch {
+      if (current === root) {
+        return null;
+      }
       current = path.dirname(current);
     }
   }
-  return null;
+}
+
+async function assertProjectRoot(projectRoot: string): Promise<string> {
+  const resolvedRoot = path.resolve(projectRoot);
+  const detectedRoot = await findProjectRoot(resolvedRoot, { includeSelf: true });
+  if (!detectedRoot || path.resolve(detectedRoot) !== resolvedRoot) {
+    throw new Error(`Project root is invalid: ${projectRoot}`);
+  }
+  await fs.realpath(resolvedRoot);
+  return resolvedRoot;
+}
+
+async function assertPathInsideDetectedProject(targetPath: string): Promise<{ projectRoot: string; path: string }> {
+  const resolvedPath = path.resolve(targetPath);
+  const projectRoot = await findProjectRoot(resolvedPath, { includeSelf: true });
+  if (!projectRoot) {
+    throw new Error(`Project root was not found for path: ${targetPath}`);
+  }
+  await assertResolvedInsideProject(projectRoot, resolvedPath);
+  return { projectRoot: path.resolve(projectRoot), path: resolvedPath };
+}
+
+async function assertPathInsideProject(projectRoot: string, targetPath: string): Promise<string> {
+  const resolvedRoot = await assertProjectRoot(projectRoot);
+  const resolvedPath = path.resolve(targetPath);
+  await assertResolvedInsideProject(resolvedRoot, resolvedPath);
+  return resolvedPath;
+}
+
+function assertDocumentId(documentId: string) {
+  if (!DOCUMENT_ID_PATTERN.test(documentId)) {
+    throw new Error(`Invalid documentId: ${documentId}`);
+  }
+}
+
+function assertParagraphId(paragraphId: string) {
+  if (!PARAGRAPH_ID_PATTERN.test(paragraphId)) {
+    throw new Error(`Invalid paragraphId: ${paragraphId}`);
+  }
 }
 
 /**
@@ -175,7 +246,8 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.listTree, async (_, root: string) => {
     try {
-      return await fileService.listTree(root);
+      const projectRoot = await assertProjectRoot(root);
+      return await fileService.listTree(projectRoot);
     } catch (error) {
       console.error('[IPC fs:listTree] failed', error);
       throw new Error(`LIST_TREE_FAILED: ${getErrorMessage(error)}`);
@@ -184,16 +256,20 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.createEntry, async (_, root: string, type: FsEntryType, name: string) => {
     try {
+      const validatedParent = await assertPathInsideDetectedProject(root);
+      const parentPath = validatedParent.path;
       const validatedName = validateEntryName(name);
 
       if (type === 'folder') {
-        const folderPath = path.join(root, validatedName);
+        const folderPath = path.join(parentPath, validatedName);
+        await assertResolvedInsideProject(validatedParent.projectRoot, folderPath);
         await fs.mkdir(folderPath);
         return { ok: true as const, path: folderPath, type };
       }
 
       const fileName = ensureLzlFileName(validateEntryName(sanitizeFileStem(validatedName)));
-      const filePath = path.join(root, fileName);
+      const filePath = path.join(parentPath, fileName);
+      await assertResolvedInsideProject(validatedParent.projectRoot, filePath);
       const title = toTitleFromFileName(fileName);
 
       if (await fileExists(filePath)) {
@@ -212,23 +288,26 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.renameEntry, async (_, targetPath: string, nextName: string) => {
     try {
-      const stats = await fs.stat(targetPath);
+      const validatedTarget = await assertPathInsideDetectedProject(targetPath);
+      const stats = await fs.stat(validatedTarget.path);
 
       if (stats.isDirectory()) {
         const validName = validateEntryName(nextName);
-        const nextPath = path.join(path.dirname(targetPath), validName);
-        await assertRenameTargetAvailable(targetPath, nextPath);
-        await fs.rename(targetPath, nextPath);
+        const nextPath = path.join(path.dirname(validatedTarget.path), validName);
+        await assertResolvedInsideProject(validatedTarget.projectRoot, nextPath);
+        await assertRenameTargetAvailable(validatedTarget.path, nextPath);
+        await fs.rename(validatedTarget.path, nextPath);
         return { ok: true as const, path: nextPath };
       }
 
       const safeName = sanitizeFileStem(validateEntryName(nextName));
-      const nextFileName = ensureFileName(safeName, path.extname(targetPath));
-      const nextPath = path.join(path.dirname(targetPath), nextFileName);
-      await assertRenameTargetAvailable(targetPath, nextPath);
+      const nextFileName = ensureFileName(safeName, path.extname(validatedTarget.path));
+      const nextPath = path.join(path.dirname(validatedTarget.path), nextFileName);
+      await assertResolvedInsideProject(validatedTarget.projectRoot, nextPath);
+      await assertRenameTargetAvailable(validatedTarget.path, nextPath);
 
-      if (/\.(md|lzl)$/i.test(targetPath)) {
-        const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
+      if (/\.(md|lzl)$/i.test(validatedTarget.path)) {
+        const oldAnalysisPath = fileService.toAnalysisPath(validatedTarget.path);
         const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
 
         if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(nextAnalysisPath))) {
@@ -236,10 +315,10 @@ export function registerIpcHandlers() {
         }
       }
 
-      await fs.rename(targetPath, nextPath);
+      await fs.rename(validatedTarget.path, nextPath);
 
-      if (/\.(md|lzl)$/i.test(targetPath)) {
-        const oldAnalysisPath = fileService.toAnalysisPath(targetPath);
+      if (/\.(md|lzl)$/i.test(validatedTarget.path)) {
+        const oldAnalysisPath = fileService.toAnalysisPath(validatedTarget.path);
         const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
 
         if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(oldAnalysisPath))) {
@@ -256,30 +335,29 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.deleteEntry, async (_, targetPath: string) => {
     try {
-      const stats = await fs.stat(targetPath);
+      const validatedTarget = await assertPathInsideDetectedProject(targetPath);
+      const stats = await fs.stat(validatedTarget.path);
 
       if (stats.isDirectory()) {
-        await fs.rm(targetPath, { recursive: true, force: true });
+        await fs.rm(validatedTarget.path, { recursive: true, force: true });
         return { ok: true as const };
       }
 
       // 削除前に documentId とプロジェクトルートを取得（新形式クリーンアップ用）
-      const [documentId, projectRoot] = await Promise.all([
-        extractDocumentId(targetPath),
-        findProjectRoot(targetPath),
-      ]);
+      const documentId = await extractDocumentId(validatedTarget.path);
 
-      await fs.rm(targetPath, { force: true });
+      await fs.rm(validatedTarget.path, { force: true });
 
-      if (/\.(md|lzl)$/i.test(targetPath)) {
+      if (/\.(md|lzl)$/i.test(validatedTarget.path)) {
         // 旧サイドカー削除
-        const analysisPath = fileService.toAnalysisPath(targetPath);
+        const analysisPath = fileService.toAnalysisPath(validatedTarget.path);
         await fs.rm(analysisPath, { force: true });
       }
 
       // 新形式世代ファイル削除
-      if (documentId && projectRoot) {
-        await deleteAnalysisFiles(projectRoot, documentId);
+      if (documentId) {
+        assertDocumentId(documentId);
+        await deleteAnalysisFiles(validatedTarget.projectRoot, documentId);
       }
 
       return { ok: true as const };
@@ -290,13 +368,17 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.loadDocument, async (_, filePath: string) => {
-    return fileService.load(filePath);
+    const validatedFilePath = (await assertPathInsideDetectedProject(filePath)).path;
+    return fileService.load(validatedFilePath);
   });
 
   ipcMain.handle(IPC_CHANNELS.createDocument, async (_, root: string, title: string) => {
+    const validatedParent = await assertPathInsideDetectedProject(root);
+    const parentPath = validatedParent.path;
     const safeStem = sanitizeFileStem(title);
     const fileName = ensureLzlFileName(safeStem);
-    const filePath = path.join(root, fileName);
+    const filePath = path.join(parentPath, fileName);
+    await assertResolvedInsideProject(validatedParent.projectRoot, filePath);
     const doc = buildInitialDocument(filePath, toTitleFromFileName(fileName));
 
     if (await fileExists(filePath)) {
@@ -308,7 +390,8 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.saveDocument, async (_, filePath: string, doc: LiteLizardDocument, revision: number) => {
-    return fileService.save(filePath, doc, revision);
+    const validatedFilePath = (await assertPathInsideDetectedProject(filePath)).path;
+    return fileService.save(validatedFilePath, doc, revision);
   });
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysisSettings, async () => {
@@ -401,12 +484,15 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysis, async (_, projectRoot: string, documentId: string, filePath?: string) => {
     try {
-      const result = await loadLatestAnalysis(projectRoot, documentId);
+      const validatedProjectRoot = await assertProjectRoot(projectRoot);
+      assertDocumentId(documentId);
+      const result = await loadLatestAnalysis(validatedProjectRoot, documentId);
       if (result) return result;
 
       // 新形式が存在しない場合、旧サイドカーからマイグレーション
       if (filePath) {
-        const v1 = await fileService.readSidecarAnalysis(filePath);
+        const validatedFilePath = await assertPathInsideProject(validatedProjectRoot, filePath);
+        const v1 = await fileService.readSidecarAnalysis(validatedFilePath);
         if (v1) return migrateFromV1(v1);
       }
       return null;
@@ -420,7 +506,10 @@ export function registerIpcHandlers() {
     IPC_CHANNELS.saveAnalysisResult,
     async (_, projectRoot: string, documentId: string, paragraphId: string, pattern: ParagraphAnalysisPattern) => {
       try {
-        await appendParagraphPattern(projectRoot, documentId, paragraphId, pattern);
+        const validatedProjectRoot = await assertProjectRoot(projectRoot);
+        assertDocumentId(documentId);
+        assertParagraphId(paragraphId);
+        await appendParagraphPattern(validatedProjectRoot, documentId, paragraphId, pattern);
       } catch (error) {
         console.error('[IPC analysis:save] failed', error);
         throw new Error(`SAVE_ANALYSIS_FAILED: ${getErrorMessage(error)}`);
@@ -430,7 +519,9 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.createAnalysisGeneration, async (_, projectRoot: string, documentId: string) => {
     try {
-      const file = await createGeneration(projectRoot, documentId);
+      const validatedProjectRoot = await assertProjectRoot(projectRoot);
+      assertDocumentId(documentId);
+      const file = await createGeneration(validatedProjectRoot, documentId);
       return file.generation;
     } catch (error) {
       console.error('[IPC analysis:newGeneration] failed', error);
@@ -440,6 +531,8 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.importTextFile, async (_, createParent: string) => {
     try {
+      const validatedParent = await assertPathInsideDetectedProject(createParent);
+      const parentPath = validatedParent.path;
       const result = await dialog.showOpenDialog({
         properties: ['openFile'],
         filters: [{ name: 'Text Files', extensions: ['txt', 'md'] }],
@@ -456,7 +549,8 @@ export function registerIpcHandlers() {
       const importResult = parseTextToImportResult(rawText, title);
 
       const destFileName = ensureLzlFileName(sanitizeFileStem(title));
-      const destFilePath = path.join(createParent, destFileName);
+      const destFilePath = path.join(parentPath, destFileName);
+      await assertResolvedInsideProject(validatedParent.projectRoot, destFilePath);
 
       if (await fileExists(destFilePath)) {
         throw new Error(`IMPORT_FILE_ALREADY_EXISTS: ${destFileName}`);
