@@ -92,6 +92,22 @@ export interface ParagraphAnalysisPattern {
   result: Record<string, unknown>;
 }
 
+export interface ReadingAgent {
+  id: string;
+  name: string;
+  role: string;
+  systemPrompt: string;
+  createdAt: string;
+  updatedAt: string;
+  builtIn: boolean;
+}
+
+export interface ReadingAgentInput {
+  name: string;
+  role: string;
+  systemPrompt: string;
+}
+
 export interface FileNode {
   path: string;
   name: string;

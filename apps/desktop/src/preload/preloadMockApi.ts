@@ -3,7 +3,6 @@ import {
   DEFAULT_ANALYSIS_SETTINGS,
   parseTextToImportResult,
   type AnalysisRunInput,
-  type AnalysisRunResult,
   type AnalysisSettings,
   type AnalysisSettingsInput,
   type BridgeApi,
@@ -11,6 +10,8 @@ import {
   type GenerationalAnalysisFile,
   type LiteLizardDocument,
   type ParagraphAnalysisPattern,
+  type ReadingAgent,
+  type ReadingAgentInput,
 } from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
@@ -25,6 +26,7 @@ interface MockState {
   revisions: Map<string, number>;
   analysisFiles: Map<string, GenerationalAnalysisFile>;
   analysisSettings: AnalysisSettings;
+  readingAgents: Map<string, ReadingAgent>;
 }
 
 function clone<T>(value: T): T {
@@ -52,10 +54,6 @@ function dirName(filePath: string) {
     return '/';
   }
   return normalized.slice(0, index);
-}
-
-function withMarkdownExtension(fileName: string) {
-  return /\.md$/i.test(fileName) ? fileName : `${fileName}.md`;
 }
 
 function withLzlExtension(fileName: string) {
@@ -283,6 +281,47 @@ function appendAnalysisPattern(
   state.analysisFiles.set(key, nextFile);
 }
 
+function createInitialReadingAgents(): ReadingAgent[] {
+  const now = '2026-05-02T00:00:00.000Z';
+  return [
+    {
+      id: 'reader-quiet',
+      name: '静かな読者',
+      role: '情緒や余韻を中心に短く',
+      systemPrompt: 'あなたは静かな読者として、段落の情緒や余韻を短く分析します。',
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-critical',
+      name: '批評的な読者',
+      role: '構成・論理・破綻を指摘',
+      systemPrompt: 'あなたは批評的な読者として、構成・論理・破綻を具体的に指摘します。',
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+  ];
+}
+
+function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: string }): ReadingAgent {
+  const now = new Date().toISOString();
+  const id = input.id?.trim() || `reader-${Math.random().toString(36).slice(2, 10)}`;
+  const current = state.readingAgents.get(id);
+  const next: ReadingAgent = {
+    id,
+    name: input.name.trim(),
+    role: input.role.trim(),
+    systemPrompt: input.systemPrompt.trim(),
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+    builtIn: current?.builtIn ?? false,
+  };
+  state.readingAgents.set(id, next);
+  return clone(next);
+}
+
 export function createMockPreloadApi(): BridgeApi {
   const state: MockState = {
     tree: clone(initialMockTree),
@@ -301,6 +340,7 @@ export function createMockPreloadApi(): BridgeApi {
         },
       },
     },
+    readingAgents: new Map(createInitialReadingAgents().map((agent) => [agent.id, agent])),
   };
 
   return {
@@ -579,6 +619,22 @@ export function createMockPreloadApi(): BridgeApi {
       state.revisions.set(normalizePath(filePath), 0);
 
       return { ok: true as const, filePath, document: clone(document) };
+    },
+
+    listReadingAgents: async () => Array.from(state.readingAgents.values()).map(clone),
+
+    getReadingAgent: async (id: string) => clone(state.readingAgents.get(id) ?? null),
+
+    saveReadingAgent: async (input: ReadingAgentInput & { id?: string }) => upsertReadingAgent(state, input),
+
+    deleteReadingAgent: async (id: string) => {
+      state.readingAgents.delete(id);
+      return { ok: true };
+    },
+
+    resetReadingAgents: async () => {
+      state.readingAgents = new Map(createInitialReadingAgents().map((agent) => [agent.id, agent]));
+      return Array.from(state.readingAgents.values()).map(clone);
     },
   };
 }
