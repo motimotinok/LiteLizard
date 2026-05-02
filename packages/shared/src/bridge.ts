@@ -5,6 +5,8 @@ import type {
   GenerationalAnalysisFile,
   LiteLizardDocument,
   ParagraphAnalysisPattern,
+  ReadingAgent,
+  ReadingAgentInput,
 } from './types.js';
 import type { AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
 
@@ -60,6 +62,11 @@ export interface BridgeApi {
   importTextFile(
     createParent: string,
   ): Promise<{ ok: true; filePath: string; document: LiteLizardDocument } | null>;
+  listReadingAgents(): Promise<ReadingAgent[]>;
+  getReadingAgent(id: string): Promise<ReadingAgent | null>;
+  saveReadingAgent(input: ReadingAgentInput & { id?: string }): Promise<ReadingAgent>;
+  deleteReadingAgent(id: string): Promise<{ ok: true }>;
+  resetReadingAgents(): Promise<ReadingAgent[]>;
 }
 
 /**
@@ -89,6 +96,11 @@ export const IPC_CHANNELS = {
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
   analysisProgress: 'analysis:progress',
   importTextFile: 'doc:importText',
+  listReadingAgents: 'agents:list',
+  getReadingAgent: 'agents:get',
+  saveReadingAgent: 'agents:save',
+  deleteReadingAgent: 'agents:delete',
+  resetReadingAgents: 'agents:reset',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

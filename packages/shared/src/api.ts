@@ -53,6 +53,19 @@ export const ApiErrorSchema = z.object({
   }),
 });
 
+export const ReadingAgentInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  role: z.string().trim().min(1).max(240),
+  systemPrompt: z.string().trim().min(1).max(8_000),
+});
+
+export const ReadingAgentSchema = ReadingAgentInputSchema.extend({
+  id: z.string().trim().min(1).max(120),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  builtIn: z.boolean(),
+});
+
 export type AnalysisRequest = z.infer<typeof AnalysisRequestSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 export type AnalysisSuccess = z.infer<typeof AnalysisSuccessSchema>;
@@ -61,6 +74,8 @@ export type AnalysisRunInput = AnalysisRequest;
 export type AnalysisRunResult = AnalysisSuccess;
 export type EmailLinkRequest = z.infer<typeof EmailLinkRequestSchema>;
 export type EmailLinkVerify = z.infer<typeof EmailLinkVerifySchema>;
+export type ReadingAgentInputPayload = z.infer<typeof ReadingAgentInputSchema>;
+export type ReadingAgentPayload = z.infer<typeof ReadingAgentSchema>;
 export type Persona = PersonaMode;
 export type Usage = UsageResponse;
 

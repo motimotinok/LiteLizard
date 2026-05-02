@@ -56,5 +56,15 @@ export function createIpcBridge(): BridgeApi {
     },
     importTextFile: (createParent) =>
       ipcRenderer.invoke(IPC_CHANNELS.importTextFile, createParent),
+    listReadingAgents: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.listReadingAgents),
+    getReadingAgent: (id) =>
+      ipcRenderer.invoke(IPC_CHANNELS.getReadingAgent, id),
+    saveReadingAgent: (input) =>
+      ipcRenderer.invoke(IPC_CHANNELS.saveReadingAgent, input),
+    deleteReadingAgent: (id) =>
+      ipcRenderer.invoke(IPC_CHANNELS.deleteReadingAgent, id),
+    resetReadingAgents: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.resetReadingAgents),
   };
 }

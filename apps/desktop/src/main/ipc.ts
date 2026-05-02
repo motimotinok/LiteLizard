@@ -52,6 +52,10 @@ function getErrorMessage(error: unknown) {
   return 'Unknown error';
 }
 
+function readingAgentsNotImplemented(): never {
+  throw new Error('Reading Agent storage is not implemented yet. This is tracked by R-18b.');
+}
+
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
   const now = new Date().toISOString();
   const paragraphText = '新しい段落';
@@ -565,4 +569,10 @@ export function registerIpcHandlers() {
       throw new Error(`IMPORT_TEXT_FAILED: ${getErrorMessage(error)}`);
     }
   });
+
+  ipcMain.handle(IPC_CHANNELS.listReadingAgents, async () => readingAgentsNotImplemented());
+  ipcMain.handle(IPC_CHANNELS.getReadingAgent, async () => readingAgentsNotImplemented());
+  ipcMain.handle(IPC_CHANNELS.saveReadingAgent, async () => readingAgentsNotImplemented());
+  ipcMain.handle(IPC_CHANNELS.deleteReadingAgent, async () => readingAgentsNotImplemented());
+  ipcMain.handle(IPC_CHANNELS.resetReadingAgents, async () => readingAgentsNotImplemented());
 }
