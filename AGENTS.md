@@ -48,6 +48,20 @@
 | `docs/decisions.md` | git | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
 | `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
+| `docs/agent-flow.md` | git | 自律エージェント運用ルール（ラベル定義・衝突判定・PR ルール） |
+| `prompts/agent-pickup.md` | git | リモート VM 上で自律実行するエージェント向けプロンプト本体 |
+
+---
+
+## 自律エージェント運用
+
+GitHub Issue を自律エージェント（Web Claude Code, クラウド Codex 等）が拾って PR を作るフローを採用している。詳細ルールは `docs/agent-flow.md`、エージェントが読む実行プロンプトは `prompts/agent-pickup.md` を参照。
+
+主要な点:
+- `agent-ready` ラベルが付いた Issue だけが自律エージェントの対象
+- `in-progress` ラベル付きは着手中。同時 in-progress 上限は 2
+- ブランチは必ず `dev` から切り、PR の base も `dev` を指定
+- 完了時は `update-wbs-changelog` スキル経由で `CHANGELOG.md`（および該当 WBS 行）を更新し、PR 差分に含める
 
 ---
 
