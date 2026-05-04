@@ -107,4 +107,18 @@ describe('createMockPreloadApi', () => {
     expect(result.results).toHaveLength(1);
     expect(result.results[0]?.paragraphId).toBe('p2');
   });
+
+  it('Reading Agent mock は built-in 4件を返す', async () => {
+    const api = createMockPreloadApi();
+
+    const agents = await api.listReadingAgents();
+
+    expect(agents.map((agent) => agent.id)).toEqual([
+      'reader-quiet',
+      'reader-critical',
+      'reader-first',
+      'reader-editor',
+    ]);
+    expect(agents.every((agent) => agent.builtIn)).toBe(true);
+  });
 });
