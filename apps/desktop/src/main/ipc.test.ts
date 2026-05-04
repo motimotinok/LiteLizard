@@ -30,6 +30,14 @@ const analysisSettingsStoreMock = vi.hoisted(() => ({
   save: vi.fn(),
 }));
 
+const readingAgentStoreMock = vi.hoisted(() => ({
+  list: vi.fn(),
+  get: vi.fn(),
+  save: vi.fn(),
+  delete: vi.fn(),
+  resetToDefaults: vi.fn(),
+}));
+
 const analysisProviderMock = vi.hoisted(() => ({
   resolveAnalysisProvider: vi.fn(),
 }));
@@ -73,6 +81,10 @@ vi.mock('./analysisSettingsStore.js', async () => {
     createAnalysisSettingsStore: () => analysisSettingsStoreMock,
   };
 });
+
+vi.mock('./agentStore.js', () => ({
+  createReadingAgentStore: () => readingAgentStoreMock,
+}));
 
 vi.mock('./analysisProvider.js', () => analysisProviderMock);
 
@@ -124,6 +136,19 @@ describe('registerIpcHandlers', () => {
     vi.clearAllMocks();
     apiKeyVaultMock.loadAll.mockResolvedValue({ openai: 'sk-openai' });
     analysisSettingsStoreMock.load.mockResolvedValue(DEFAULT_ANALYSIS_SETTINGS);
+    readingAgentStoreMock.list.mockResolvedValue([]);
+    readingAgentStoreMock.get.mockResolvedValue(null);
+    readingAgentStoreMock.save.mockImplementation(async (input) => ({
+      id: input.id ?? 'reader-created',
+      name: input.name,
+      role: input.role,
+      systemPrompt: input.systemPrompt,
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+      builtIn: false,
+    }));
+    readingAgentStoreMock.delete.mockResolvedValue(undefined);
+    readingAgentStoreMock.resetToDefaults.mockResolvedValue([]);
     analysisProviderMock.resolveAnalysisProvider.mockReturnValue({
       id: 'openai',
       label: 'OpenAI',
@@ -142,6 +167,39 @@ describe('registerIpcHandlers', () => {
 
     expect(registeredChannels).toEqual(expect.arrayContaining(expectedInvokeChannels));
     expect(registeredChannels).toHaveLength(expectedInvokeChannels.length);
+  });
+
+  it('wires reading agent IPC handlers to the main store', async () => {
+    const savedInput = {
+      id: 'reader-quiet',
+      name: '静かな読者',
+      role: '静かに読む',
+      systemPrompt: '静かに読んでください。',
+    };
+    readingAgentStoreMock.list.mockResolvedValue([{ id: 'reader-quiet' }]);
+    readingAgentStoreMock.get.mockResolvedValue({ id: 'reader-quiet' });
+    readingAgentStoreMock.resetToDefaults.mockResolvedValue([{ id: 'reader-quiet' }]);
+
+    registerIpcHandlers();
+
+    await expect(getRequiredHandler(IPC_CHANNELS.listReadingAgents)(undefined as never)).resolves.toEqual([{ id: 'reader-quiet' }]);
+    await expect(getRequiredHandler(IPC_CHANNELS.getReadingAgent)(undefined as never, 'reader-quiet' as never)).resolves.toEqual({
+      id: 'reader-quiet',
+    });
+    await expect(getRequiredHandler(IPC_CHANNELS.saveReadingAgent)(undefined as never, savedInput as never)).resolves.toMatchObject({
+      id: 'reader-quiet',
+      name: '静かな読者',
+    });
+    await expect(getRequiredHandler(IPC_CHANNELS.deleteReadingAgent)(undefined as never, 'reader-quiet' as never)).resolves.toEqual({
+      ok: true,
+    });
+    await expect(getRequiredHandler(IPC_CHANNELS.resetReadingAgents)(undefined as never)).resolves.toEqual([{ id: 'reader-quiet' }]);
+
+    expect(readingAgentStoreMock.list).toHaveBeenCalled();
+    expect(readingAgentStoreMock.get).toHaveBeenCalledWith('reader-quiet');
+    expect(readingAgentStoreMock.save).toHaveBeenCalledWith(savedInput);
+    expect(readingAgentStoreMock.delete).toHaveBeenCalledWith('reader-quiet');
+    expect(readingAgentStoreMock.resetToDefaults).toHaveBeenCalled();
   });
 
   it('sends analysis progress from the runAnalysis handler through the shared progress channel', async () => {

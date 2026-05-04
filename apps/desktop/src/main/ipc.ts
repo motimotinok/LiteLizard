@@ -13,12 +13,14 @@ import {
   type AnalysisSettingsInput,
   type LiteLizardDocument,
   type ParagraphAnalysisPattern,
+  type ReadingAgentInput,
 } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
 import { runAnalysis } from './apiBridge.js';
 import { createAnalysisSettingsStore, mergeAnalysisSettings } from './analysisSettingsStore.js';
 import { resolveAnalysisProvider } from './analysisProvider.js';
+import { createReadingAgentStore } from './agentStore.js';
 import {
   appendParagraphPattern,
   createGeneration,
@@ -39,6 +41,7 @@ import { getLastOpenedFolder, setLastOpenedFolder } from './appStore.js';
 const fileService = createFileService();
 const apiKeyVault = createApiKeyVault(app.getPath('userData'));
 const analysisSettingsStore = createAnalysisSettingsStore(app.getPath('userData'));
+const readingAgentStore = createReadingAgentStore(app.getPath('userData'));
 
 type FsEntryType = 'file' | 'folder';
 
@@ -50,10 +53,6 @@ function getErrorMessage(error: unknown) {
     return error.message;
   }
   return 'Unknown error';
-}
-
-function readingAgentsNotImplemented(): never {
-  throw new Error('Reading Agent storage is not implemented yet. This is tracked by R-18b.');
 }
 
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
@@ -570,9 +569,49 @@ export function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.listReadingAgents, async () => readingAgentsNotImplemented());
-  ipcMain.handle(IPC_CHANNELS.getReadingAgent, async () => readingAgentsNotImplemented());
-  ipcMain.handle(IPC_CHANNELS.saveReadingAgent, async () => readingAgentsNotImplemented());
-  ipcMain.handle(IPC_CHANNELS.deleteReadingAgent, async () => readingAgentsNotImplemented());
-  ipcMain.handle(IPC_CHANNELS.resetReadingAgents, async () => readingAgentsNotImplemented());
+  ipcMain.handle(IPC_CHANNELS.listReadingAgents, async () => {
+    try {
+      return await readingAgentStore.list();
+    } catch (error) {
+      console.error('[IPC agents:list] failed', error);
+      throw new Error(`LIST_READING_AGENTS_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getReadingAgent, async (_, id: string) => {
+    try {
+      return await readingAgentStore.get(id);
+    } catch (error) {
+      console.error('[IPC agents:get] failed', error);
+      throw new Error(`GET_READING_AGENT_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.saveReadingAgent, async (_, input: ReadingAgentInput & { id?: string }) => {
+    try {
+      return await readingAgentStore.save(input);
+    } catch (error) {
+      console.error('[IPC agents:save] failed', error);
+      throw new Error(`SAVE_READING_AGENT_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.deleteReadingAgent, async (_, id: string) => {
+    try {
+      await readingAgentStore.delete(id);
+      return { ok: true as const };
+    } catch (error) {
+      console.error('[IPC agents:delete] failed', error);
+      throw new Error(`DELETE_READING_AGENT_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.resetReadingAgents, async () => {
+    try {
+      return await readingAgentStore.resetToDefaults();
+    } catch (error) {
+      console.error('[IPC agents:reset] failed', error);
+      throw new Error(`RESET_READING_AGENTS_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
 }

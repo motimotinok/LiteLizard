@@ -283,12 +283,14 @@ function appendAnalysisPattern(
 
 function createInitialReadingAgents(): ReadingAgent[] {
   const now = '2026-05-02T00:00:00.000Z';
+  const buildPrompt = (name: string, role: string) =>
+    `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。\n\n## 視点\n${role}。読み手の身体感覚に近い、率直な反応を優先してください。\n\n## 出力\n- 100〜200字\n- タグを4つ（情緒・印象を表すもの）\n- 0〜100の確度\n\n## 禁則\n- 文章の良し悪しの断定\n- 著者への助言\n- 修正案の提示`;
   return [
     {
       id: 'reader-quiet',
       name: '静かな読者',
       role: '情緒や余韻を中心に短く',
-      systemPrompt: 'あなたは静かな読者として、段落の情緒や余韻を短く分析します。',
+      systemPrompt: buildPrompt('静かな読者', '情緒や余韻を中心に短く'),
       createdAt: now,
       updatedAt: now,
       builtIn: true,
@@ -297,7 +299,25 @@ function createInitialReadingAgents(): ReadingAgent[] {
       id: 'reader-critical',
       name: '批評的な読者',
       role: '構成・論理・破綻を指摘',
-      systemPrompt: 'あなたは批評的な読者として、構成・論理・破綻を具体的に指摘します。',
+      systemPrompt: buildPrompt('批評的な読者', '構成・論理・破綻を指摘'),
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-first',
+      name: 'はじめての読者',
+      role: '予備知識ゼロで率直に',
+      systemPrompt: buildPrompt('はじめての読者', '予備知識ゼロで率直に'),
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-editor',
+      name: '担当編集',
+      role: '売り・引っかかりを評価',
+      systemPrompt: buildPrompt('担当編集', '売り・引っかかりを評価'),
       createdAt: now,
       updatedAt: now,
       builtIn: true,
