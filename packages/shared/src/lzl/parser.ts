@@ -73,7 +73,6 @@ export function parseLzl(content: string): ParsedLzlDocument {
 
   const flushParagraph = () => {
     if (buffer.length === 0 && currentParagraphId.length === 0) {
-      currentParagraphId = '';
       return;
     }
 
