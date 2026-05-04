@@ -1,3 +1,6 @@
+[2026/05/04]Issue #82 desktop lint エラー解消
+未使用 import / 引数 / 関数を整理し、src/preload/ の stale な tsc 出力（.js / .d.ts / .js.map）を削除して renderer と同じく gitignore 対象にすることで `pnpm --filter @litelizard/desktop lint` を通る状態に戻した
+
 [2026/05/05]Issue #76 R-18b Reading Agent 永続化ストア
 main 側に `userData/agents.json` ベースの Reading Agent ストアと CRUD IPC を実装し、初回 seed・不正 JSON 復旧・preload mock の4件 seed をテストで確認した
 
