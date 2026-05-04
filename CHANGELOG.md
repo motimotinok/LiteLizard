@@ -1,3 +1,6 @@
+[2026/05/05]Issue #76 R-18b Reading Agent 永続化ストア
+main 側に `userData/agents.json` ベースの Reading Agent ストアと CRUD IPC を実装し、初回 seed・不正 JSON 復旧・preload mock の4件 seed をテストで確認した
+
 [2026/05/02]Issue #60 parser.ts の冗長な代入を削除
 flushParagraph 内で `currentParagraphId.length === 0` 確認済みの早期 return 分岐にあった `currentParagraphId = ''` を削除した
 
