@@ -7,6 +7,7 @@ import { resetRateLimitState } from './services/rateLimit.js';
 function analysisPayload(paragraphs: Array<{ paragraphId: string; text: string }>) {
   return {
     documentId: 'doc_xxxxxx',
+    agentId: 'reader-quiet',
     promptVersion: 'v1.0.0',
     personaMode: 'general-reader' as const,
     paragraphs,
@@ -103,12 +104,14 @@ describe('API integration', () => {
   it('updates usage after successful request', async () => {
     const { accessToken } = await createSession(app);
 
-    await app.inject({
+    const analysisResponse = await app.inject({
       method: 'POST',
       url: '/v1/analysis/paragraphs',
       headers: { Authorization: `Bearer ${accessToken}` },
       payload: analysisPayload([{ paragraphId: 'p_01abcd', text: 'hello world' }]),
     });
+    expect(analysisResponse.statusCode).toBe(200);
+    expect((analysisResponse.json() as { agentId: string }).agentId).toBe('reader-quiet');
 
     const usageResponse = await app.inject({
       method: 'GET',
