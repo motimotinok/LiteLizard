@@ -103,6 +103,7 @@ export async function analysisRoutes(app: FastifyInstance) {
       return reply.code(200).send({
         requestId,
         documentId: body.documentId,
+        agentId: body.agentId,
         personaMode: body.personaMode,
         promptVersion: body.promptVersion,
         results: analysis.results,

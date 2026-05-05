@@ -1,3 +1,6 @@
+[2026/05/05]GitHub Actions CI 修正
+Reading Agent 追加で `AnalysisRequestSchema` に `agentId` が必須になった一方、API 統合テストの payload と API 成功レスポンスが古い契約のままだったため、CI の `apps/api` テストが validation error で失敗していた。テスト payload と `/v1/analysis/paragraphs` 成功レスポンスを `agentId` 付きに揃え、`pnpm test` / `pnpm build` で確認した
+
 [2026/05/05]R-18 Reading Agent 編集・解析適用
 renderer store と AgentsScreen を Reading Agent 永続化ストアへ接続し、agentId ベースの解析実行、model/temperature 反映、未保存 draft の dry-run、active agent 復元、仕様と検証記録まで完了した
 
