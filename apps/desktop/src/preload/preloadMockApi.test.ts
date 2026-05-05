@@ -95,6 +95,7 @@ describe('createMockPreloadApi', () => {
 
     const result = await api.runAnalysis({
       documentId: 'doc-1',
+      agentId: 'reader-quiet',
       personaMode: 'general-reader',
       promptVersion: 'v1.0.0',
       paragraphs: [{ paragraphId: 'p2', order: 2, text: 'second' }],

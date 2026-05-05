@@ -1,4 +1,4 @@
-import { DEFAULT_ANALYSIS_SETTINGS, } from '@litelizard/shared';
+import { buildImportedDocument, DEFAULT_ANALYSIS_SETTINGS, parseTextToImportResult, } from '@litelizard/shared';
 import { initialMockApiKeyConfigured, initialMockDocuments, initialMockTree, mockRootPath, } from './preloadMockData.js';
 function clone(value) {
     return structuredClone(value);
@@ -21,9 +21,6 @@ function dirName(filePath) {
         return '/';
     }
     return normalized.slice(0, index);
-}
-function withMarkdownExtension(fileName) {
-    return /\.md$/i.test(fileName) ? fileName : `${fileName}.md`;
 }
 function withLzlExtension(fileName) {
     return /\.lzl$/i.test(fileName) ? fileName : `${fileName}.lzl`;
@@ -186,6 +183,38 @@ function paragraphAnalysisFromText(text) {
         model: 'mock-model-v1',
     };
 }
+function paragraphAnalysisFromAgent(text, agent) {
+    const base = paragraphAnalysisFromText(`${agent.name}:${agent.role}:${agent.systemPrompt}:${text}`);
+    return {
+        ...base,
+        deepMeaning: `『${agent.name}』は、${base.deepMeaning}`,
+        model: agent.model?.trim() || base.model,
+    };
+}
+function analysisFileKey(documentId) {
+    return documentId;
+}
+function appendAnalysisPattern(state, documentId, paragraphId, pattern) {
+    const key = analysisFileKey(documentId);
+    const current = state.analysisFiles.get(key);
+    const now = new Date().toISOString();
+    const nextFile = current
+        ? clone(current)
+        : {
+            version: 1,
+            documentId,
+            generation: 1,
+            createdAt: now,
+            updatedAt: now,
+            paragraphs: {},
+        };
+    const history = nextFile.paragraphs[paragraphId]?.patterns ?? [];
+    nextFile.paragraphs[paragraphId] = {
+        patterns: [...history, clone(pattern)],
+    };
+    nextFile.updatedAt = now;
+    state.analysisFiles.set(key, nextFile);
+}
 function createInitialReadingAgents() {
     const now = '2026-05-02T00:00:00.000Z';
     const buildPrompt = (name, role) => `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。\n\n## 視点\n${role}。読み手の身体感覚に近い、率直な反応を優先してください。\n\n## 出力\n- 100〜200字\n- タグを4つ（情緒・印象を表すもの）\n- 0〜100の確度\n\n## 禁則\n- 文章の良し悪しの断定\n- 著者への助言\n- 修正案の提示`;
@@ -195,6 +224,8 @@ function createInitialReadingAgents() {
             name: '静かな読者',
             role: '情緒や余韻を中心に短く',
             systemPrompt: buildPrompt('静かな読者', '情緒や余韻を中心に短く'),
+            model: null,
+            temperature: 0.7,
             createdAt: now,
             updatedAt: now,
             builtIn: true,
@@ -204,6 +235,8 @@ function createInitialReadingAgents() {
             name: '批評的な読者',
             role: '構成・論理・破綻を指摘',
             systemPrompt: buildPrompt('批評的な読者', '構成・論理・破綻を指摘'),
+            model: null,
+            temperature: 0.7,
             createdAt: now,
             updatedAt: now,
             builtIn: true,
@@ -213,6 +246,8 @@ function createInitialReadingAgents() {
             name: 'はじめての読者',
             role: '予備知識ゼロで率直に',
             systemPrompt: buildPrompt('はじめての読者', '予備知識ゼロで率直に'),
+            model: null,
+            temperature: 0.7,
             createdAt: now,
             updatedAt: now,
             builtIn: true,
@@ -222,6 +257,8 @@ function createInitialReadingAgents() {
             name: '担当編集',
             role: '売り・引っかかりを評価',
             systemPrompt: buildPrompt('担当編集', '売り・引っかかりを評価'),
+            model: null,
+            temperature: 0.7,
             createdAt: now,
             updatedAt: now,
             builtIn: true,
@@ -237,6 +274,8 @@ function upsertReadingAgent(state, input) {
         name: input.name.trim(),
         role: input.role.trim(),
         systemPrompt: input.systemPrompt.trim(),
+        model: input.model?.trim() || null,
+        temperature: input.temperature,
         createdAt: current?.createdAt ?? now,
         updatedAt: now,
         builtIn: current?.builtIn ?? false,
@@ -249,6 +288,7 @@ export function createMockPreloadApi() {
         tree: clone(initialMockTree),
         documents: new Map(Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])),
         revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
+        analysisFiles: new Map(),
         analysisSettings: {
             ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
             providers: {
@@ -260,6 +300,7 @@ export function createMockPreloadApi() {
             },
         },
         readingAgents: new Map(createInitialReadingAgents().map((agent) => [agent.id, agent])),
+        activeReadingAgentId: 'reader-quiet',
     };
     return {
         openFolder: async () => mockRootPath,
@@ -384,13 +425,18 @@ export function createMockPreloadApi() {
         runAnalysis: async (input) => {
             const analyzedAt = new Date().toISOString();
             const requestId = `req_mock_${input.documentId}_${input.paragraphs.length}`;
+            const agent = state.readingAgents.get(input.agentId) ?? Array.from(state.readingAgents.values())[0];
+            if (!agent) {
+                throw new Error(`Reading Agent not found: ${input.agentId}`);
+            }
             return {
                 requestId,
                 documentId: input.documentId,
+                agentId: input.agentId,
                 personaMode: input.personaMode,
                 promptVersion: input.promptVersion,
                 results: input.paragraphs.map((paragraph) => {
-                    const analysis = paragraphAnalysisFromText(paragraph.text);
+                    const analysis = paragraphAnalysisFromAgent(paragraph.text, agent);
                     return {
                         paragraphId: paragraph.paragraphId,
                         emotion: analysis.emotion,
@@ -454,14 +500,47 @@ export function createMockPreloadApi() {
             }
             return { ok: true, model: input.model.trim() };
         },
+        onAnalysisProgress: () => () => { },
         loadAnalysis: async (_projectRoot, _documentId, _filePath) => {
-            return null;
+            return clone(state.analysisFiles.get(analysisFileKey(_documentId)) ?? null);
         },
         saveAnalysisResult: async (_projectRoot, _documentId, _paragraphId, _pattern) => {
-            // mock: no-op
+            appendAnalysisPattern(state, _documentId, _paragraphId, _pattern);
         },
         createAnalysisGeneration: async (_projectRoot, _documentId) => {
-            return 1;
+            const key = analysisFileKey(_documentId);
+            const current = state.analysisFiles.get(key);
+            const generation = (current?.generation ?? 0) + 1;
+            const now = new Date().toISOString();
+            state.analysisFiles.set(key, {
+                version: 1,
+                documentId: _documentId,
+                generation,
+                createdAt: now,
+                updatedAt: now,
+                paragraphs: {},
+            });
+            return generation;
+        },
+        importTextFile: async (createParent) => {
+            const sampleText = `# サンプル章\n\nサンプル段落1。\n\nサンプル段落2。`;
+            const fileName = withLzlExtension('imported-sample');
+            const filePath = joinPath(createParent, fileName);
+            if (pathExists(state.tree, filePath)) {
+                throw new Error(`IMPORT_FILE_ALREADY_EXISTS: ${filePath}`);
+            }
+            const importResult = parseTextToImportResult(sampleText, 'imported-sample');
+            const document = buildImportedDocument(importResult, filePath);
+            const children = findDirectoryChildren(state, createParent);
+            children.push({ path: filePath, name: fileName, type: 'file' });
+            state.documents.set(normalizePath(filePath), document);
+            state.revisions.set(normalizePath(filePath), 0);
+            return { ok: true, filePath, document: clone(document) };
+        },
+        getActiveReadingAgentId: async () => state.activeReadingAgentId,
+        setActiveReadingAgentId: async (id) => {
+            state.activeReadingAgentId = id;
+            return { ok: true };
         },
         listReadingAgents: async () => Array.from(state.readingAgents.values()).map(clone),
         getReadingAgent: async (id) => clone(state.readingAgents.get(id) ?? null),
@@ -472,7 +551,23 @@ export function createMockPreloadApi() {
         },
         resetReadingAgents: async () => {
             state.readingAgents = new Map(createInitialReadingAgents().map((agent) => [agent.id, agent]));
+            state.activeReadingAgentId = 'reader-quiet';
             return Array.from(state.readingAgents.values()).map(clone);
+        },
+        dryRunReadingAgent: async (input) => {
+            const analyzedAt = new Date().toISOString();
+            const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);
+            return {
+                paragraphId: input.paragraph.paragraphId,
+                emotion: analysis.emotion,
+                theme: analysis.theme,
+                deepMeaning: analysis.deepMeaning,
+                confidence: analysis.confidence,
+                model: analysis.model,
+                analyzedAt,
+                promptVersion: input.promptVersion,
+            };
         },
     };
 }
+//# sourceMappingURL=preloadMockApi.js.map

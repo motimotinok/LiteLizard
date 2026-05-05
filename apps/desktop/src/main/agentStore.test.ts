@@ -60,7 +60,13 @@ describe('createReadingAgentStore', () => {
       await fs.writeFile(path.join(userDataPath, 'agents.json'), JSON.stringify(existing, null, 2), 'utf8');
       const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
 
-      await expect(store.list()).resolves.toEqual(existing);
+      await expect(store.list()).resolves.toEqual([
+        {
+          ...existing[0],
+          model: null,
+          temperature: 0.7,
+        },
+      ]);
     });
   });
 
@@ -75,12 +81,16 @@ describe('createReadingAgentStore', () => {
         name: '  自作読者  ',
         role: '  余白を見る  ',
         systemPrompt: '  余白を中心に読んでください。  ',
+        model: '  gpt-4.1-mini  ',
+        temperature: 0.3,
       });
       const updated = await store.save({
         id: 'reader-custom',
         name: '更新読者',
         role: '温度を見る',
         systemPrompt: '温度を中心に読んでください。',
+        model: null,
+        temperature: 0.8,
       });
 
       expect(created).toMatchObject({
@@ -88,12 +98,16 @@ describe('createReadingAgentStore', () => {
         name: '自作読者',
         role: '余白を見る',
         systemPrompt: '余白を中心に読んでください。',
+        model: 'gpt-4.1-mini',
+        temperature: 0.3,
         createdAt: '2026-05-02T00:00:02.000Z',
         builtIn: false,
       });
       expect(updated).toMatchObject({
         id: 'reader-custom',
         name: '更新読者',
+        model: null,
+        temperature: 0.8,
         createdAt: '2026-05-02T00:00:02.000Z',
         updatedAt: '2026-05-02T00:00:03.000Z',
         builtIn: false,
@@ -112,6 +126,8 @@ describe('createReadingAgentStore', () => {
         name: '削除対象',
         role: '消える',
         systemPrompt: '消える読者です。',
+        model: null,
+        temperature: 0.7,
       });
       await store.delete('reader-delete-me');
 
@@ -131,6 +147,8 @@ describe('createReadingAgentStore', () => {
         name: '自作読者',
         role: '自由に読む',
         systemPrompt: '自由に読んでください。',
+        model: null,
+        temperature: 0.7,
       });
       const reset = await store.resetToDefaults();
 

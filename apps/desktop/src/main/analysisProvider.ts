@@ -1,13 +1,14 @@
 import OpenAI, { AuthenticationError, RateLimitError } from 'openai';
 import type { AnalysisResult, AnalysisRunInput } from '@litelizard/shared';
-import type { AnalysisProviderId, AnalysisSettings, PersonaMode } from '@litelizard/shared';
+import type { AnalysisProviderId, AnalysisSettings, ReadingAgentInput } from '@litelizard/shared';
 
 export interface AnalysisProviderRequest {
   paragraphId: string;
   text: string;
-  personaMode: PersonaMode;
+  agent: ReadingAgentInput;
   promptVersion: string;
   model: string;
+  temperature: number;
   contextTexts: string[];
 }
 
@@ -69,18 +70,21 @@ function extractJsonText(input: string): string {
   return trimmed;
 }
 
-function buildSystemPrompt(personaMode: PersonaMode, contextTexts: string[]): string {
+export function buildSystemPrompt(agent: ReadingAgentInput, contextTexts: string[]): string {
   const contextBlock =
     contextTexts.length > 0
-      ? `\nContext paragraphs (oldest first):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
-      : '\nContext paragraphs: none';
+      ? `Context paragraphs (oldest first):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+      : 'Context paragraphs: none';
 
   return [
     'You are LiteLizard analysis model.',
+    `Reading agent name: ${agent.name}.`,
+    `Reading agent role: ${agent.role}.`,
+    'Reading agent system prompt:',
+    agent.systemPrompt,
     'Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1).',
-    `Persona mode: ${personaMode}.`,
     contextBlock,
-  ].join(' ');
+  ].join('\n\n');
 }
 
 export function normalizeAnalysisPayload(
@@ -113,11 +117,12 @@ export function createOpenAiAnalysisProvider(apiKey: string): AnalysisProvider {
   return {
     id: 'openai',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.personaMode, input.contextTexts);
+      const system = buildSystemPrompt(input.agent, input.contextTexts);
       let completion: Awaited<ReturnType<typeof client.responses.create>>;
       try {
         completion = await client.responses.create({
           model: input.model,
+          temperature: input.temperature,
           input: [
             { role: 'system', content: system },
             { role: 'user', content: input.text },
@@ -166,7 +171,7 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
   return {
     id: 'anthropic',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.personaMode, input.contextTexts);
+      const system = buildSystemPrompt(input.agent, input.contextTexts);
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -177,6 +182,7 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
         body: JSON.stringify({
           model: input.model,
           max_tokens: 1200,
+          temperature: input.temperature,
           system,
           messages: [
             {
@@ -225,7 +231,7 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
   return {
     id: 'local-llm',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.personaMode, input.contextTexts);
+      const system = buildSystemPrompt(input.agent, input.contextTexts);
       const prompt = [
         system,
         'Target paragraph:',
@@ -245,6 +251,9 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
             prompt,
             stream: false,
             keep_alive: '30s',
+            options: {
+              temperature: input.temperature,
+            },
           }),
         });
       } catch (error) {

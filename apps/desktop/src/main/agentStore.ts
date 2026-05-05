@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  DEFAULT_READING_AGENT_TEMPERATURE,
   ReadingAgentInputSchema,
   ReadingAgentSchema,
   type ReadingAgent,
@@ -47,6 +48,8 @@ export function createDefaultReadingAgents(now: string): ReadingAgent[] {
   return presets.map((preset) => ({
     ...preset,
     systemPrompt: buildSystemPrompt(preset.name, preset.role),
+    model: null,
+    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     createdAt: now,
     updatedAt: now,
     builtIn: true,
@@ -148,6 +151,8 @@ export function createReadingAgentStore(
           name: parsed.name,
           role: parsed.role,
           systemPrompt: parsed.systemPrompt,
+          model: parsed.model,
+          temperature: parsed.temperature,
           createdAt: existing?.createdAt ?? timestamp,
           updatedAt: timestamp,
           builtIn: existing?.builtIn ?? false,

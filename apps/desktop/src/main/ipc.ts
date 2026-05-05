@@ -13,11 +13,12 @@ import {
   type AnalysisSettingsInput,
   type LiteLizardDocument,
   type ParagraphAnalysisPattern,
+  type ReadingAgentDryRunInput,
   type ReadingAgentInput,
 } from '@litelizard/shared';
 import { createFileService } from './fileService.js';
 import { createApiKeyVault } from './sessionVault.js';
-import { runAnalysis } from './apiBridge.js';
+import { dryRunReadingAgent, runAnalysis } from './apiBridge.js';
 import { createAnalysisSettingsStore, mergeAnalysisSettings } from './analysisSettingsStore.js';
 import { resolveAnalysisProvider } from './analysisProvider.js';
 import { createReadingAgentStore } from './agentStore.js';
@@ -36,7 +37,12 @@ import {
   validateEntryName,
 } from './ipcPathUtils.js';
 import { ensureProject } from './projectManager.js';
-import { getLastOpenedFolder, setLastOpenedFolder } from './appStore.js';
+import {
+  getActiveReadingAgentId,
+  getLastOpenedFolder,
+  setActiveReadingAgentId,
+  setLastOpenedFolder,
+} from './appStore.js';
 
 const fileService = createFileService();
 const apiKeyVault = createApiKeyVault(app.getPath('userData'));
@@ -468,16 +474,20 @@ export function registerIpcHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.runAnalysis, async (event, input: AnalysisRunInput) => {
-    const [savedSettings, secrets] = await Promise.all([
+    const [savedSettings, secrets, agent] = await Promise.all([
       analysisSettingsStore.load(),
       apiKeyVault.loadAll(),
+      readingAgentStore.get(input.agentId),
     ]);
+    if (!agent) {
+      throw new Error(`Reading Agent が見つかりません: ${input.agentId}`);
+    }
     const analysisSettings = mergeAnalysisSettings(savedSettings, {
       openai: Boolean(secrets.openai?.trim()),
       anthropic: Boolean(secrets.anthropic?.trim()),
     });
     const provider = resolveAnalysisProvider(analysisSettings, secrets);
-    return runAnalysis(input, provider, (result) => {
+    return runAnalysis(input, provider, agent, (result) => {
       event.sender.send(IPC_CHANNELS.analysisProgress, {
         paragraphId: result.paragraphId,
         result,
@@ -569,6 +579,15 @@ export function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.getActiveReadingAgentId, async () => {
+    return getActiveReadingAgentId();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.setActiveReadingAgentId, async (_, id: string) => {
+    await setActiveReadingAgentId(id);
+    return { ok: true as const };
+  });
+
   ipcMain.handle(IPC_CHANNELS.listReadingAgents, async () => {
     try {
       return await readingAgentStore.list();
@@ -612,6 +631,24 @@ export function registerIpcHandlers() {
     } catch (error) {
       console.error('[IPC agents:reset] failed', error);
       throw new Error(`RESET_READING_AGENTS_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.dryRunReadingAgent, async (_, input: ReadingAgentDryRunInput) => {
+    try {
+      const [savedSettings, secrets] = await Promise.all([
+        analysisSettingsStore.load(),
+        apiKeyVault.loadAll(),
+      ]);
+      const analysisSettings = mergeAnalysisSettings(savedSettings, {
+        openai: Boolean(secrets.openai?.trim()),
+        anthropic: Boolean(secrets.anthropic?.trim()),
+      });
+      const provider = resolveAnalysisProvider(analysisSettings, secrets);
+      return await dryRunReadingAgent(input, provider);
+    } catch (error) {
+      console.error('[IPC agents:dryRun] failed', error);
+      throw new Error(`DRY_RUN_READING_AGENT_FAILED: ${getErrorMessage(error)}`);
     }
   });
 }

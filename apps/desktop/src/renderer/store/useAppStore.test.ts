@@ -40,6 +40,26 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     testLocalLlmConnection: vi.fn(),
     onAnalysisProgress: vi.fn(() => () => {}),
     importTextFile: vi.fn(),
+    getActiveReadingAgentId: vi.fn().mockResolvedValue('reader-quiet'),
+    setActiveReadingAgentId: vi.fn().mockResolvedValue({ ok: true }),
+    listReadingAgents: vi.fn().mockResolvedValue([
+      {
+        id: 'reader-quiet',
+        name: '静かな読者',
+        role: '余韻を読む',
+        systemPrompt: '余韻を中心に読んでください。',
+        model: null,
+        temperature: 0.7,
+        createdAt: '2026-05-02T00:00:00.000Z',
+        updatedAt: '2026-05-02T00:00:00.000Z',
+        builtIn: true,
+      },
+    ]),
+    getReadingAgent: vi.fn(),
+    saveReadingAgent: vi.fn(),
+    deleteReadingAgent: vi.fn(),
+    resetReadingAgents: vi.fn(),
+    dryRunReadingAgent: vi.fn(),
     ...overrides,
   };
 }
@@ -172,6 +192,23 @@ describe('useAppStore L-06 analysis state', () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
     useAppStore.setState(baseState, true);
+    useAppStore.setState({
+      agents: [
+        {
+          id: 'reader-quiet',
+          name: '静かな読者',
+          role: '余韻を読む',
+          systemPrompt: '余韻を中心に読んでください。',
+          model: null,
+          temperature: 0.7,
+          createdAt: '2026-05-02T00:00:00.000Z',
+          updatedAt: '2026-05-02T00:00:00.000Z',
+          builtIn: true,
+        },
+      ],
+      activeAgentId: 'reader-quiet',
+      agentsLoaded: true,
+    });
   });
 
   it('loadDocument は最新の互換 pattern を初期表示に使い、不一致履歴は stale のままにする', async () => {
@@ -236,12 +273,14 @@ describe('useAppStore L-06 analysis state', () => {
           confidence: 0.88,
           model: 'gpt-4o-mini',
           analyzedAt: '2026-04-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
         },
       });
 
       return {
         requestId: 'req_1',
         documentId: document.documentId,
+        agentId: 'reader-quiet',
         personaMode: document.personaMode,
         promptVersion: 'v1.0.0',
         results: [
@@ -253,6 +292,7 @@ describe('useAppStore L-06 analysis state', () => {
             confidence: 0.88,
             model: 'gpt-4o-mini',
             analyzedAt: '2026-04-12T00:00:00.000Z',
+            promptVersion: 'v1.0.0',
           },
           {
             paragraphId: 'p2',
@@ -262,6 +302,7 @@ describe('useAppStore L-06 analysis state', () => {
             confidence: 0.75,
             model: 'gpt-4o-mini',
             analyzedAt: '2026-04-12T00:01:00.000Z',
+            promptVersion: 'v1.0.0',
           },
         ],
       };
@@ -386,11 +427,13 @@ describe('useAppStore L-06 analysis state', () => {
           confidence: 0.88,
           model: 'gpt-4o-mini',
           analyzedAt: '2026-04-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
         },
       });
       return {
         requestId: 'req_2',
         documentId: document.documentId,
+        agentId: 'reader-quiet',
         personaMode: document.personaMode,
         promptVersion: 'v1.0.0',
         results: [],

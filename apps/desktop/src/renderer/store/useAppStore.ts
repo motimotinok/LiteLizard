@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import {
   DEFAULT_ANALYSIS_SETTINGS,
+  type AnalysisResult,
   type AnalysisRunInput,
   type AnalysisSettings,
   type AnalysisSettingsInput,
   type FileNode,
   type LiteLizardDocument,
   type ParagraphAnalysisPattern,
+  type ReadingAgent,
+  type ReadingAgentInput,
 } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
@@ -62,8 +65,10 @@ function getSelectedAnalysisProviderState(settings: AnalysisSettings) {
   return {
     id: 'local-llm' as const,
     label: 'Local LLM',
-    runnable: false,
-    reason: 'ローカル LLM は未対応です。設定を OpenAI または Anthropic に変更してください。',
+    runnable: settings.localLlm.configured,
+    reason: settings.localLlm.configured
+      ? null
+      : 'ローカル LLM のエンドポイントとモデルを設定してください。',
   };
 }
 
@@ -102,6 +107,9 @@ interface AppState {
   selectedPatternIndexByParagraphId: SelectedPatternIndexByParagraphId;
   generationSyncPending: boolean;
   analysisSettings: AnalysisSettings;
+  agents: ReadingAgent[];
+  activeAgentId: string | null;
+  agentsLoaded: boolean;
   activeWorkspacePanel: WorkspacePanel;
   editorMode: EditorMode;
   viewScale: ViewScale;
@@ -143,6 +151,17 @@ interface AppState {
   openAgentsPanel: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
+  loadAgents: () => Promise<void>;
+  setActiveAgent: (id: string) => Promise<void>;
+  saveAgent: (input: ReadingAgentInput & { id?: string }) => Promise<ReadingAgent>;
+  deleteAgent: (id: string) => Promise<void>;
+  resetAgents: () => Promise<ReadingAgent[]>;
+  dryRunAgent: (input: {
+    agent: ReadingAgentInput & { id?: string };
+    paragraphId: string;
+    text: string;
+    order?: number;
+  }) => Promise<AnalysisResult>;
   bootstrapAnalysisSettings: () => Promise<void>;
   saveProviderApiKey: (providerId: 'openai' | 'anthropic', apiKey: string) => Promise<void>;
   clearProviderApiKey: (providerId: 'openai' | 'anthropic') => Promise<void>;
@@ -430,6 +449,9 @@ export const useAppStore = create<AppState>((set, get) => {
     ...resetAnalysisState(),
     ...resetUndoState(),
     analysisSettings: cloneAnalysisSettings(),
+    agents: [],
+    activeAgentId: null,
+    agentsLoaded: false,
     activeWorkspacePanel: 'editor',
     editorMode: 'writing',
     viewScale: 'micro',
@@ -915,8 +937,12 @@ export const useAppStore = create<AppState>((set, get) => {
   },
 
   runAnalysis: async () => {
-    const { document, analysisSettings } = get();
+    const { document, analysisSettings, activeAgentId } = get();
     if (!document) {
+      return;
+    }
+    if (!activeAgentId) {
+      set({ statusMessage: '分析エージェントを選択してください' });
       return;
     }
 
@@ -951,6 +977,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     const payload: AnalysisRunInput = {
       documentId: document.documentId,
+      agentId: activeAgentId,
       personaMode: document.personaMode,
       promptVersion: 'v1.0.0',
       paragraphs: staleParagraphs.map((paragraph) => ({
@@ -1048,8 +1075,12 @@ export const useAppStore = create<AppState>((set, get) => {
   },
 
   runAnalysisFor: async (paragraphId: string) => {
-    const { document, analysisSettings } = get();
+    const { document, analysisSettings, activeAgentId } = get();
     if (!document) return;
+    if (!activeAgentId) {
+      set({ statusMessage: '分析エージェントを選択してください' });
+      return;
+    }
 
     const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
     if (!selectedProvider.runnable) {
@@ -1076,6 +1107,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     const payload: AnalysisRunInput = {
       documentId: document.documentId,
+      agentId: activeAgentId,
       personaMode: document.personaMode,
       promptVersion: 'v1.0.0',
       paragraphs: [{ paragraphId: paragraph.id, order: paragraph.order, text: paragraph.light.text }],
@@ -1251,6 +1283,116 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
     set({ analysisLayerOpen: !analysisLayerOpen });
+  },
+
+  loadAgents: async () => {
+    try {
+      const [agents, savedActiveAgentId] = await Promise.all([
+        window.litelizard.listReadingAgents(),
+        window.litelizard.getActiveReadingAgentId(),
+      ]);
+      const activeAgentId =
+        savedActiveAgentId && agents.some((agent) => agent.id === savedActiveAgentId)
+          ? savedActiveAgentId
+          : agents[0]?.id ?? null;
+
+      if (activeAgentId && activeAgentId !== savedActiveAgentId) {
+        await window.litelizard.setActiveReadingAgentId(activeAgentId);
+      }
+
+      set({
+        agents,
+        activeAgentId,
+        agentsLoaded: true,
+        statusMessage: agents.length > 0 ? get().statusMessage : '分析エージェントがありません',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ agentsLoaded: true, statusMessage: `分析エージェントの取得に失敗しました: ${message}` });
+    }
+  },
+
+  setActiveAgent: async (id) => {
+    const agent = get().agents.find((entry) => entry.id === id);
+    if (!agent) {
+      set({ statusMessage: '分析エージェントが見つかりません' });
+      return;
+    }
+
+    await window.litelizard.setActiveReadingAgentId(id);
+    set({ activeAgentId: id, statusMessage: `${agent.name} を選択しました` });
+  },
+
+  saveAgent: async (input) => {
+    const previousActiveAgentId = get().activeAgentId;
+    const saved = await window.litelizard.saveReadingAgent(input);
+    const shouldActivate = previousActiveAgentId === null;
+    set((state) => {
+      const existingIndex = state.agents.findIndex((agent) => agent.id === saved.id);
+      const agents =
+        existingIndex >= 0
+          ? state.agents.map((agent) => (agent.id === saved.id ? saved : agent))
+          : [...state.agents, saved];
+      return {
+        agents,
+        activeAgentId: shouldActivate ? saved.id : state.activeAgentId,
+        statusMessage: `${saved.name} を保存しました`,
+      };
+    });
+    if (shouldActivate) {
+      await window.litelizard.setActiveReadingAgentId(saved.id);
+    }
+    return saved;
+  },
+
+  deleteAgent: async (id) => {
+    const { agents, activeAgentId } = get();
+    if (agents.length <= 1) {
+      set({ statusMessage: '最後の分析エージェントは削除できません' });
+      throw new Error('最後の分析エージェントは削除できません');
+    }
+
+    await window.litelizard.deleteReadingAgent(id);
+    const nextAgents = agents.filter((agent) => agent.id !== id);
+    const nextActiveAgentId =
+      activeAgentId === id ? nextAgents[0]?.id ?? null : activeAgentId;
+
+    if (nextActiveAgentId) {
+      await window.litelizard.setActiveReadingAgentId(nextActiveAgentId);
+    }
+
+    set({
+      agents: nextAgents,
+      activeAgentId: nextActiveAgentId,
+      statusMessage: '分析エージェントを削除しました',
+    });
+  },
+
+  resetAgents: async () => {
+    const agents = await window.litelizard.resetReadingAgents();
+    const activeAgentId = agents[0]?.id ?? null;
+    if (activeAgentId) {
+      await window.litelizard.setActiveReadingAgentId(activeAgentId);
+    }
+    set({ agents, activeAgentId, statusMessage: '分析エージェントを初期状態に戻しました' });
+    return agents;
+  },
+
+  dryRunAgent: async ({ agent, paragraphId, text, order }) => {
+    const { document, analysisSettings } = get();
+    const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+    if (!selectedProvider.runnable) {
+      throw new Error(selectedProvider.reason ?? `${selectedProvider.label} を設定してください。`);
+    }
+    if (!document) {
+      throw new Error('ドキュメントを開いてください');
+    }
+    return window.litelizard.dryRunReadingAgent({
+      agent,
+      paragraph: { paragraphId, order, text },
+      documentParagraphs: toAnalysisParagraphInput(document),
+      promptVersion: 'v1.0.0',
+    });
   },
 
   bootstrapAnalysisSettings: async () => {

@@ -14,3 +14,4 @@
 | [chapter-paragraph-ops.md](chapter-paragraph-ops.md) | 章削除・段落統合エッジケース | S-07 | stable |
 | [undo-redo.md](undo-redo.md) | Undo/Redo 対象範囲・実装方針（Zustand 統合 Command スタック） | S-08 | stable |
 | [ui-redesign-minimal.md](ui-redesign-minimal.md) | UI リデザイン仕様（案 A Minimal） | R-16 | stable |
+| [reading-agent.md](reading-agent.md) | Reading Agent 永続化・編集・解析適用 | R-18 | stable |

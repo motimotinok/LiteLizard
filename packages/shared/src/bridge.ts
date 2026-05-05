@@ -8,11 +8,18 @@ import type {
   ReadingAgent,
   ReadingAgentInput,
 } from './types.js';
-import type { AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
+import type { AnalysisParagraph, AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
 
 export interface AnalysisProgressEvent {
   paragraphId: string;
   result: AnalysisResult;
+}
+
+export interface ReadingAgentDryRunInput {
+  agent: ReadingAgentInput & { id?: string };
+  paragraph: AnalysisParagraph;
+  documentParagraphs: AnalysisParagraph[];
+  promptVersion: string;
 }
 
 /**
@@ -62,11 +69,14 @@ export interface BridgeApi {
   importTextFile(
     createParent: string,
   ): Promise<{ ok: true; filePath: string; document: LiteLizardDocument } | null>;
+  getActiveReadingAgentId(): Promise<string | null>;
+  setActiveReadingAgentId(id: string): Promise<{ ok: true }>;
   listReadingAgents(): Promise<ReadingAgent[]>;
   getReadingAgent(id: string): Promise<ReadingAgent | null>;
   saveReadingAgent(input: ReadingAgentInput & { id?: string }): Promise<ReadingAgent>;
   deleteReadingAgent(id: string): Promise<{ ok: true }>;
   resetReadingAgents(): Promise<ReadingAgent[]>;
+  dryRunReadingAgent(input: ReadingAgentDryRunInput): Promise<AnalysisResult>;
 }
 
 /**
@@ -96,11 +106,14 @@ export const IPC_CHANNELS = {
   testLocalLlmConnection: 'settings:analysis:testLocalLlmConnection',
   analysisProgress: 'analysis:progress',
   importTextFile: 'doc:importText',
+  getActiveReadingAgentId: 'agents:getActive',
+  setActiveReadingAgentId: 'agents:setActive',
   listReadingAgents: 'agents:list',
   getReadingAgent: 'agents:get',
   saveReadingAgent: 'agents:save',
   deleteReadingAgent: 'agents:delete',
   resetReadingAgents: 'agents:reset',
+  dryRunReadingAgent: 'agents:dryRun',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

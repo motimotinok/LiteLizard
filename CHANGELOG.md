@@ -1,3 +1,6 @@
+[2026/05/05]R-18 Reading Agent 編集・解析適用
+renderer store と AgentsScreen を Reading Agent 永続化ストアへ接続し、agentId ベースの解析実行、model/temperature 反映、未保存 draft の dry-run、active agent 復元、仕様と検証記録まで完了した
+
 [2026/05/05]Issue #76 R-18b Reading Agent 永続化ストア
 main 側に `userData/agents.json` ベースの Reading Agent ストアと CRUD IPC を実装し、初回 seed・不正 JSON 復旧・preload mock の4件 seed をテストで確認した
 
