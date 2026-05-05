@@ -97,6 +97,8 @@ export interface ReadingAgent {
   name: string;
   role: string;
   systemPrompt: string;
+  model: string | null;
+  temperature: number;
   createdAt: string;
   updatedAt: string;
   builtIn: boolean;
@@ -106,6 +108,8 @@ export interface ReadingAgentInput {
   name: string;
   role: string;
   systemPrompt: string;
+  model: string | null;
+  temperature: number;
 }
 
 export interface FileNode {

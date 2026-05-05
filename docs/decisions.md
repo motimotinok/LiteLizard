@@ -6,6 +6,15 @@
 
 ---
 
+## [2026-05-05] Reading Agent を解析実行単位として採用 (R-18)
+
+- **決定**: Reading Agent を `userData/agents.json` に保存するアプリ横断の読者プロファイルとし、新しい解析実行では `agentId` を正とする。`personaMode` は既存 `.lzl` / analysis 互換のため温存する
+- **仕様**: [`docs/specs/reading-agent.md`](specs/reading-agent.md)
+- **理由**: UI 上の読者選択、AgentsScreen の編集内容、main process の provider 実行を同じ契約に揃えないと、編集しても解析結果に反映されないため。agent をプロジェクト横断にすることで、作品をまたいだ読者キャラとして再利用できる
+- **却下した案**:
+  - `personaMode` の即時削除: 既存 `.lzl` と analysis 読み込み互換を壊すため
+  - agent をプロジェクト単位保存にする: まずは読者キャラをアプリ横断の好みとして扱う方針にしたため
+
 ## [2026-04-25] UI 全面刷新（案 A Minimal を採用）
 
 - **決定**: Claude Design (claude.ai/design) で詰めた **案 A Minimal**（iA Writer 寄り、極めて静謐な執筆 UI）を renderer に取り込む。仕様詳細は [`docs/specs/ui-redesign-minimal.md`](specs/ui-redesign-minimal.md)

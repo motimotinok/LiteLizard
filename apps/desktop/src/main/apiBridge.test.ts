@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { AnalysisResult, AnalysisRunInput } from '@litelizard/shared';
-import { runAnalysis } from './apiBridge.js';
+import type { AnalysisResult, AnalysisRunInput, ReadingAgent } from '@litelizard/shared';
+import { dryRunReadingAgent, runAnalysis } from './apiBridge.js';
 import {
   buildContextTexts,
   createLocalLlmAnalysisProvider,
@@ -12,6 +12,18 @@ import type { ResolvedAnalysisProvider } from './analysisProvider.js';
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const testAgent: ReadingAgent = {
+  id: 'reader-quiet',
+  name: '静かな読者',
+  role: '余韻を読む',
+  systemPrompt: '余韻を中心に読んでください。',
+  model: null,
+  temperature: 0.7,
+  createdAt: '2026-05-02T00:00:00.000Z',
+  updatedAt: '2026-05-02T00:00:00.000Z',
+  builtIn: true,
+};
 
 describe('resolveAnalysisProvider', () => {
   it('OpenAI を選択できる', () => {
@@ -160,9 +172,10 @@ describe('createLocalLlmAnalysisProvider', () => {
     const result = await provider.analyzeParagraph({
       paragraphId: 'p-1',
       text: '旅立ちの朝、彼女はまだ扉の前にいた。',
-      personaMode: 'general-reader',
+      agent: testAgent,
       promptVersion: 'v1',
       model: 'llama3.2',
+      temperature: 0.2,
       contextTexts: ['前の段落'],
     });
 
@@ -179,13 +192,16 @@ describe('createLocalLlmAnalysisProvider', () => {
       prompt: string;
       stream: boolean;
       keep_alive: string;
+      options: { temperature: number };
     };
     expect(requestBody).toMatchObject({
       model: 'llama3.2',
       stream: false,
       keep_alive: '30s',
+      options: { temperature: 0.2 },
     });
     expect(requestBody.prompt).toContain('Context paragraphs');
+    expect(requestBody.prompt).toContain('余韻を中心に読んでください。');
     expect(requestBody.prompt).toContain('旅立ちの朝');
     expect(result).toMatchObject({
       paragraphId: 'p-1',
@@ -213,9 +229,10 @@ describe('createLocalLlmAnalysisProvider', () => {
     const result = await provider.analyzeParagraph({
       paragraphId: 'p-2',
       text: '駅の灯りが見えた。',
-      personaMode: 'friendly',
+      agent: testAgent,
       promptVersion: 'v1',
       model: 'llama3.2',
+      temperature: 0.7,
       contextTexts: [],
     });
 
@@ -238,9 +255,10 @@ describe('createLocalLlmAnalysisProvider', () => {
       provider.analyzeParagraph({
         paragraphId: 'p-1',
         text: '本文',
-        personaMode: 'general-reader',
+        agent: testAgent,
         promptVersion: 'v1',
         model: 'missing-model',
+        temperature: 0.7,
         contextTexts: [],
       }),
     ).rejects.toThrow('Local LLM API エラー (500): model not found');
@@ -258,9 +276,10 @@ describe('createLocalLlmAnalysisProvider', () => {
       provider.analyzeParagraph({
         paragraphId: 'p-1',
         text: '本文',
-        personaMode: 'general-reader',
+        agent: testAgent,
         promptVersion: 'v1',
         model: 'llama3.2',
+        temperature: 0.7,
         contextTexts: [],
       }),
     ).rejects.toThrow('Local LLM 接続に失敗しました: ECONNREFUSED');
@@ -316,6 +335,7 @@ describe('runAnalysis', () => {
 
     const input: AnalysisRunInput = {
       documentId: 'doc-1',
+      agentId: 'reader-quiet',
       personaMode: 'general-reader',
       promptVersion: 'v1.0.0',
       paragraphs: [
@@ -330,12 +350,15 @@ describe('runAnalysis', () => {
       ],
     };
 
-    const result = await runAnalysis(input, resolved);
+    const result = await runAnalysis(input, resolved, testAgent);
 
     expect(provider.analyzeParagraph).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         paragraphId: 'p2',
+        agent: testAgent,
+        model: 'gpt-4.1-mini',
+        temperature: 0.7,
         contextTexts: ['one'],
       }),
     );
@@ -347,6 +370,47 @@ describe('runAnalysis', () => {
       }),
     );
     expect(result.results).toHaveLength(3);
+    expect(result.agentId).toBe('reader-quiet');
+  });
+
+  it('agent model override を使う', async () => {
+    const provider = {
+      id: 'openai' as const,
+      analyzeParagraph: vi.fn(async (input) => ({
+        paragraphId: input.paragraphId,
+        emotion: [],
+        theme: [],
+        deepMeaning: input.text,
+        confidence: 0.5,
+        model: input.model,
+        analyzedAt: '2026-04-21T00:00:00.000Z',
+        promptVersion: input.promptVersion,
+      })),
+    };
+    const resolved: ResolvedAnalysisProvider = {
+      id: 'openai',
+      label: 'OpenAI',
+      model: 'gpt-default',
+      provider,
+    };
+    const agent = { ...testAgent, model: 'gpt-agent', temperature: 0.4 };
+
+    await runAnalysis(
+      {
+        documentId: 'doc-1',
+        agentId: agent.id,
+        personaMode: 'general-reader',
+        promptVersion: 'v1.0.0',
+        paragraphs: [{ paragraphId: 'p1', order: 1, text: 'one' }],
+        documentParagraphs: [{ paragraphId: 'p1', order: 1, text: 'one' }],
+      },
+      resolved,
+      agent,
+    );
+
+    expect(provider.analyzeParagraph).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-agent', temperature: 0.4 }),
+    );
   });
 
   it('最初の失敗時だけ 1 回リトライする', async () => {
@@ -377,15 +441,64 @@ describe('runAnalysis', () => {
     await runAnalysis(
       {
         documentId: 'doc-1',
+        agentId: 'reader-quiet',
         personaMode: 'general-reader',
         promptVersion: 'v1.0.0',
         paragraphs: [{ paragraphId: 'p1', order: 1, text: 'one' }],
         documentParagraphs: [{ paragraphId: 'p1', order: 1, text: 'one' }],
       },
       resolved,
+      testAgent,
     );
 
     expect(provider.analyzeParagraph).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('dryRunReadingAgent', () => {
+  it('agent draft を保存せずに1段落だけ解析する', async () => {
+    const provider = {
+      id: 'openai' as const,
+      analyzeParagraph: vi.fn(async (input) => ({
+        paragraphId: input.paragraphId,
+        emotion: [],
+        theme: input.contextTexts,
+        deepMeaning: input.text,
+        confidence: 0.5,
+        model: input.model,
+        analyzedAt: '2026-04-21T00:00:00.000Z',
+        promptVersion: input.promptVersion,
+      })),
+    };
+    const resolved: ResolvedAnalysisProvider = {
+      id: 'openai',
+      label: 'OpenAI',
+      model: 'gpt-default',
+      provider,
+    };
+
+    const result = await dryRunReadingAgent(
+      {
+        agent: { ...testAgent, id: undefined, model: 'draft-model', temperature: 0.2 },
+        paragraph: { paragraphId: 'p2', order: 2, text: 'two' },
+        documentParagraphs: [
+          { paragraphId: 'p1', order: 1, text: 'one' },
+          { paragraphId: 'p2', order: 2, text: 'two' },
+        ],
+        promptVersion: 'v1.0.0',
+      },
+      resolved,
+    );
+
+    expect(provider.analyzeParagraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paragraphId: 'p2',
+        model: 'draft-model',
+        temperature: 0.2,
+        contextTexts: ['one'],
+      }),
+    );
+    expect(result.paragraphId).toBe('p2');
   });
 });
 

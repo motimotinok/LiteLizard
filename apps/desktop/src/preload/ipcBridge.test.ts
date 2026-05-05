@@ -42,6 +42,8 @@ describe('createIpcBridge', () => {
     await api.saveAnalysisSettings({} as never);
     await api.testLocalLlmConnection({ endpoint: 'http://127.0.0.1:11434', model: 'llama3.2' });
     await api.importTextFile('/project');
+    await api.getActiveReadingAgentId();
+    await api.setActiveReadingAgentId('reader-quiet');
     await api.listReadingAgents();
     await api.getReadingAgent('reader-quiet');
     await api.saveReadingAgent({
@@ -49,9 +51,23 @@ describe('createIpcBridge', () => {
       name: '静かな読者',
       role: '情緒や余韻を中心に短く',
       systemPrompt: 'あなたは静かな読者として段落を読みます。',
+      model: null,
+      temperature: 0.7,
     });
     await api.deleteReadingAgent('reader-quiet');
     await api.resetReadingAgents();
+    await api.dryRunReadingAgent({
+      agent: {
+        name: '静かな読者',
+        role: '情緒や余韻を中心に短く',
+        systemPrompt: 'あなたは静かな読者として段落を読みます。',
+        model: null,
+        temperature: 0.7,
+      },
+      paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },
+      documentParagraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
+      promptVersion: 'v1.0.0',
+    });
 
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.openFolder);
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.getLastOpenedFolder);
@@ -76,6 +92,8 @@ describe('createIpcBridge', () => {
       { endpoint: 'http://127.0.0.1:11434', model: 'llama3.2' },
     );
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.importTextFile, '/project');
+    expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.getActiveReadingAgentId);
+    expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.setActiveReadingAgentId, 'reader-quiet');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.listReadingAgents);
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.getReadingAgent, 'reader-quiet');
     expect(electronMock.invoke).toHaveBeenCalledWith(
@@ -85,10 +103,16 @@ describe('createIpcBridge', () => {
         name: '静かな読者',
         role: '情緒や余韻を中心に短く',
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
+        model: null,
+        temperature: 0.7,
       },
     );
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.deleteReadingAgent, 'reader-quiet');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.resetReadingAgents);
+    expect(electronMock.invoke).toHaveBeenCalledWith(
+      IPC_CHANNELS.dryRunReadingAgent,
+      expect.objectContaining({ promptVersion: 'v1.0.0' }),
+    );
   });
 
   it('onRequestOpenFolder registers and removes the menu event listener', () => {

@@ -44,6 +44,7 @@ const analysisProviderMock = vi.hoisted(() => ({
 
 const apiBridgeMock = vi.hoisted(() => ({
   runAnalysis: vi.fn(),
+  dryRunReadingAgent: vi.fn(),
 }));
 
 const analysisStoreMock = vi.hoisted(() => ({
@@ -97,7 +98,9 @@ vi.mock('./projectManager.js', () => ({
 }));
 
 vi.mock('./appStore.js', () => ({
+  getActiveReadingAgentId: vi.fn(async () => 'reader-quiet'),
   getLastOpenedFolder: vi.fn(),
+  setActiveReadingAgentId: vi.fn(),
   setLastOpenedFolder: vi.fn(),
 }));
 
@@ -143,6 +146,8 @@ describe('registerIpcHandlers', () => {
       name: input.name,
       role: input.role,
       systemPrompt: input.systemPrompt,
+      model: input.model ?? null,
+      temperature: input.temperature ?? 0.7,
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
       builtIn: false,
@@ -175,6 +180,8 @@ describe('registerIpcHandlers', () => {
       name: '静かな読者',
       role: '静かに読む',
       systemPrompt: '静かに読んでください。',
+      model: null,
+      temperature: 0.7,
     };
     readingAgentStoreMock.list.mockResolvedValue([{ id: 'reader-quiet' }]);
     readingAgentStoreMock.get.mockResolvedValue({ id: 'reader-quiet' });
@@ -194,6 +201,10 @@ describe('registerIpcHandlers', () => {
       ok: true,
     });
     await expect(getRequiredHandler(IPC_CHANNELS.resetReadingAgents)(undefined as never)).resolves.toEqual([{ id: 'reader-quiet' }]);
+    await expect(getRequiredHandler(IPC_CHANNELS.getActiveReadingAgentId)(undefined as never)).resolves.toBe('reader-quiet');
+    await expect(getRequiredHandler(IPC_CHANNELS.setActiveReadingAgentId)(undefined as never, 'reader-quiet' as never)).resolves.toEqual({
+      ok: true,
+    });
 
     expect(readingAgentStoreMock.list).toHaveBeenCalled();
     expect(readingAgentStoreMock.get).toHaveBeenCalledWith('reader-quiet');
@@ -213,9 +224,21 @@ describe('registerIpcHandlers', () => {
       analyzedAt: '2026-04-25T00:00:00.000Z',
       promptVersion: 'v1.0.0',
     };
-    apiBridgeMock.runAnalysis.mockImplementation(async (_input, _provider, onProgress) => {
+    const agent = {
+      id: 'reader-quiet',
+      name: '静かな読者',
+      role: '静かに読む',
+      systemPrompt: '静かに読んでください。',
+      model: null,
+      temperature: 0.7,
+      createdAt: '2026-05-02T00:00:00.000Z',
+      updatedAt: '2026-05-02T00:00:00.000Z',
+      builtIn: true,
+    };
+    readingAgentStoreMock.get.mockResolvedValue(agent);
+    apiBridgeMock.runAnalysis.mockImplementation(async (_input, _provider, _agent, onProgress) => {
       onProgress(progressResult);
-      return { requestId: 'req_123', results: [progressResult] };
+      return { requestId: 'req_123', agentId: 'reader-quiet', results: [progressResult] };
     });
 
     registerIpcHandlers();
@@ -231,6 +254,7 @@ describe('registerIpcHandlers', () => {
       { sender: { send } },
       {
         documentId: 'd_123',
+        agentId: 'reader-quiet',
         personaMode: 'general-reader',
         promptVersion: 'v1.0.0',
         paragraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
@@ -239,12 +263,49 @@ describe('registerIpcHandlers', () => {
     );
 
     expect(analysisProviderMock.resolveAnalysisProvider).toHaveBeenCalled();
-    expect(apiBridgeMock.runAnalysis).toHaveBeenCalled();
+    expect(apiBridgeMock.runAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'reader-quiet' }),
+      expect.anything(),
+      agent,
+      expect.any(Function),
+    );
     expect(send).toHaveBeenCalledWith(IPC_CHANNELS.analysisProgress, {
       paragraphId: 'p_123',
       result: progressResult,
     });
-    expect(result).toEqual({ requestId: 'req_123', results: [progressResult] });
+    expect(result).toEqual({ requestId: 'req_123', agentId: 'reader-quiet', results: [progressResult] });
+  });
+
+  it('runs reading agent dry-run through the provider without progress events', async () => {
+    const result: AnalysisResult = {
+      paragraphId: 'p_123',
+      emotion: ['静けさ'],
+      theme: ['余韻'],
+      deepMeaning: '静かな余韻です。',
+      confidence: 0.8,
+      model: 'gpt-4.1-mini',
+      analyzedAt: '2026-05-05T00:00:00.000Z',
+      promptVersion: 'v1.0.0',
+    };
+    apiBridgeMock.dryRunReadingAgent.mockResolvedValue(result);
+
+    registerIpcHandlers();
+
+    const input = {
+      agent: {
+        name: '静かな読者',
+        role: '静かに読む',
+        systemPrompt: '静かに読んでください。',
+        model: null,
+        temperature: 0.7,
+      },
+      paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },
+      documentParagraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
+      promptVersion: 'v1.0.0',
+    };
+
+    await expect(getRequiredHandler(IPC_CHANNELS.dryRunReadingAgent)(undefined as never, input as never)).resolves.toEqual(result);
+    expect(apiBridgeMock.dryRunReadingAgent).toHaveBeenCalledWith(input, expect.anything());
   });
 
   it('allows filesystem IPC calls for paths inside a project root', async () => {

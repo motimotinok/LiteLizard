@@ -1885,6 +1885,67 @@ button {
   margin-left: 20px;
 }
 
+.agents-sidebar-active {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.agents-sidebar-empty {
+  padding: 12px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.agents-dirty-badge {
+  margin-left: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.agents-error {
+  margin-top: 10px;
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: #8f2d2d;
+}
+
+.agents-preview {
+  margin-top: 14px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+}
+
+.agents-preview-row,
+.agents-preview-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.agents-preview-row strong {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.agents-preview p {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+
 /* =========================================================
  * 起動画面 (Project loading)
  * ========================================================= */

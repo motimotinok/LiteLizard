@@ -4,12 +4,14 @@ import { app } from 'electron';
 
 interface AppStoreSchema {
   lastOpenedFolder: string | null;
+  activeReadingAgentId: string | null;
 }
 
 const STORE_FILE = 'app-store.json';
 
 const defaults: AppStoreSchema = {
   lastOpenedFolder: null,
+  activeReadingAgentId: null,
 };
 
 function getStorePath(): string {
@@ -37,5 +39,16 @@ export async function getLastOpenedFolder(): Promise<string | null> {
 }
 
 export async function setLastOpenedFolder(folderPath: string): Promise<void> {
-  await writeStore({ lastOpenedFolder: folderPath });
+  const store = await readStore();
+  await writeStore({ ...store, lastOpenedFolder: folderPath });
+}
+
+export async function getActiveReadingAgentId(): Promise<string | null> {
+  const store = await readStore();
+  return store.activeReadingAgentId;
+}
+
+export async function setActiveReadingAgentId(id: string): Promise<void> {
+  const store = await readStore();
+  await writeStore({ ...store, activeReadingAgentId: id });
 }

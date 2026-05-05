@@ -209,12 +209,14 @@ export function App() {
     openFolder,
     restoreLastProject,
     bootstrapAnalysisSettings,
+    loadAgents,
   } = useAppStore();
 
   useEffect(() => {
     void bootstrapAnalysisSettings();
+    void loadAgents();
     void restoreLastProject();
-  }, [bootstrapAnalysisSettings, restoreLastProject]);
+  }, [bootstrapAnalysisSettings, loadAgents, restoreLastProject]);
 
   useEffect(() => {
     if (!window.litelizard) {

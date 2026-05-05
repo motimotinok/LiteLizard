@@ -21,7 +21,12 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { getLastOpenedFolder, setLastOpenedFolder } from './appStore.js';
+import {
+  getActiveReadingAgentId,
+  getLastOpenedFolder,
+  setActiveReadingAgentId,
+  setLastOpenedFolder,
+} from './appStore.js';
 
 describe('appStore', () => {
   beforeEach(() => {
@@ -43,14 +48,32 @@ describe('appStore', () => {
   it('lastOpenedFolder を保存する', async () => {
     appStoreMock.writeFile.mockResolvedValue(undefined);
     appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockRejectedValue(new Error('missing'));
 
     await setLastOpenedFolder('/projects/story');
 
     expect(appStoreMock.mkdir).toHaveBeenCalledWith('/tmp/litelizard-user-data', { recursive: true });
     expect(appStoreMock.writeFile).toHaveBeenCalledWith(
       '/tmp/litelizard-user-data/app-store.json',
-      JSON.stringify({ lastOpenedFolder: '/projects/story' }, null, 2),
+      JSON.stringify({ lastOpenedFolder: '/projects/story', activeReadingAgentId: null }, null, 2),
       'utf8'
+    );
+  });
+
+  it('activeReadingAgentId を保存して復元する', async () => {
+    appStoreMock.readFile
+      .mockResolvedValueOnce(JSON.stringify({ lastOpenedFolder: '/projects/story' }))
+      .mockResolvedValueOnce(JSON.stringify({ activeReadingAgentId: 'reader-editor' }));
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+
+    await setActiveReadingAgentId('reader-editor');
+    await expect(getActiveReadingAgentId()).resolves.toBe('reader-editor');
+
+    expect(appStoreMock.writeFile).toHaveBeenCalledWith(
+      '/tmp/litelizard-user-data/app-store.json',
+      JSON.stringify({ lastOpenedFolder: '/projects/story', activeReadingAgentId: 'reader-editor' }, null, 2),
+      'utf8',
     );
   });
 });

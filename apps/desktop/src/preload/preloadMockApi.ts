@@ -27,6 +27,7 @@ interface MockState {
   analysisFiles: Map<string, GenerationalAnalysisFile>;
   analysisSettings: AnalysisSettings;
   readingAgents: Map<string, ReadingAgent>;
+  activeReadingAgentId: string | null;
 }
 
 function clone<T>(value: T): T {
@@ -249,6 +250,15 @@ function paragraphAnalysisFromText(text: string) {
   };
 }
 
+function paragraphAnalysisFromAgent(text: string, agent: ReadingAgentInput) {
+  const base = paragraphAnalysisFromText(`${agent.name}:${agent.role}:${agent.systemPrompt}:${text}`);
+  return {
+    ...base,
+    deepMeaning: `『${agent.name}』は、${base.deepMeaning}`,
+    model: agent.model?.trim() || base.model,
+  };
+}
+
 function analysisFileKey(documentId: string) {
   return documentId;
 }
@@ -291,6 +301,8 @@ function createInitialReadingAgents(): ReadingAgent[] {
       name: '静かな読者',
       role: '情緒や余韻を中心に短く',
       systemPrompt: buildPrompt('静かな読者', '情緒や余韻を中心に短く'),
+      model: null,
+      temperature: 0.7,
       createdAt: now,
       updatedAt: now,
       builtIn: true,
@@ -300,6 +312,8 @@ function createInitialReadingAgents(): ReadingAgent[] {
       name: '批評的な読者',
       role: '構成・論理・破綻を指摘',
       systemPrompt: buildPrompt('批評的な読者', '構成・論理・破綻を指摘'),
+      model: null,
+      temperature: 0.7,
       createdAt: now,
       updatedAt: now,
       builtIn: true,
@@ -309,6 +323,8 @@ function createInitialReadingAgents(): ReadingAgent[] {
       name: 'はじめての読者',
       role: '予備知識ゼロで率直に',
       systemPrompt: buildPrompt('はじめての読者', '予備知識ゼロで率直に'),
+      model: null,
+      temperature: 0.7,
       createdAt: now,
       updatedAt: now,
       builtIn: true,
@@ -318,6 +334,8 @@ function createInitialReadingAgents(): ReadingAgent[] {
       name: '担当編集',
       role: '売り・引っかかりを評価',
       systemPrompt: buildPrompt('担当編集', '売り・引っかかりを評価'),
+      model: null,
+      temperature: 0.7,
       createdAt: now,
       updatedAt: now,
       builtIn: true,
@@ -334,6 +352,8 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
     name: input.name.trim(),
     role: input.role.trim(),
     systemPrompt: input.systemPrompt.trim(),
+    model: input.model?.trim() || null,
+    temperature: input.temperature,
     createdAt: current?.createdAt ?? now,
     updatedAt: now,
     builtIn: current?.builtIn ?? false,
@@ -361,6 +381,7 @@ export function createMockPreloadApi(): BridgeApi {
       },
     },
     readingAgents: new Map(createInitialReadingAgents().map((agent) => [agent.id, agent])),
+    activeReadingAgentId: 'reader-quiet',
   };
 
   return {
@@ -513,14 +534,19 @@ export function createMockPreloadApi(): BridgeApi {
     runAnalysis: async (input: AnalysisRunInput) => {
       const analyzedAt = new Date().toISOString();
       const requestId = `req_mock_${input.documentId}_${input.paragraphs.length}`;
+      const agent = state.readingAgents.get(input.agentId) ?? Array.from(state.readingAgents.values())[0];
+      if (!agent) {
+        throw new Error(`Reading Agent not found: ${input.agentId}`);
+      }
 
       return {
         requestId,
         documentId: input.documentId,
+        agentId: input.agentId,
         personaMode: input.personaMode,
         promptVersion: input.promptVersion,
         results: input.paragraphs.map((paragraph) => {
-          const analysis = paragraphAnalysisFromText(paragraph.text);
+          const analysis = paragraphAnalysisFromAgent(paragraph.text, agent);
           return {
             paragraphId: paragraph.paragraphId,
             emotion: analysis.emotion,
@@ -641,6 +667,13 @@ export function createMockPreloadApi(): BridgeApi {
       return { ok: true as const, filePath, document: clone(document) };
     },
 
+    getActiveReadingAgentId: async () => state.activeReadingAgentId,
+
+    setActiveReadingAgentId: async (id: string) => {
+      state.activeReadingAgentId = id;
+      return { ok: true };
+    },
+
     listReadingAgents: async () => Array.from(state.readingAgents.values()).map(clone),
 
     getReadingAgent: async (id: string) => clone(state.readingAgents.get(id) ?? null),
@@ -654,7 +687,23 @@ export function createMockPreloadApi(): BridgeApi {
 
     resetReadingAgents: async () => {
       state.readingAgents = new Map(createInitialReadingAgents().map((agent) => [agent.id, agent]));
+      state.activeReadingAgentId = 'reader-quiet';
       return Array.from(state.readingAgents.values()).map(clone);
+    },
+
+    dryRunReadingAgent: async (input) => {
+      const analyzedAt = new Date().toISOString();
+      const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);
+      return {
+        paragraphId: input.paragraph.paragraphId,
+        emotion: analysis.emotion,
+        theme: analysis.theme,
+        deepMeaning: analysis.deepMeaning,
+        confidence: analysis.confidence,
+        model: analysis.model,
+        analyzedAt,
+        promptVersion: input.promptVersion,
+      };
     },
   };
 }

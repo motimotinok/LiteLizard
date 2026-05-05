@@ -6,7 +6,6 @@ import {
   getVisiblePatternIndices,
   resolveDisplayedPatternIndex,
 } from '../store/analysisHistory.js';
-import { READING_AGENTS } from './ui/agents.js';
 import { toKanjiIndex } from './ui/kanji.js';
 import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
 
@@ -63,11 +62,11 @@ function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
 
   return {
     label: 'Local LLM',
-    configured: false,
-    runnable: false,
-    missingTitle: 'ローカル LLM はまだ解析実行に対応していません。',
-    missingBody: '現時点では OpenAI または Anthropic を既定 provider に選んでください。',
-    disabledTitle: 'ローカル LLM は未対応です',
+    configured: analysisSettings.localLlm.configured,
+    runnable: analysisSettings.localLlm.configured,
+    missingTitle: 'ローカル LLM の設定が必要です。',
+    missingBody: '設定画面でエンドポイントとモデル名を保存してください。',
+    disabledTitle: 'ローカル LLM が未設定です',
   };
 }
 
@@ -86,21 +85,24 @@ export function AnalysisPane({
   const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
   const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
   const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
+  const agents = useAppStore((s) => s.agents);
+  const activeAgentId = useAppStore((s) => s.activeAgentId);
+  const agentsLoaded = useAppStore((s) => s.agentsLoaded);
+  const setActiveAgent = useAppStore((s) => s.setActiveAgent);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-  const generateAllDisabled = staleCount === 0 || hasPending || !providerUi.runnable;
+  const generateAllDisabled = staleCount === 0 || hasPending || !providerUi.runnable || !activeAgentId;
 
-  const [activeAgentId, setActiveAgentId] = useState<string>(READING_AGENTS[0].id);
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
   const [draggingParagraphId, setDraggingParagraphId] = useState<string | null>(null);
   const [dropTargetParagraphId, setDropTargetParagraphId] = useState<string | null>(null);
 
   const activeAgent = useMemo(
-    () => READING_AGENTS.find((agent) => agent.id === activeAgentId) ?? READING_AGENTS[0],
-    [activeAgentId],
+    () => agents.find((agent) => agent.id === activeAgentId) ?? agents[0] ?? null,
+    [activeAgentId, agents],
   );
 
   useEffect(() => {
@@ -151,11 +153,13 @@ export function AnalysisPane({
 
   const runButtonTitle = !providerUi.runnable
     ? providerUi.disabledTitle
-    : hasPending
-      ? '解析実行中です'
-      : staleCount === 0
-        ? '再解析が必要な段落はありません'
-        : `${staleCount}件の段落を解析`;
+    : !activeAgentId
+      ? '分析エージェントを選択してください'
+      : hasPending
+        ? '解析実行中です'
+        : staleCount === 0
+          ? '再解析が必要な段落はありません'
+          : `${staleCount}件の段落を解析`;
 
   return (
     <aside className="analysis-shell" aria-label="analysis-panel">
@@ -171,31 +175,39 @@ export function AnalysisPane({
           >
             <span className="agent-select-trigger-label">
               <span className="agent-select-trigger-dot" aria-hidden />
-              <span className="agent-select-trigger-name">{activeAgent.name}</span>
-              <span className="agent-select-trigger-desc">{activeAgent.desc}</span>
+              <span className="agent-select-trigger-name">
+                {activeAgent?.name ?? (agentsLoaded ? '未設定' : '読み込み中')}
+              </span>
+              <span className="agent-select-trigger-desc">
+                {activeAgent?.role ?? '分析エージェント'}
+              </span>
             </span>
             <IconChevronDown size={13} />
           </button>
           {agentMenuOpen ? (
             <div className="agent-select-menu" role="listbox">
-              {READING_AGENTS.map((agent) => (
+              {agents.length > 0 ? agents.map((agent) => (
                 <button
                   key={agent.id}
                   type="button"
                   className={
-                    agent.id === activeAgent.id
+                    agent.id === activeAgent?.id
                       ? 'agent-select-option is-active'
                       : 'agent-select-option'
                   }
                   onClick={() => {
-                    setActiveAgentId(agent.id);
+                    void setActiveAgent(agent.id);
                     setAgentMenuOpen(false);
                   }}
                 >
                   <div className="agent-select-option-name">{agent.name}</div>
-                  <div className="agent-select-option-desc">{agent.desc}</div>
+                  <div className="agent-select-option-desc">{agent.role}</div>
                 </button>
-              ))}
+              )) : (
+                <div className="agent-select-option-name" style={{ padding: '10px 12px' }}>
+                  分析エージェントがありません
+                </div>
+              )}
               <div className="agent-select-divider" />
               <button
                 type="button"
