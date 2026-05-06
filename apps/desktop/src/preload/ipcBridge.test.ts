@@ -28,6 +28,7 @@ describe('createIpcBridge', () => {
     await api.listTree('/project');
     await api.createEntry('/project', 'file', 'draft');
     await api.renameEntry('/project/old.lzl', 'new');
+    await api.moveEntry('/project/old.lzl', '/project/archive');
     await api.deleteEntry('/project/draft.lzl');
     await api.loadDocument('/project/draft.lzl');
     await api.createDocument('/project', 'draft');
@@ -75,6 +76,7 @@ describe('createIpcBridge', () => {
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.listTree, '/project');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.createEntry, '/project', 'file', 'draft');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.renameEntry, '/project/old.lzl', 'new');
+    expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.moveEntry, '/project/old.lzl', '/project/archive');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.deleteEntry, '/project/draft.lzl');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.loadDocument, '/project/draft.lzl');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.createDocument, '/project', 'draft');

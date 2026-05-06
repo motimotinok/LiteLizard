@@ -16,6 +16,7 @@ interface Props {
   currentFilePath: string | null;
   onCreateEntry: (parentPath: string, type: 'file' | 'folder', name: string) => void;
   onRenameEntry: (targetPath: string, nextName: string) => void;
+  onMoveEntry: (sourcePath: string, destinationFolderPath: string) => void;
   onDeleteEntry: (targetPath: string) => void;
   onSelectFile: (path: string) => void;
   onImportTextFile: (createParent: string) => void;
@@ -34,6 +35,7 @@ interface TreeProps {
   expanded: Set<string>;
   onToggle: (path: string) => void;
   onSelectFile: (path: string) => void;
+  onMoveEntry: (sourcePath: string, destinationFolderPath: string) => void;
   onOpenContextMenu: (event: React.MouseEvent<HTMLElement>, node: FileNode) => void;
   inlineCreate: InlineCreateState | null;
   inlineRename: string | null;
@@ -57,6 +59,8 @@ interface InlineInputProps {
   onConfirm: (name: string) => void;
   onCancel: () => void;
 }
+
+const DRAG_FILE_MIME = 'application/x-litelizard-file-path';
 
 function baseName(targetPath: string) {
   const normalized = targetPath.replace(/\\/g, '/');
@@ -150,6 +154,7 @@ function Tree({
   expanded,
   onToggle,
   onSelectFile,
+  onMoveEntry,
   onOpenContextMenu,
   inlineCreate,
   inlineRename,
@@ -176,6 +181,21 @@ function Tree({
           }
 
           const isExpanded = expanded.has(node.path);
+          const handleDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
+            if (event.dataTransfer.types.includes(DRAG_FILE_MIME)) {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+            }
+          };
+          const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+            const sourcePath = event.dataTransfer.getData(DRAG_FILE_MIME);
+            if (!sourcePath || dirName(sourcePath) === node.path) {
+              return;
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            onMoveEntry(sourcePath, node.path);
+          };
           return (
             <div key={node.path}>
               <button
@@ -184,6 +204,8 @@ function Tree({
                 style={{ paddingLeft: `${depth * 14 + 8}px` }}
                 onClick={() => onToggle(node.path)}
                 onContextMenu={(event) => onOpenContextMenu(event, node)}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
               >
                 <span className="explorer-chevron" aria-hidden>
                   {isExpanded ? <IconChevronDown size={11} /> : <IconChevronRight size={11} />}
@@ -203,6 +225,7 @@ function Tree({
                       expanded={expanded}
                       onToggle={onToggle}
                       onSelectFile={onSelectFile}
+                      onMoveEntry={onMoveEntry}
                       onOpenContextMenu={onOpenContextMenu}
                       inlineCreate={inlineCreate}
                       inlineRename={inlineRename}
@@ -253,6 +276,12 @@ function Tree({
             style={{ paddingLeft: `${depth * 14 + 26}px` }}
             onClick={() => onSelectFile(node.path)}
             onContextMenu={(event) => onOpenContextMenu(event, node)}
+            draggable
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData(DRAG_FILE_MIME, node.path);
+              event.dataTransfer.setData('text/plain', node.path);
+            }}
           >
             <span className="explorer-node-icon" aria-hidden>
               <IconFile size={13} />
@@ -284,6 +313,7 @@ export function ExplorerPane({
   currentFilePath,
   onCreateEntry,
   onRenameEntry,
+  onMoveEntry,
   onDeleteEntry,
   onSelectFile,
   onImportTextFile,
@@ -439,6 +469,20 @@ export function ExplorerPane({
         <div
           className="explorer-tree"
           onContextMenu={(event) => event.preventDefault()}
+          onDragOver={(event) => {
+            if (rootPath && event.dataTransfer.types.includes(DRAG_FILE_MIME)) {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+            }
+          }}
+          onDrop={(event) => {
+            const sourcePath = event.dataTransfer.getData(DRAG_FILE_MIME);
+            if (!rootPath || !sourcePath || dirName(sourcePath) === rootPath) {
+              return;
+            }
+            event.preventDefault();
+            onMoveEntry(sourcePath, rootPath);
+          }}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
               setSelectedFolderPath(null);
@@ -456,6 +500,7 @@ export function ExplorerPane({
             expanded={expandedFolders}
             onToggle={toggleFolder}
             onSelectFile={onSelectFile}
+            onMoveEntry={onMoveEntry}
             onOpenContextMenu={onOpenContextMenu}
             inlineCreate={inlineCreate}
             inlineRename={inlineRename}

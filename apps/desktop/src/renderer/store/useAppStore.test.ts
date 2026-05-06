@@ -20,6 +20,7 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     listTree: vi.fn(),
     createEntry: vi.fn(),
     renameEntry: vi.fn(),
+    moveEntry: vi.fn(),
     deleteEntry: vi.fn(),
     loadDocument: vi.fn(),
     createDocument: vi.fn(),
@@ -250,6 +251,42 @@ describe('useAppStore project startup flow', () => {
     expect(state.revision).toBe(0);
     expect(state.dirty).toBe(false);
     expect(setLastOpenedFolder).toHaveBeenCalledWith('/projects/next');
+  });
+
+  it('moveEntry は開いているファイルの保存先パスとツリーを更新する', async () => {
+    const movedPath = '/projects/novel/archive/draft.lzl';
+    const moveEntry = vi.fn().mockResolvedValue({ ok: true, path: movedPath });
+    const refreshedTree = [
+      {
+        path: '/projects/novel/archive',
+        name: 'archive',
+        type: 'directory' as const,
+        children: [{ path: movedPath, name: 'draft.lzl', type: 'file' as const }],
+      },
+    ];
+    window.litelizard = createBridge({
+      moveEntry,
+      listTree: vi.fn().mockResolvedValue(refreshedTree),
+    });
+
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      tree: [],
+      currentFilePath: '/projects/novel/draft.lzl',
+      document: createLzlDocument(),
+      revision: 3,
+    });
+
+    await useAppStore.getState().moveEntry('/projects/novel/draft.lzl', '/projects/novel/archive');
+
+    const state = useAppStore.getState();
+    expect(moveEntry).toHaveBeenCalledWith('/projects/novel/draft.lzl', '/projects/novel/archive');
+    expect(state.tree).toEqual(refreshedTree);
+    expect(state.currentFilePath).toBe(movedPath);
+    expect(state.document?.title).toBe('draft');
+    expect(state.document?.source?.originPath).toBe(movedPath);
+    expect(state.revision).toBe(0);
+    expect(state.statusMessage).toBe('ファイルを移動しました');
   });
 });
 

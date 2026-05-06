@@ -29,6 +29,7 @@ function WorkspaceShell() {
     createDocument,
     createEntry,
     renameEntry,
+    moveEntry,
     deleteEntry,
     importTextFile,
     loadDocument,
@@ -157,6 +158,7 @@ function WorkspaceShell() {
           currentFilePath={currentFilePath}
           onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
           onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
+          onMoveEntry={(sourcePath, destinationFolderPath) => void moveEntry(sourcePath, destinationFolderPath)}
           onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
           onSelectFile={(path) => void loadDocument(path)}
           onImportTextFile={(createParent) => void importTextFile(createParent)}

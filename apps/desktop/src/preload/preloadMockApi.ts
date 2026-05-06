@@ -471,6 +471,36 @@ export function createMockPreloadApi(): BridgeApi {
       return { ok: true, path: nextPath };
     },
 
+    moveEntry: async (sourcePath: string, destinationFolderPath: string) => {
+      const found = deepFindNode(state.tree, sourcePath);
+      if (!found) {
+        throw new Error(`Path not found: ${sourcePath}`);
+      }
+      if (found.node.type === 'directory') {
+        throw new Error('Folders cannot be moved with this operation.');
+      }
+
+      const destinationChildren = findDirectoryChildren(state, destinationFolderPath);
+      const oldPath = normalizePath(found.node.path);
+      const nextPath = joinPath(destinationFolderPath, baseName(oldPath));
+
+      if (oldPath === normalizePath(nextPath)) {
+        return { ok: true, path: oldPath };
+      }
+
+      if (pathExists(state.tree, nextPath)) {
+        throw new Error(`Target already exists: ${nextPath}`);
+      }
+
+      found.siblings.splice(found.index, 1);
+      found.node.path = nextPath;
+      found.node.name = baseName(nextPath);
+      destinationChildren.push(found.node);
+      remapDocumentPaths(state, oldPath, nextPath);
+
+      return { ok: true, path: nextPath };
+    },
+
     deleteEntry: async (targetPath: string) => {
       const found = deepFindNode(state.tree, targetPath);
       if (!found) {

@@ -340,7 +340,53 @@ describe('registerIpcHandlers', () => {
     });
   });
 
-  it('rejects delete, rename, load, and save calls outside a project before filesystem work runs', async () => {
+  it('moves a .lzl file into another project folder with its analysis sidecar', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      const sourcePath = path.join(projectRoot, 'draft.lzl');
+      const targetFolder = path.join(projectRoot, 'archive');
+      const nextPath = path.join(targetFolder, 'draft.lzl');
+      const sourceAnalysisPath = `${sourcePath}.analysis.json`;
+      const nextAnalysisPath = `${nextPath}.analysis.json`;
+
+      await fs.mkdir(targetFolder);
+      await fs.writeFile(sourcePath, 'documentId: d_abcdefghij', 'utf8');
+      await fs.writeFile(sourceAnalysisPath, '{"documentId":"d_abcdefghij"}', 'utf8');
+
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.moveEntry)(undefined as never, sourcePath as never, targetFolder as never),
+      ).resolves.toEqual({ ok: true, path: nextPath });
+
+      await expect(fs.readFile(nextPath, 'utf8')).resolves.toContain('documentId');
+      await expect(fs.readFile(nextAnalysisPath, 'utf8')).resolves.toContain('d_abcdefghij');
+      await expect(fs.access(sourcePath)).rejects.toThrow();
+      await expect(fs.access(sourceAnalysisPath)).rejects.toThrow();
+    });
+  });
+
+  it('rejects move when the destination file already exists', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      const sourcePath = path.join(projectRoot, 'draft.lzl');
+      const targetFolder = path.join(projectRoot, 'archive');
+      const nextPath = path.join(targetFolder, 'draft.lzl');
+
+      await fs.mkdir(targetFolder);
+      await fs.writeFile(sourcePath, 'documentId: d_abcdefghij', 'utf8');
+      await fs.writeFile(nextPath, 'documentId: d_existing01', 'utf8');
+
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.moveEntry)(undefined as never, sourcePath as never, targetFolder as never),
+      ).rejects.toThrow('MOVE_ENTRY_FAILED: Target already exists');
+
+      await expect(fs.readFile(sourcePath, 'utf8')).resolves.toContain('d_abcdefghij');
+      await expect(fs.readFile(nextPath, 'utf8')).resolves.toContain('d_existing01');
+    });
+  });
+
+  it('rejects delete, rename, move, load, and save calls outside a project before filesystem work runs', async () => {
     await withTempProject(async ({ outsidePath }) => {
       const renameSpy = vi.spyOn(fs, 'rename');
       const rmSpy = vi.spyOn(fs, 'rm');
@@ -352,6 +398,8 @@ describe('registerIpcHandlers', () => {
           .rejects.toThrow('DELETE_ENTRY_FAILED: Project root was not found');
         await expect(getRequiredHandler(IPC_CHANNELS.renameEntry)(undefined as never, outsidePath as never, 'next' as never))
           .rejects.toThrow('RENAME_ENTRY_FAILED: Project root was not found');
+        await expect(getRequiredHandler(IPC_CHANNELS.moveEntry)(undefined as never, outsidePath as never, outsidePath as never))
+          .rejects.toThrow('MOVE_ENTRY_FAILED: Project root was not found');
         await expect(getRequiredHandler(IPC_CHANNELS.loadDocument)(undefined as never, outsidePath as never))
           .rejects.toThrow('Project root was not found');
         await expect(
