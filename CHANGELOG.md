@@ -1,3 +1,6 @@
+[2026/05/07]R-20 現在の文書内検索画面
+左メニューの検索ボタンを有効化し、現在開いている文書の title / chapter title / paragraph text を対象にした検索画面を追加した。検索結果は段落単位で表示し、クリックするとエディターへ戻って対象段落を active にし、既存のスクロールリクエスト経路で該当段落へ移動する。空検索・該当なし・文書未選択の表示も整えた。検証: `searchInDocument` helper / SearchScreen / store action のテスト追加、`pnpm -w lint` / `pnpm -w test`（desktop 237 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: プロジェクト全体検索、ファイル名検索、正規表現検索、置換は非ゴール。
+
 [2026/05/07]R-07 章サマリー解析表示（マクロ視点時の分析ペイン）
 マクロ視点（`viewScale === 'macro'`）のときの AnalysisPane を、段落カードの代わりに章ごとのサマリーカードに切り替えた。集約ロジックは renderer 内 `apps/desktop/src/renderer/utils/chapterAnalysisAggregation.ts` に純関数 `aggregateChapterAnalyses` として切り出し、章ごとに段落数・解析済み / 要再解析 / 未解析 / 解析中 / 失敗の内訳、`complete` 段落から集計した上位テーマ・感情、`confidence` 平均（`complete` 段落のみ）を返す。未解析は `status === 'stale'` かつ `analyzedAt` 未設定で判定する。表示は `apps/desktop/src/renderer/components/ChapterSummaryList.tsx` に分離して props だけで描画できるようにし、AnalysisPane 側は `viewScale` を `useAppStore` から購読してボディだけを差し替える。新規 LLM 章解析は呼び出さない。helper の単体テスト 7 件と ChapterSummaryList の SSR テスト 5 件を追加。検証: `pnpm -w lint` / `pnpm -w test`（desktop 222 / shared 46 / api 4）/ `pnpm -w build` 成功。残課題: Electron 上の手動表示確認は未実施。
 

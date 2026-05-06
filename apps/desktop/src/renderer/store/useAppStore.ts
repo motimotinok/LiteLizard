@@ -34,7 +34,12 @@ export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
 export type AnalysisMode = 'paragraph' | 'chapter' | 'document';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
-export type WorkspacePanel = 'editor' | 'settings' | 'agents';
+export type WorkspacePanel = 'editor' | 'settings' | 'agents' | 'search';
+
+export interface PendingParagraphNavigation {
+  paragraphId: string;
+  nonce: number;
+}
 
 export interface AnalysisRunSummary {
   targetCount: number;
@@ -108,6 +113,7 @@ interface AppState {
   analysisMode: AnalysisMode;
   analysisLayerOpen: boolean;
   statusMessage: string;
+  pendingParagraphNavigation: PendingParagraphNavigation | null;
   undoStack: UndoSnapshot[];
   redoStack: UndoSnapshot[];
   pushUndo: (snapshot: UndoSnapshot) => void;
@@ -146,6 +152,9 @@ interface AppState {
   openSettingsPanel: () => void;
   openEditorPanel: () => void;
   openAgentsPanel: () => void;
+  openSearchPanel: () => void;
+  requestNavigateToParagraph: (paragraphId: string) => void;
+  consumePendingParagraphNavigation: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
   loadAgents: () => Promise<void>;
@@ -462,6 +471,7 @@ export const useAppStore = create<AppState>((set, get) => {
     analysisMode: 'paragraph',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
+    pendingParagraphNavigation: null,
 
   pushUndo: (snapshot) => {
     set((state) => {
@@ -1352,6 +1362,22 @@ export const useAppStore = create<AppState>((set, get) => {
 
   openEditorPanel: () => {
     set({ activeWorkspacePanel: 'editor', statusMessage: 'ドキュメント表示に戻りました' });
+  },
+
+  openSearchPanel: () => {
+    set({ activeWorkspacePanel: 'search', statusMessage: '検索を開きました' });
+  },
+
+  requestNavigateToParagraph: (paragraphId: string) => {
+    set({
+      activeWorkspacePanel: 'editor',
+      pendingParagraphNavigation: { paragraphId, nonce: Date.now() },
+      statusMessage: '段落へ移動しました',
+    });
+  },
+
+  consumePendingParagraphNavigation: () => {
+    set({ pendingParagraphNavigation: null });
   },
 
   setAnalysisLayerOpen: (open: boolean) => {

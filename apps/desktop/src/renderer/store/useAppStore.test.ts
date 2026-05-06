@@ -735,6 +735,28 @@ describe('useAppStore R-15 DnD reorder undo/redo', () => {
     expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p2', 'p1']);
   });
 
+  it('openSearchPanel は activeWorkspacePanel を search にする', () => {
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('editor');
+    useAppStore.getState().openSearchPanel();
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('search');
+    expect(useAppStore.getState().statusMessage).toBe('検索を開きました');
+  });
+
+  it('requestNavigateToParagraph は editor へ戻して pending navigation を立てる', () => {
+    useAppStore.setState({ activeWorkspacePanel: 'search', pendingParagraphNavigation: null });
+    useAppStore.getState().requestNavigateToParagraph('p42');
+    const state = useAppStore.getState();
+    expect(state.activeWorkspacePanel).toBe('editor');
+    expect(state.pendingParagraphNavigation?.paragraphId).toBe('p42');
+    expect(typeof state.pendingParagraphNavigation?.nonce).toBe('number');
+  });
+
+  it('consumePendingParagraphNavigation は pending navigation を消す', () => {
+    useAppStore.setState({ pendingParagraphNavigation: { paragraphId: 'p1', nonce: 1 } });
+    useAppStore.getState().consumePendingParagraphNavigation();
+    expect(useAppStore.getState().pendingParagraphNavigation).toBeNull();
+  });
+
   it('lexicalStateJson を持たないスナップショットも undo / redo で利用できる', () => {
     const document = createMultiChapterDocument();
     useAppStore.setState({ document });

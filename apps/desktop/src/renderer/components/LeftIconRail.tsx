@@ -1,7 +1,7 @@
 import React from 'react';
 import { IconAgent, IconFolder, IconSearch, IconSettings } from './ui/icons.js';
 
-export type LeftIconRailPanel = 'editor' | 'agents' | 'settings';
+export type LeftIconRailPanel = 'editor' | 'agents' | 'settings' | 'search';
 
 interface LeftIconRailProps {
   activePanel: LeftIconRailPanel;
@@ -12,12 +12,12 @@ interface NavItem {
   id: LeftIconRailPanel;
   label: string;
   Icon: (props: { size?: number }) => React.ReactElement;
-  disabled?: boolean;
 }
 
 const PRIMARY_NAV: NavItem[] = [
   { id: 'editor', label: 'エクスプローラー', Icon: IconFolder },
   { id: 'agents', label: '分析エージェント', Icon: IconAgent },
+  { id: 'search', label: '検索', Icon: IconSearch },
 ];
 
 export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) {
@@ -38,15 +38,6 @@ export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) 
           </button>
         );
       })}
-      <button
-        type="button"
-        className="rail-icon-button"
-        aria-label="検索"
-        title="検索 (今後追加されます)"
-        disabled
-      >
-        <IconSearch size={17} />
-      </button>
       <span className="left-icon-rail-spacer" />
       <button
         type="button"
