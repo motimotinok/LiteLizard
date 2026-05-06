@@ -1,15 +1,40 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
+  DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_ANALYSIS_SETTINGS,
+  type AnalysisContextLimitMode,
+  type AnalysisContextPolicy,
+  type AnalysisContextScope,
   type AnalysisSettings,
   type AnalysisSettingsInput,
 } from '@litelizard/shared';
 
 const SETTINGS_FILE_NAME = 'analysis-settings.json';
+const MIN_LAST_N = 1;
+const MAX_LAST_N = 999;
 
 function cloneDefaultSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
+}
+
+function normalizeContextPolicy(
+  input?: Partial<AnalysisContextPolicy> | null,
+): AnalysisContextPolicy {
+  const scope: AnalysisContextScope =
+    input?.scope === 'chapter' || input?.scope === 'document'
+      ? input.scope
+      : DEFAULT_ANALYSIS_CONTEXT_POLICY.scope;
+  const limitMode: AnalysisContextLimitMode =
+    input?.limitMode === 'none' || input?.limitMode === 'lastN'
+      ? input.limitMode
+      : DEFAULT_ANALYSIS_CONTEXT_POLICY.limitMode;
+  const rawLastN = input?.lastN;
+  const lastN =
+    typeof rawLastN === 'number' && Number.isFinite(rawLastN)
+      ? Math.min(Math.max(Math.trunc(rawLastN), MIN_LAST_N), MAX_LAST_N)
+      : DEFAULT_ANALYSIS_CONTEXT_POLICY.lastN;
+  return { scope, limitMode, lastN };
 }
 
 function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): AnalysisSettingsInput {
@@ -37,6 +62,7 @@ function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): Analy
       endpoint: localEndpoint,
       defaultModel: localDefaultModel,
     },
+    contextPolicy: normalizeContextPolicy(input?.contextPolicy),
   };
 }
 
@@ -55,6 +81,8 @@ export function mergeAnalysisSettings(
   settings.localLlm.endpoint = normalized.localLlm.endpoint;
   settings.localLlm.defaultModel = normalized.localLlm.defaultModel;
   settings.localLlm.configured = Boolean(normalized.localLlm.endpoint && normalized.localLlm.defaultModel);
+  // normalizeSettings 内で必ず値を埋めているが、型上 optional のため fallback を残す
+  settings.contextPolicy = normalized.contextPolicy ?? { ...DEFAULT_ANALYSIS_CONTEXT_POLICY };
 
   return settings;
 }

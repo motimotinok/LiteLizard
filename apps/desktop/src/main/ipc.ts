@@ -487,12 +487,18 @@ export function registerIpcHandlers() {
       anthropic: Boolean(secrets.anthropic?.trim()),
     });
     const provider = resolveAnalysisProvider(analysisSettings, secrets);
-    return runAnalysis(input, provider, agent, (result) => {
-      event.sender.send(IPC_CHANNELS.analysisProgress, {
-        paragraphId: result.paragraphId,
-        result,
-      } satisfies AnalysisProgressEvent);
-    });
+    return runAnalysis(
+      input,
+      provider,
+      agent,
+      (result) => {
+        event.sender.send(IPC_CHANNELS.analysisProgress, {
+          paragraphId: result.paragraphId,
+          result,
+        } satisfies AnalysisProgressEvent);
+      },
+      analysisSettings.contextPolicy,
+    );
   });
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysis, async (_, projectRoot: string, documentId: string, filePath?: string) => {
@@ -645,7 +651,7 @@ export function registerIpcHandlers() {
         anthropic: Boolean(secrets.anthropic?.trim()),
       });
       const provider = resolveAnalysisProvider(analysisSettings, secrets);
-      return await dryRunReadingAgent(input, provider);
+      return await dryRunReadingAgent(input, provider, analysisSettings.contextPolicy);
     } catch (error) {
       console.error('[IPC agents:dryRun] failed', error);
       throw new Error(`DRY_RUN_READING_AGENT_FAILED: ${getErrorMessage(error)}`);

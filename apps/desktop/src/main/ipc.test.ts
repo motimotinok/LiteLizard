@@ -268,6 +268,7 @@ describe('registerIpcHandlers', () => {
       expect.anything(),
       agent,
       expect.any(Function),
+      expect.objectContaining({ scope: expect.any(String), limitMode: expect.any(String) }),
     );
     expect(send).toHaveBeenCalledWith(IPC_CHANNELS.analysisProgress, {
       paragraphId: 'p_123',
@@ -305,7 +306,11 @@ describe('registerIpcHandlers', () => {
     };
 
     await expect(getRequiredHandler(IPC_CHANNELS.dryRunReadingAgent)(undefined as never, input as never)).resolves.toEqual(result);
-    expect(apiBridgeMock.dryRunReadingAgent).toHaveBeenCalledWith(input, expect.anything());
+    expect(apiBridgeMock.dryRunReadingAgent).toHaveBeenCalledWith(
+      input,
+      expect.anything(),
+      expect.objectContaining({ scope: expect.any(String), limitMode: expect.any(String) }),
+    );
   });
 
   it('allows filesystem IPC calls for paths inside a project root', async () => {

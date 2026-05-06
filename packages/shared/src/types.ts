@@ -173,6 +173,27 @@ export interface LocalLlmSettings {
   configured: boolean;
 }
 
+/**
+ * 分析コンテキストポリシー（仕様 docs/specs/analysis-api.md §2.1）。
+ * - `scope`: 'document' は文書全体の前段落、'chapter' は対象段落と同一章の前段落のみ。
+ * - `limitMode`: 'none' は前段落を全件、'lastN' は直近 `lastN` 件に絞る。
+ * - `lastN`: `limitMode === 'lastN'` のときに使う件数。1 以上 999 以下。
+ */
+export type AnalysisContextScope = 'document' | 'chapter';
+export type AnalysisContextLimitMode = 'none' | 'lastN';
+
+export interface AnalysisContextPolicy {
+  scope: AnalysisContextScope;
+  limitMode: AnalysisContextLimitMode;
+  lastN: number;
+}
+
+export const DEFAULT_ANALYSIS_CONTEXT_POLICY: AnalysisContextPolicy = {
+  scope: 'document',
+  limitMode: 'lastN',
+  lastN: 10,
+};
+
 export interface AnalysisSettings {
   defaultProvider: AnalysisProviderId;
   providers: {
@@ -180,6 +201,7 @@ export interface AnalysisSettings {
     anthropic: CloudProviderSettings;
   };
   localLlm: LocalLlmSettings;
+  contextPolicy: AnalysisContextPolicy;
 }
 
 export interface AnalysisSettingsInput {
@@ -196,6 +218,8 @@ export interface AnalysisSettingsInput {
     endpoint: string;
     defaultModel: string;
   };
+  // 旧クライアント互換のため optional。未指定時は DEFAULT_ANALYSIS_CONTEXT_POLICY が使われる。
+  contextPolicy?: AnalysisContextPolicy;
 }
 
 export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
@@ -215,4 +239,5 @@ export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
     defaultModel: 'llama3.1:8b',
     configured: false,
   },
+  contextPolicy: { ...DEFAULT_ANALYSIS_CONTEXT_POLICY },
 };
