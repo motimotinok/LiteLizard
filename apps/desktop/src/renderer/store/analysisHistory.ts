@@ -84,14 +84,14 @@ export function projectAnalysisHistoriesToDocument(
       }
 
       const pattern = history[displayedIndex];
-      const result = pattern.result as Record<string, unknown>;
+      const result = pattern.result;
 
       return {
         ...paragraph,
         lizard: {
           status: 'complete',
-          emotion: Array.isArray(result.emotion) ? (result.emotion as string[]) : [],
-          theme: Array.isArray(result.theme) ? (result.theme as string[]) : [],
+          emotion: Array.isArray(result.emotion) ? result.emotion : [],
+          theme: Array.isArray(result.theme) ? result.theme : [],
           deepMeaning: typeof result.deepMeaning === 'string' ? result.deepMeaning : '',
           confidence: typeof result.confidence === 'number' ? result.confidence : 0,
           model: typeof result.model === 'string' ? result.model : '',

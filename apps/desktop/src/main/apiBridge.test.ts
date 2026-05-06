@@ -503,7 +503,7 @@ describe('dryRunReadingAgent', () => {
 });
 
 describe('buildContextTexts', () => {
-  it('最大10件まで前段落だけ返す', () => {
+  it('既定ポリシー (document/lastN=10) で最大10件まで前段落だけ返す', () => {
     const paragraphs = Array.from({ length: 12 }, (_, index) => ({
       paragraphId: `p${index + 1}`,
       order: index + 1,
@@ -542,5 +542,72 @@ describe('buildContextTexts', () => {
     ];
 
     expect(buildContextTexts(paragraphs, 'missing')).toEqual([]);
+  });
+
+  it('chapter scope では同じ chapter の前段落だけ返す', () => {
+    const paragraphs = [
+      { paragraphId: 'p1', order: 1, text: 'a1', chapterId: 'c1' },
+      { paragraphId: 'p2', order: 2, text: 'a2', chapterId: 'c1' },
+      { paragraphId: 'p3', order: 3, text: 'b1', chapterId: 'c2' },
+      { paragraphId: 'p4', order: 4, text: 'b2', chapterId: 'c2' },
+    ];
+
+    expect(
+      buildContextTexts(paragraphs, 'p4', {
+        scope: 'chapter',
+        limitMode: 'none',
+        lastN: 10,
+      }),
+    ).toEqual(['b1']);
+  });
+
+  it('limitMode=none では件数制限なしで前段落を全件返す', () => {
+    const paragraphs = Array.from({ length: 15 }, (_, index) => ({
+      paragraphId: `p${index + 1}`,
+      order: index + 1,
+      text: `t${index + 1}`,
+    }));
+
+    const result = buildContextTexts(paragraphs, 'p15', {
+      scope: 'document',
+      limitMode: 'none',
+      lastN: 10,
+    });
+
+    expect(result).toHaveLength(14);
+    expect(result[0]).toBe('t1');
+    expect(result[result.length - 1]).toBe('t14');
+  });
+
+  it('limitMode=lastN は指定件数を超えない', () => {
+    const paragraphs = Array.from({ length: 8 }, (_, index) => ({
+      paragraphId: `p${index + 1}`,
+      order: index + 1,
+      text: `t${index + 1}`,
+    }));
+
+    expect(
+      buildContextTexts(paragraphs, 'p8', {
+        scope: 'document',
+        limitMode: 'lastN',
+        lastN: 3,
+      }),
+    ).toEqual(['t5', 't6', 't7']);
+  });
+
+  it('chapter scope でも対象段落に chapterId が無ければ document scope と同等', () => {
+    const paragraphs = [
+      { paragraphId: 'p1', order: 1, text: 'one' },
+      { paragraphId: 'p2', order: 2, text: 'two' },
+      { paragraphId: 'p3', order: 3, text: 'three' },
+    ];
+
+    expect(
+      buildContextTexts(paragraphs, 'p3', {
+        scope: 'chapter',
+        limitMode: 'none',
+        lastN: 10,
+      }),
+    ).toEqual(['one', 'two']);
   });
 });
