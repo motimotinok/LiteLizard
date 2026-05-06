@@ -15,6 +15,8 @@ export const AnalysisParagraphSchema = z.object({
   paragraphId: z.string().min(1),
   order: z.number().int().positive().optional(),
   text: z.string().min(1).max(10_000),
+  // chapter scope ポリシー判定で利用。古いクライアントとの互換のため optional。
+  chapterId: z.string().min(1).optional(),
 });
 
 export const AnalysisRequestSchema = z.object({

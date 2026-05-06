@@ -1,3 +1,9 @@
+[2026/05/06]L-09 分析コンテキストポリシー切替を実装
+解析時の前段落コンテキストを `scope: document/chapter` × `limitMode: none/lastN` の組み合わせで切替できるようにした。`AnalysisContextPolicy` を shared 型に追加し、`AnalysisSettings.contextPolicy` で既定値 `{document, lastN, 10}`（従来挙動）として保存。`buildContextTexts` を policy 受け取りに拡張、`apiBridge.runAnalysis` / `dryRunReadingAgent` で main 側 settings を伝搬、renderer の `toAnalysisParagraphInput` に `chapterId` を追加、SettingsScreen に分析コンテキスト UI を追加。`AnalysisParagraphSchema.chapterId` は optional で互換維持し、欠落時は document scope に fallback。回帰テストは settings store 3 件、buildContextTexts 4 件、ipc 引数検証 2 件を追加。仕様 `docs/specs/analysis-api.md` §2.1 を「将来拡張」から実装済みに書き換え。残課題: トークン上限ベースの自動 trim、UI の disabled スタイル整備
+
+[2026/05/06]Issue #64 analysisStore の競合書き込み対策
+`saveAnalysis` の一時ファイル名を `${pid}.${randomUUID()}.tmp` に変えて並行保存時の rename 競合と `ENOENT` を回避し、`appendParagraphPattern` / `createGeneration` を `(projectRoot, documentId)` 単位の Promise チェーンで直列化してロストアップデートを防いだ。同一段落への 10 並列 append、異段落並列、`saveAnalysis` 並列、`createGeneration` 並列の 4 シナリオを vitest で追加。残課題: 複数プロセス間ロックは未対応（Electron 1 プロセス前提）
+
 [2026/05/05]GitHub Actions CI 修正
 Reading Agent 追加で `AnalysisRequestSchema` に `agentId` が必須になった一方、API 統合テストの payload と API 成功レスポンスが古い契約のままだったため、CI の `apps/api` テストが validation error で失敗していた。テスト payload と `/v1/analysis/paragraphs` 成功レスポンスを `agentId` 付きに揃え、`pnpm test` / `pnpm build` で確認した
 

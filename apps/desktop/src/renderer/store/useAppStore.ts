@@ -179,6 +179,7 @@ function toAnalysisParagraphInput(document: LiteLizardDocument) {
     paragraphId: paragraph.id,
     order: paragraph.order,
     text: paragraph.light.text,
+    chapterId: paragraph.chapterId,
   }));
 }
 
@@ -1458,6 +1459,9 @@ export const useAppStore = create<AppState>((set, get) => {
           defaultModel: input.localLlm.defaultModel,
           configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
         },
+        contextPolicy: input.contextPolicy
+          ? { ...input.contextPolicy }
+          : { ...current.contextPolicy },
       };
       set({ analysisSettings, statusMessage: '分析設定を保存しました' });
     } catch (error) {

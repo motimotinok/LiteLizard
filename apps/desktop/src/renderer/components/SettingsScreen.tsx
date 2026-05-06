@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AnalysisProviderId } from '@litelizard/shared';
+import type {
+  AnalysisContextLimitMode,
+  AnalysisContextScope,
+  AnalysisProviderId,
+} from '@litelizard/shared';
 import { useAppStore } from '../store/useAppStore.js';
 import { AuxShell } from './ui/AuxShell.js';
 import { CenteredHeader } from './ui/CenteredHeader.js';
@@ -48,6 +52,9 @@ export function SettingsScreen() {
     anthropicModel: analysisSettings.providers.anthropic.defaultModel,
     localEndpoint: analysisSettings.localLlm.endpoint,
     localModel: analysisSettings.localLlm.defaultModel,
+    contextScope: analysisSettings.contextPolicy.scope,
+    contextLimitMode: analysisSettings.contextPolicy.limitMode,
+    contextLastN: analysisSettings.contextPolicy.lastN,
   });
   const [localLlmStatus, setLocalLlmStatus] = useState<string>('未接続');
 
@@ -58,6 +65,9 @@ export function SettingsScreen() {
       anthropicModel: analysisSettings.providers.anthropic.defaultModel,
       localEndpoint: analysisSettings.localLlm.endpoint,
       localModel: analysisSettings.localLlm.defaultModel,
+      contextScope: analysisSettings.contextPolicy.scope,
+      contextLimitMode: analysisSettings.contextPolicy.limitMode,
+      contextLastN: analysisSettings.contextPolicy.lastN,
     });
   }, [analysisSettings]);
 
@@ -70,6 +80,9 @@ export function SettingsScreen() {
   );
 
   const saveDraftSettings = async () => {
+    const lastN = Number.isFinite(settingsDraft.contextLastN)
+      ? Math.min(Math.max(Math.trunc(settingsDraft.contextLastN), 1), 999)
+      : analysisSettings.contextPolicy.lastN;
     await saveAnalysisSettings({
       defaultProvider: settingsDraft.defaultProvider,
       providers: {
@@ -86,6 +99,11 @@ export function SettingsScreen() {
       localLlm: {
         endpoint: settingsDraft.localEndpoint.trim(),
         defaultModel: settingsDraft.localModel.trim(),
+      },
+      contextPolicy: {
+        scope: settingsDraft.contextScope,
+        limitMode: settingsDraft.contextLimitMode,
+        lastN,
       },
     });
   };
@@ -339,6 +357,107 @@ export function SettingsScreen() {
                 >
                   接続を確認
                 </button>
+              </div>
+            </Section>
+
+            <Section label={toKanjiIndex(4)} title="分析コンテキスト">
+              <Row label="範囲" hint="解析時に LLM へ渡す前段落の取得元">
+                <div className="settings-radio-group">
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="context-scope"
+                      value="document"
+                      checked={settingsDraft.contextScope === 'document'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          contextScope: 'document' as AnalysisContextScope,
+                        }))
+                      }
+                    />
+                    文書全体
+                  </label>
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="context-scope"
+                      value="chapter"
+                      checked={settingsDraft.contextScope === 'chapter'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          contextScope: 'chapter' as AnalysisContextScope,
+                        }))
+                      }
+                    />
+                    同じ章のみ
+                  </label>
+                </div>
+              </Row>
+              <Row label="上限" hint="前段落の件数を制限するか">
+                <div className="settings-radio-group">
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="context-limit-mode"
+                      value="lastN"
+                      checked={settingsDraft.contextLimitMode === 'lastN'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          contextLimitMode: 'lastN' as AnalysisContextLimitMode,
+                        }))
+                      }
+                    />
+                    直近 N 件
+                  </label>
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="context-limit-mode"
+                      value="none"
+                      checked={settingsDraft.contextLimitMode === 'none'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          contextLimitMode: 'none' as AnalysisContextLimitMode,
+                        }))
+                      }
+                    />
+                    上限なし
+                  </label>
+                </div>
+              </Row>
+              <Row label="件数 (N)" hint="直近 N 件のときに使う前段落数">
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  step={1}
+                  className="settings-input"
+                  disabled={settingsDraft.contextLimitMode !== 'lastN'}
+                  value={settingsDraft.contextLastN}
+                  onChange={(event) => {
+                    const next = Number.parseInt(event.target.value, 10);
+                    setSettingsDraft((current) => ({
+                      ...current,
+                      contextLastN: Number.isFinite(next) ? next : current.contextLastN,
+                    }));
+                  }}
+                />
+              </Row>
+              <div className="settings-actions-row">
+                <span>変更は「設定を保存」で適用されます。</span>
+                <div className="settings-actions-buttons">
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveDraftSettings()}
+                  >
+                    設定を保存
+                  </button>
+                </div>
               </div>
             </Section>
           </>
