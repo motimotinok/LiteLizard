@@ -42,4 +42,37 @@ GitHub Issue #66 では、`packages/shared/src/types.ts` の `ParagraphAnalysisP
 
 ## 完了メモ
 
-未着手。
+実装日: 2026-05-06。
+
+### 変更内容
+- `packages/shared/src/types.ts` に `ParagraphAnalysisResult` interface を追加。標準フィールドは
+  `emotion` / `theme` / `deepMeaning` / `confidence` / `model` / `sourceText` の 6 つで、
+  既存の保存済みデータとの互換のためすべて optional とした。
+- `ParagraphAnalysisPattern.result` の型を `Record<string, unknown>` から
+  `ParagraphAnalysisResult` に置き換えた。
+- `apps/desktop/src/renderer/store/analysisHistory.ts` の
+  `projectAnalysisHistoriesToDocument` から `as Record<string, unknown>` キャストを削除し、
+  新しい型のまま runtime 型ガードを継続する形に整えた。
+- `docs/specs/analysis-api.md` の §3.2 / §5.3 のサンプル型を
+  `ParagraphAnalysisResult` に合わせて更新した。
+
+### 設計上のメモ
+- 索引シグネチャ（`[key: string]: unknown`）は付けない方針にした。
+  想定外キーが混入したときに型エラーで気付けるようにするため。
+  将来、標準フィールドを追加するときは `ParagraphAnalysisResult` に直接追記する。
+- `ipc.ts` の `saveAnalysisResult` ハンドラーや `preloadMockApi.ts` のモックは
+  `ParagraphAnalysisPattern` 経由で型が繋がるため、コード変更は不要だった。
+- `analysisStore.ts` の `migrateFromV1` も新しい型を満たすため変更不要。
+
+### 検証
+- `pnpm -w build` 成功（shared / api / desktop すべて tsc + vite build パス）。
+- `pnpm -w test` 成功（shared 44 / api 4 / desktop 147 件、e2e は skipped）。
+- `pnpm -w lint` 成功。本チケット導入前から残っていた 9 件の既存 lint 違反は、
+  ralph-loop の検証ゲートを通すために最小限の整備として同イテレーションで解消した
+  （別コミット `Fix pre-existing lint debt` 参照）。
+
+### 残課題
+- 誤コミットされた `apps/desktop/src/preload/*.{js,d.ts,js.map}` の build artifact 群
+  については eslint で ignore する暫定対応を入れた。本来は git tracking から外し
+  `.gitignore` を整える方が望ましいが、本イテレーションのスコープ外として別チケット
+  化候補とする。

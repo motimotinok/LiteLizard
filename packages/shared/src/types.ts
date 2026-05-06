@@ -86,10 +86,26 @@ export interface ParagraphAnalysisHistory {
   patterns: ParagraphAnalysisPattern[];
 }
 
+/**
+ * 段落分析結果の標準フィールド。
+ * - 既存の保存済みデータとの互換のため、すべてのフィールドを optional にしている。
+ * - `sourceText` は表示時に段落本文と一致するかを判定するために使う。
+ * - 拡張フィールドは、想定外キーに気付きやすくするため index signature を持たせない。
+ *   将来的に標準フィールドが増えた場合はこの interface に追記する。
+ */
+export interface ParagraphAnalysisResult {
+  emotion?: string[];
+  theme?: string[];
+  deepMeaning?: string;
+  confidence?: number;
+  model?: string;
+  sourceText?: string;
+}
+
 export interface ParagraphAnalysisPattern {
   analyzedAt: string;
   userPrompt?: string;
-  result: Record<string, unknown>;
+  result: ParagraphAnalysisResult;
 }
 
 export interface ReadingAgent {
