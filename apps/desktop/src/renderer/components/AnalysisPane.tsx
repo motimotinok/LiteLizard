@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
 import type { AnalysisMode } from '../store/useAppStore.js';
 import { reorderByKey } from '../utils/arrayUtils.js';
+import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
+import { ChapterSummaryList } from './ChapterSummaryList.js';
 import { useAppStore } from '../store/useAppStore.js';
 import {
   getVisiblePatternIndices,
@@ -117,7 +119,9 @@ export function AnalysisPane({
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
   const setActiveAgent = useAppStore((s) => s.setActiveAgent);
+  const viewScale = useAppStore((s) => s.viewScale);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
+  const chapterSummaries = useMemo(() => aggregateChapterAnalyses(document), [document]);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
@@ -308,6 +312,9 @@ export function AnalysisPane({
               </button>
             </div>
           ) : null}
+          {viewScale === 'macro' ? (
+            <ChapterSummaryList summaries={chapterSummaries} />
+          ) : (
           <div className="analysis-card-list">
             {document.paragraphs.map((paragraph, index) => {
               const expanded = Boolean(expandedByParagraphId[paragraph.id]);
@@ -536,8 +543,10 @@ export function AnalysisPane({
               );
             })}
           </div>
+          )}
         </div>
       )}
     </aside>
   );
 }
+

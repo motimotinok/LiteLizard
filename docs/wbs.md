@@ -208,7 +208,7 @@
 | R-04 | エクスプローラー: .lzl 拡張子非表示 + 自動付与 | E-02 | P1 | S | ✅ | 2026-04-17 | |
 | R-05 | エクスプローラー: .litelizard/ 非表示 | E-05 ✅ | P1 | S | ✅ | Claude | claude/review-task-checklist-ygfSP |
 | R-06 | エクスプローラー: 削除時に解析 JSON 連動削除 | E-06 ✅ | P1 | S | ✅ | | (E-06 実装時に完了済み) |
-| R-07 | 章サマリー解析表示（マクロ視点時の分析ペイン） | L-06 | P2 | M | ⛔ | | |
+| R-07 | 章サマリー解析表示（マクロ視点時の分析ペイン） | L-06 | P2 | M | ✅ | Claude | ralphloop |
 | R-08 | 全体解析の成功/失敗件数表示 | L-06 ✅ | P2 | S | ✅ | Codex | ralphloop |
 | R-09 | sourceHash による stale 検出・表示 | L-06 ✅ | P1 | S | ✅ | Claude | claude/review-task-checklist-3fkKs (#70) |
 | R-10 | 分析モード選択 UI（スタブ） | — | P2 | S | ✅ | Codex | ralphloop |
