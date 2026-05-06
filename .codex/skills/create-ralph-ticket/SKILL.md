@@ -5,7 +5,7 @@ description: "LiteLizard の Ralph Loop 用ローカルチケットを docs/tick
 
 # Create Ralph Ticket
 
-LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 配下に Markdown ファイルとして作成する。
+LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 直下に Markdown ファイルとして作成する。
 
 このスキルは、ユーザーが明示的に Ralph Loop / ローカルチケット作成を依頼した時だけ使う。自律実行中に勝手に新規チケットを作らない。
 
@@ -15,6 +15,8 @@ LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 配下に Markdown 
 - `gh issue create` は使わない。
 - `docs/wbs.md` は更新しない。
 - チケットは LLM が 1 回の作業単位として扱える粒度にする。
+- 新規チケットは `docs/tickets/` 直下に作成し、`docs/tickets/done/` には作成しない。
+- `docs/tickets/done/` は Ralph Loop が完了済みチケットを移動するための置き場として扱う。
 - 実装手順を細かく固定せず、ゴール、スコープ、非ゴール、受け入れ条件、検証方法を中心に書く。
 - チケットの front matter に `status: todo`、空の `started_at`、空の `completed_at` を必ず入れる。
 - `started_at` / `completed_at` は Ralph Loop が更新する欄で、値が入る場合は `YYYY-MM-DDTHH:mm:ss+09:00` 形式にする。
@@ -22,10 +24,16 @@ LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 配下に Markdown 
 
 ## ファイル配置
 
-保存先:
+新規チケットの保存先:
 
 ```text
 docs/tickets/
+```
+
+完了済みチケットの移動先:
+
+```text
+docs/tickets/done/
 ```
 
 ファイル名:

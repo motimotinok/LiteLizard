@@ -1,7 +1,7 @@
 ---
-status: todo
+status: done
 started_at:
-completed_at:
+completed_at: 2026-05-06T10:01:50+09:00
 ---
 
 # 分析コンテキストポリシー切替
