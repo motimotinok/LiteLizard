@@ -1,3 +1,21 @@
+[2026/05/06]R-08 全体解析の成功/失敗件数表示
+全体解析の完了後に対象段落数、成功件数、失敗件数を renderer store の `analysisRunSummary` と AnalysisPane の静かな件数表示で確認できるようにした。結果が返らなかった対象段落は失敗扱いにし、progress や final response で成功した段落の解析結果は残す。0 件時も summary と status message を更新する。`useAppStore.test.ts` に成功、一部失敗、対象0件の回帰テストを追加。検証: `pnpm --filter @litelizard/desktop test -- useAppStore` / `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` 成功。残課題なし
+
+[2026/05/06]personaMode の .lzl 読み込み既定値を現行仕様に合わせた
+`.lzl` v1 は `personaMode` を保存せず、Reading Agent が新しい読者選択の正規入力である方針に合わせて、`.lzl` から `LiteLizardDocument` へ変換する際の互換用既定値を `friendly` から `general-reader` に変更した。`docs/specs/reading-agent.md` に `.lzl` へ personaMode を新規永続化しないことと、active Reading Agent を上書きしないことを追記。converter の回帰テストを追加し、`pnpm --filter @litelizard/shared test -- converter` / `pnpm --filter @litelizard/shared test` / `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` で確認。残課題なし
+
+[2026/05/06]R-10 分析モード選択 UI スタブを追加
+AnalysisPane に「段落 / 章 / 全体」を選べる segmented control を追加し、選択状態を renderer store の `analysisMode` として保持するようにした。章 / 全体は将来実装のスタブとして選択だけ可能にし、既存の段落解析実行は段落モード時のみ従来通り動くようにした。`useAppStore.test.ts` に mode 切替の回帰テストを追加。検証は `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` 成功。残課題: 章解析・全体解析の実行ロジックは後続タスク。
+
+[2026/05/06]R-12 分析カードクリック時アニメーション改善
+分析カードの active 表示に短い pulse と控えめな内枠を追加し、クリック直後に選択されたことが分かるようにした。stale 表示と active 左罫線が重ならないよう stale 側を少し内側へ逃がし、`prefers-reduced-motion` では animation / transition を止める。表示状態だけの小変更のためテスト追加はせず、差分レビューと `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` で確認。残課題なし
+
+[2026/05/06]Issue #65 preload mock 解析ストアの仕様を回帰テストで固定
+`apps/desktop/src/preload/preloadMockApi.ts` の `loadAnalysis` / `saveAnalysisResult` / `createAnalysisGeneration` は既に `documentId` ごとに `GenerationalAnalysisFile` をインメモリで保持し、main 側 `analysisStore.ts` の最新世代返却・パターン追記・世代インクリメント＋空 paragraphs と整合する実装になっていた。Electron dev + mock モードでの解析 UI 回帰確認を支えるため、`preloadMockApi.test.ts` に「保存前の null」「同一段落への複数 pattern 蓄積」「異なる documentId 独立」「戻り値の deep clone」「世代インクリメントで paragraphs リセット」「未保存 documentId でも generation:1 から」の 6 ケースを追加。実装は無変更。`pnpm -w lint` / `pnpm -w test` / `pnpm -w build` 成功。残課題なし
+
+[2026/05/06]T-04 章削除・段落統合のエッジケーステストを整備
+`docs/specs/chapter-paragraph-ops.md` のエッジケース表に対応するテストを追加した。store 層では `deleteChapterFromDocument` の通常ケース（前章末尾への吸収＋ stale 化）、先頭章削除時の無題章生成、唯一章削除、空章削除（先頭・中間・唯一）、未知 ID の no-op を `documentOps.test.ts` に 8 件追加。Lexical Plugin 層では Backspace の判定（先頭章 no-op、非先頭章タイトルの格下げ、章境界 no-op、同一章内段落統合、非 collapsed/非段落先頭の pass-through）と隣接段落テキスト結合を `editor/utils/backspaceMerge.ts` に純粋関数として切り出して `backspaceMerge.test.ts` で 12 件確認。`ChapterCommandPlugin` は同 helper を呼ぶ最小リファクタに留め、判定順序・ undo push・ Lexical 操作は変えていない。`pnpm -w lint` / `pnpm -w test`（desktop 178 件・shared 44 件・api 4 件）/ `pnpm -w build` 成功。残課題: Lexical エディター上での手動 / Electron 統合テストはチケット範囲外。
+
 [2026/05/06]WBS L-09/T-05 整合性更新
 L-09 分析コンテキストポリシー切替と T-05 回帰テストは実装済みだったため、WBS の状態・完了メモ・集計を実態に合わせて更新した
 

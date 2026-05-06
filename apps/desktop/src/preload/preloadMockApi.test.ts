@@ -1,3 +1,4 @@
+import type { ParagraphAnalysisPattern } from '@litelizard/shared';
 import { describe, expect, it } from 'vitest';
 import { createMockPreloadApi } from './preloadMockApi.js';
 import { mockRootPath } from './preloadMockData.js';
@@ -107,6 +108,92 @@ describe('createMockPreloadApi', () => {
 
     expect(result.results).toHaveLength(1);
     expect(result.results[0]?.paragraphId).toBe('p2');
+  });
+
+  describe('解析ストア mock', () => {
+    function makePattern(seq: number): ParagraphAnalysisPattern {
+      return {
+        analyzedAt: `2026-04-11T00:00:0${seq % 10}.000Z`,
+        result: { emotion: [`seq-${seq}`] },
+      };
+    }
+
+    it('loadAnalysis は保存前は null を返す', async () => {
+      const api = createMockPreloadApi();
+
+      expect(await api.loadAnalysis(mockRootPath, 'doc-empty')).toBeNull();
+    });
+
+    it('saveAnalysisResult で段落ごとの patterns が蓄積される', async () => {
+      const api = createMockPreloadApi();
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', makePattern(0));
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', makePattern(1));
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p2', makePattern(2));
+
+      const file = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(file?.documentId).toBe('doc-1');
+      expect(file?.generation).toBe(1);
+      expect(file?.paragraphs.p1?.patterns.map((p) => p.result.emotion?.[0])).toEqual([
+        'seq-0',
+        'seq-1',
+      ]);
+      expect(file?.paragraphs.p2?.patterns).toHaveLength(1);
+    });
+
+    it('loadAnalysis は documentId ごとに独立した結果を返す', async () => {
+      const api = createMockPreloadApi();
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-a', 'p1', makePattern(0));
+      await api.saveAnalysisResult(mockRootPath, 'doc-b', 'p1', makePattern(1));
+
+      const fileA = await api.loadAnalysis(mockRootPath, 'doc-a');
+      const fileB = await api.loadAnalysis(mockRootPath, 'doc-b');
+      expect(fileA?.paragraphs.p1?.patterns[0]?.result.emotion?.[0]).toBe('seq-0');
+      expect(fileB?.paragraphs.p1?.patterns[0]?.result.emotion?.[0]).toBe('seq-1');
+    });
+
+    it('loadAnalysis の戻り値を変更してもストアに影響しない', async () => {
+      const api = createMockPreloadApi();
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', makePattern(0));
+      const file = await api.loadAnalysis(mockRootPath, 'doc-1');
+      file!.paragraphs.p1!.patterns.push(makePattern(99));
+
+      const reloaded = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(reloaded?.paragraphs.p1?.patterns).toHaveLength(1);
+    });
+
+    it('createAnalysisGeneration は世代番号をインクリメントし新世代を空で作る', async () => {
+      const api = createMockPreloadApi();
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', makePattern(0));
+      const first = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(first?.generation).toBe(1);
+
+      const generation = await api.createAnalysisGeneration(mockRootPath, 'doc-1');
+      expect(generation).toBe(2);
+
+      const next = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(next?.generation).toBe(2);
+      expect(next?.paragraphs).toEqual({});
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p2', makePattern(3));
+      const final = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(final?.generation).toBe(2);
+      expect(final?.paragraphs.p2?.patterns).toHaveLength(1);
+    });
+
+    it('createAnalysisGeneration は何も保存していない documentId でも 1 から始まる', async () => {
+      const api = createMockPreloadApi();
+
+      const generation = await api.createAnalysisGeneration(mockRootPath, 'doc-fresh');
+      expect(generation).toBe(1);
+
+      const file = await api.loadAnalysis(mockRootPath, 'doc-fresh');
+      expect(file?.generation).toBe(1);
+      expect(file?.paragraphs).toEqual({});
+    });
   });
 
   it('Reading Agent mock は built-in 4件を返す', async () => {

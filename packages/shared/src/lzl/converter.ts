@@ -31,7 +31,7 @@ export function toLiteLizardDocument(parsed: ParsedLzlDocument): LiteLizardDocum
     version: 2,
     documentId: parsed.frontmatter.documentId,
     title: parsed.frontmatter.title,
-    personaMode: 'friendly',
+    personaMode: 'general-reader',
     createdAt: parsed.frontmatter.created,
     updatedAt: parsed.frontmatter.updated,
     source: {

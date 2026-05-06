@@ -12,6 +12,8 @@ Reading Agent は、解析時にどの読者視点で段落を読むかを決め
 
 R-18 以降の新しい解析実行では `agentId` を正とする。既存 `.lzl` / `.litelizard/analysis` との互換のため `personaMode` は型と保存形式に残すが、Reading Agent の代替として新規実行ロジックを分岐させない。
 
+`.lzl` v1 は `personaMode` をフロントマターに保存しない。`.lzl` から `LiteLizardDocument` へ変換するときは、互換用の既定値として `general-reader` を補う。読者選択の復元は `personaMode` ではなく、アプリ側の active Reading Agent で扱う。
+
 ## 2. 現行仕様
 
 ### データモデル
@@ -66,6 +68,7 @@ AgentsScreen は `name` / `role` / `systemPrompt` / `model` / `temperature` を 
 ## 3. 制約・非ゴール
 
 - `personaMode` は互換目的で残すが、新しい読者選択 UI の正規入力にはしない。
+- `.lzl` v1 には `personaMode` を新規永続化しない。読み込み時の `general-reader` は既存型を満たすための互換値であり、active Reading Agent を上書きしない。
 - active agent は現時点ではプロジェクト別にしない。作品ごとに agent を固定する仕様は将来拡張とする。
 - dry-run は保存副作用を持たない。解析履歴、世代ファイル、段落カードの `lizard` 更新を発生させない。
 - AgentsScreen の model は Settings と同じ自由入力とし、provider ごとの model 候補管理や補完は含めない。

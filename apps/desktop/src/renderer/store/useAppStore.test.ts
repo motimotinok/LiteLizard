@@ -112,6 +112,16 @@ describe('useAppStore project startup flow', () => {
     expect(state.rootPath).toBeNull();
   });
 
+  it('analysisMode は段落を初期値にして章と全体へ切り替えられる', () => {
+    expect(useAppStore.getState().analysisMode).toBe('paragraph');
+
+    useAppStore.getState().setAnalysisMode('chapter');
+    expect(useAppStore.getState().analysisMode).toBe('chapter');
+
+    useAppStore.getState().setAnalysisMode('document');
+    expect(useAppStore.getState().analysisMode).toBe('document');
+  });
+
   it('restoreLastProject は保存済みフォルダを復元して ready にする', async () => {
     const setLastOpenedFolder = vi.fn().mockResolvedValue({ ok: true });
     window.litelizard = createBridge({
@@ -341,6 +351,93 @@ describe('useAppStore L-06 analysis state', () => {
     expect(state.document?.paragraphs[0].lizard.deepMeaning).toBe('progress result');
     expect(state.document?.paragraphs[0].lizard.requestId).toBe('req_1');
     expect(state.document?.paragraphs[1].lizard.deepMeaning).toBe('final only');
+    expect(state.analysisRunSummary).toEqual({ targetCount: 2, successCount: 2, failureCount: 0 });
+    expect(state.statusMessage).toBe('全体解析が完了しました（対象 2 / 成功 2 / 失敗 0）');
+  });
+
+  it('runAnalysis は一部失敗時の件数を保持し成功済み結果を残す', async () => {
+    const document = createLzlDocument();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_partial',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          emotion: ['安心'],
+          theme: ['構成'],
+          deepMeaning: 'only p1',
+          confidence: 0.88,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-04-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+
+    window.litelizard = createBridge({ runAnalysis });
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      document,
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+      },
+    });
+
+    await useAppStore.getState().runAnalysis();
+
+    const state = useAppStore.getState();
+    expect(state.analysisRunSummary).toEqual({ targetCount: 2, successCount: 1, failureCount: 1 });
+    expect(state.statusMessage).toBe('全体解析が完了しました（対象 2 / 成功 1 / 失敗 1）');
+    expect(state.document?.paragraphs[0].lizard.deepMeaning).toBe('only p1');
+    expect(state.document?.paragraphs[1].lizard.status).toBe('failed');
+  });
+
+  it('runAnalysis は対象0件でも件数表示用の summary を更新する', async () => {
+    const document = createLzlDocument({
+      paragraphs: createLzlDocument().paragraphs.map((paragraph) => ({
+        ...paragraph,
+        lizard: {
+          status: 'complete',
+          deepMeaning: 'done',
+          emotion: [],
+          theme: [],
+          confidence: 0.8,
+          analyzedAt: '2026-04-12T00:00:00.000Z',
+        },
+      })),
+    });
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+    useAppStore.setState({
+      document,
+      activeAgentId: 'reader-quiet',
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+      },
+    });
+
+    await useAppStore.getState().runAnalysis();
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(useAppStore.getState().analysisRunSummary).toEqual({
+      targetCount: 0,
+      successCount: 0,
+      failureCount: 0,
+    });
+    expect(useAppStore.getState().statusMessage).toBe('再解析が必要な段落はありません（対象 0 / 成功 0 / 失敗 0）');
   });
 
   it('構造変更時は世代を作成して履歴状態を空に戻す', async () => {

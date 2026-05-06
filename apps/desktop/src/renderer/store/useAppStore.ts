@@ -31,8 +31,15 @@ import {
 
 export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
+export type AnalysisMode = 'paragraph' | 'chapter' | 'document';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
 export type WorkspacePanel = 'editor' | 'settings' | 'agents';
+
+export interface AnalysisRunSummary {
+  targetCount: number;
+  successCount: number;
+  failureCount: number;
+}
 
 export interface UndoSnapshot {
   lexicalStateJson: string;
@@ -88,6 +95,7 @@ interface AppState {
   analysisHistoriesByParagraphId: AnalysisHistoriesByParagraphId;
   selectedPatternIndexByParagraphId: SelectedPatternIndexByParagraphId;
   generationSyncPending: boolean;
+  analysisRunSummary: AnalysisRunSummary | null;
   analysisSettings: AnalysisSettings;
   agents: ReadingAgent[];
   activeAgentId: string | null;
@@ -95,6 +103,7 @@ interface AppState {
   activeWorkspacePanel: WorkspacePanel;
   editorMode: EditorMode;
   viewScale: ViewScale;
+  analysisMode: AnalysisMode;
   analysisLayerOpen: boolean;
   statusMessage: string;
   undoStack: UndoSnapshot[];
@@ -126,6 +135,7 @@ interface AppState {
   selectAnalysisPatternIndex: (paragraphId: string, patternIndex: number) => void;
   setEditorMode: (mode: EditorMode) => void;
   setViewScale: (viewScale: ViewScale) => void;
+  setAnalysisMode: (mode: AnalysisMode) => void;
   toggleViewScale: () => void;
   cycleEditorMode: () => void;
   openSettingsPanel: () => void;
@@ -191,6 +201,10 @@ function getAnalysisStructureSignature(document: LiteLizardDocument) {
     .map((paragraph) => `${paragraph.id}:${paragraph.order}:${paragraph.chapterId}`)
     .join('|');
   return `${document.documentId}::${chapterSignature}::${paragraphSignature}`;
+}
+
+function formatAnalysisRunSummary(prefix: string, summary: AnalysisRunSummary) {
+  return `${prefix}（対象 ${summary.targetCount} / 成功 ${summary.successCount} / 失敗 ${summary.failureCount}）`;
 }
 
 function isGenerationManagedDocument(document: LiteLizardDocument | null, rootPath: string | null) {
@@ -273,6 +287,7 @@ export const useAppStore = create<AppState>((set, get) => {
     analysisHistoriesByParagraphId: {} as AnalysisHistoriesByParagraphId,
     selectedPatternIndexByParagraphId: {} as SelectedPatternIndexByParagraphId,
     generationSyncPending: false,
+    analysisRunSummary: null,
   });
 
   const resetUndoState = () => ({
@@ -438,6 +453,7 @@ export const useAppStore = create<AppState>((set, get) => {
     activeWorkspacePanel: 'editor',
     editorMode: 'writing',
     viewScale: 'micro',
+    analysisMode: 'paragraph',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
 
@@ -941,7 +957,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
     const staleParagraphs = collectStaleParagraphs(document);
     if (staleParagraphs.length === 0) {
-      set({ statusMessage: '再解析が必要な段落はありません' });
+      const summary = { targetCount: 0, successCount: 0, failureCount: 0 };
+      set({
+        analysisRunSummary: summary,
+        statusMessage: formatAnalysisRunSummary('再解析が必要な段落はありません', summary),
+      });
       return;
     }
 
@@ -956,7 +976,7 @@ export const useAppStore = create<AppState>((set, get) => {
           : paragraph
       ),
     };
-    set({ document: pendingDoc, statusMessage: '全体解析を実行中...' });
+    set({ document: pendingDoc, analysisRunSummary: null, statusMessage: '全体解析を実行中...' });
 
     const payload: AnalysisRunInput = {
       documentId: document.documentId,
@@ -1012,13 +1032,23 @@ export const useAppStore = create<AppState>((set, get) => {
         }
       });
 
+      const succeededParagraphIds = new Set([
+        ...Array.from(progressedParagraphIds),
+        ...result.results.map((analyzed) => analyzed.paragraphId),
+      ]);
+      const summary = {
+        targetCount: staleParagraphs.length,
+        successCount: staleParagraphs.filter((paragraph) => succeededParagraphIds.has(paragraph.id)).length,
+        failureCount: staleParagraphs.filter((paragraph) => !succeededParagraphIds.has(paragraph.id)).length,
+      };
+
       set((state) => {
         if (!state.document) return {};
         return {
           document: {
             ...state.document,
             paragraphs: state.document.paragraphs.map((paragraph) =>
-              result.results.some((analyzed) => analyzed.paragraphId === paragraph.id)
+              succeededParagraphIds.has(paragraph.id)
                 ? {
                     ...paragraph,
                     lizard: {
@@ -1026,16 +1056,36 @@ export const useAppStore = create<AppState>((set, get) => {
                       requestId: result.requestId,
                     },
                   }
+                : staleTextMap.has(paragraph.id)
+                  ? {
+                      ...paragraph,
+                      lizard: {
+                        status: 'failed',
+                        error: {
+                          code: 'ANALYSIS_PARTIAL_FAILURE',
+                          message: '解析結果が返りませんでした。',
+                        },
+                      },
+                    }
                 : paragraph,
             ),
             updatedAt: new Date().toISOString(),
           },
           dirty: true,
-          statusMessage: '全体解析が完了しました',
+          analysisRunSummary: summary,
+          statusMessage: formatAnalysisRunSummary('全体解析が完了しました', summary),
         };
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Analysis failed';
+      const successCount = staleParagraphs.filter((paragraph) =>
+        progressedParagraphIds.has(paragraph.id),
+      ).length;
+      const summary = {
+        targetCount: staleParagraphs.length,
+        successCount,
+        failureCount: staleParagraphs.length - successCount,
+      };
       set((state) => {
         if (!state.document) return {};
         return {
@@ -1049,7 +1099,8 @@ export const useAppStore = create<AppState>((set, get) => {
           },
           // progress で complete になった段落があれば保存が必要
           dirty: true,
-          statusMessage: `解析に失敗しました: ${message}`,
+          analysisRunSummary: summary,
+          statusMessage: formatAnalysisRunSummary(`解析に失敗しました: ${message}`, summary),
         };
       });
     } finally {
@@ -1212,6 +1263,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
   setViewScale: (viewScale: ViewScale) => {
     set({ viewScale });
+  },
+
+  setAnalysisMode: (mode: AnalysisMode) => {
+    set({ analysisMode: mode });
   },
 
   toggleViewScale: () => {
