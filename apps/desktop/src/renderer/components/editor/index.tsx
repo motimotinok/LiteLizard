@@ -11,8 +11,10 @@ interface Props {
   dirty: boolean;
   viewScale: 'micro' | 'macro';
   activeParagraphId: string | null;
+  linkedHighlightParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onSetViewScale: (viewScale: 'micro' | 'macro') => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
@@ -26,8 +28,10 @@ export function EditorPane({
   document,
   viewScale,
   activeParagraphId,
+  linkedHighlightParagraphId,
   scrollRequest,
   setActiveParagraphId,
+  onPreviewParagraphLink,
   onSetViewScale,
   onSyncStructure,
   onReorderParagraphs,
@@ -75,8 +79,10 @@ export function EditorPane({
             <MicroEditorView
               document={document}
               activeParagraphId={activeParagraphId}
+              linkedHighlightParagraphId={linkedHighlightParagraphId}
               scrollRequest={scrollRequest}
               setActiveParagraphId={setActiveParagraphId}
+              onPreviewParagraphLink={onPreviewParagraphLink}
               onSyncStructure={onSyncStructure}
               onReorderParagraphs={onReorderParagraphs}
             />

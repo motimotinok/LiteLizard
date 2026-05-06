@@ -358,6 +358,18 @@ export function SettingsScreen() {
                   接続を確認
                 </button>
               </div>
+              <div className="settings-actions-row">
+                <span>ローカル LLM</span>
+                <div className="settings-actions-buttons">
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveDraftSettings()}
+                  >
+                    ローカル LLM 設定を保存
+                  </button>
+                </div>
+              </div>
             </Section>
 
             <Section label={toKanjiIndex(4)} title="分析コンテキスト">
