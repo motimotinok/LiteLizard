@@ -1,3 +1,6 @@
+[2026/05/06]Issue #64 analysisStore の競合書き込み対策
+`saveAnalysis` の一時ファイル名を `${pid}.${randomUUID()}.tmp` に変えて並行保存時の rename 競合と `ENOENT` を回避し、`appendParagraphPattern` / `createGeneration` を `(projectRoot, documentId)` 単位の Promise チェーンで直列化してロストアップデートを防いだ。同一段落への 10 並列 append、異段落並列、`saveAnalysis` 並列、`createGeneration` 並列の 4 シナリオを vitest で追加。残課題: 複数プロセス間ロックは未対応（Electron 1 プロセス前提）
+
 [2026/05/05]GitHub Actions CI 修正
 Reading Agent 追加で `AnalysisRequestSchema` に `agentId` が必須になった一方、API 統合テストの payload と API 成功レスポンスが古い契約のままだったため、CI の `apps/api` テストが validation error で失敗していた。テスト payload と `/v1/analysis/paragraphs` 成功レスポンスを `agentId` 付きに揃え、`pnpm test` / `pnpm build` で確認した
 

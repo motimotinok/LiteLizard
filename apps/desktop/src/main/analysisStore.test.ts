@@ -227,6 +227,86 @@ describe('createGeneration', () => {
 });
 
 // -------------------------------------------------------------------
+// 並行書き込み（直列化 / tmp 衝突回避）
+// -------------------------------------------------------------------
+describe('並行書き込み', () => {
+  function makePattern(seq: number): ParagraphAnalysisPattern {
+    return {
+      analyzedAt: `2026-04-11T00:00:0${seq % 10}.000Z`,
+      result: { emotion: [`seq-${seq}`] },
+    };
+  }
+
+  it('同一段落への並行 appendParagraphPattern が直列化されロストアップデートしない', async () => {
+    await withTempProject(async (projectRoot) => {
+      const total = 10;
+      const calls = Array.from({ length: total }, (_, i) =>
+        appendParagraphPattern(projectRoot, DOC_ID, 'p_para1', makePattern(i)),
+      );
+      await Promise.all(calls);
+
+      const result = await loadLatestAnalysis(projectRoot, DOC_ID);
+      expect(result?.paragraphs['p_para1'].patterns).toHaveLength(total);
+      const seqs = (result?.paragraphs['p_para1'].patterns ?? []).map(
+        (p) => (p.result.emotion as string[] | undefined)?.[0],
+      );
+      // 直列化されているので順序付き、かつ全件揃う
+      expect(seqs.sort()).toEqual(
+        Array.from({ length: total }, (_, i) => `seq-${i}`).sort(),
+      );
+    });
+  });
+
+  it('異なる段落への並行 append でも全件揃う', async () => {
+    await withTempProject(async (projectRoot) => {
+      const ids = ['p_a', 'p_b', 'p_c', 'p_d'];
+      await Promise.all(
+        ids.map((id, i) => appendParagraphPattern(projectRoot, DOC_ID, id, makePattern(i))),
+      );
+
+      const result = await loadLatestAnalysis(projectRoot, DOC_ID);
+      for (const id of ids) {
+        expect(result?.paragraphs[id]?.patterns).toHaveLength(1);
+      }
+    });
+  });
+
+  it('saveAnalysis を並行呼び出ししても tmp 名衝突で落ちない', async () => {
+    await withTempProject(async (projectRoot) => {
+      const calls = Array.from({ length: 8 }, (_, i) =>
+        saveAnalysis(
+          projectRoot,
+          makeFile(1, { updatedAt: `2026-01-01T00:00:0${i}.000Z` }),
+        ),
+      );
+      await expect(Promise.all(calls)).resolves.not.toThrow();
+
+      const result = await loadAnalysis(projectRoot, DOC_ID, 1);
+      expect(result?.generation).toBe(1);
+      // tmp ファイルが残っていないこと
+      const analysisDir = path.join(projectRoot, '.litelizard', 'analysis');
+      const entries = await fs.readdir(analysisDir);
+      expect(entries.some((e) => e.endsWith('.tmp'))).toBe(false);
+    });
+  });
+
+  it('createGeneration の並行呼び出しでも世代番号が重ならない', async () => {
+    await withTempProject(async (projectRoot) => {
+      const total = 5;
+      const results = await Promise.all(
+        Array.from({ length: total }, () => createGeneration(projectRoot, DOC_ID)),
+      );
+
+      const generations = results.map((r) => r.generation).sort((a, b) => a - b);
+      expect(generations).toEqual([1, 2, 3, 4, 5]);
+
+      const persisted = await listGenerations(projectRoot, DOC_ID);
+      expect(persisted).toEqual([1, 2, 3, 4, 5]);
+    });
+  });
+});
+
+// -------------------------------------------------------------------
 // migrateFromV1
 // -------------------------------------------------------------------
 describe('migrateFromV1', () => {
