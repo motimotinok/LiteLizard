@@ -210,6 +210,9 @@ export function App() {
     restoreLastProject,
     bootstrapAnalysisSettings,
     loadAgents,
+    recentProjects,
+    openRecentProject,
+    removeRecentProject,
   } = useAppStore();
 
   useEffect(() => {
@@ -246,7 +249,14 @@ export function App() {
   }
 
   if (startupState === 'needs-project' && !rootPath) {
-    return <ProjectSetupScreen onSelectFolder={() => void openFolder()} />;
+    return (
+      <ProjectSetupScreen
+        onSelectFolder={() => void openFolder()}
+        recentProjects={recentProjects}
+        onOpenRecent={(folderPath) => void openRecentProject(folderPath)}
+        onRemoveRecent={(folderPath) => void removeRecentProject(folderPath)}
+      />
+    );
   }
 
   return <WorkspaceShell />;

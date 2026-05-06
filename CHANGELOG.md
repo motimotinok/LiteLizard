@@ -1,3 +1,6 @@
+[2026/05/06]R-19 Recent files 永続化
+ウェルカム画面でモック表示のみだった最近フォルダリストを永続化した。`app-store.json` の schema に `recentProjects` を追加し、`setLastOpenedFolder` 経由で重複排除＋先頭追加＋件数上限 10 件を保つ純粋ヘルパー (`appendRecentProject`) を `apps/desktop/src/main/recentProjects.ts` に切り出して unit test で固定。`getRecentProjects` IPC は `fs.stat` でディレクトリ存在を判定し `exists` フラグ付きで返す。`removeRecentProject` IPC を追加し、renderer の `useAppStore` は `hydrateProject` 成功後と `restoreLastProject` の `needs-project` フォールバック時に最近リストを refresh、`openRecentProject` 失敗時は対象を自動的にリストから除外する。`ProjectSetupScreen` に既存の `welcome-recent-*` スタイルを使った最近リスト UI を実装し、存在しないエントリは薄表示でクリックすると除外する。検証: `pnpm -w lint` / `pnpm -w test`（203/203）/ `pnpm -w build` 成功。残課題: `.lzl` ファイル単位の最近リストはスコープ外。
+
 [2026/05/06]R-08 全体解析の成功/失敗件数表示
 全体解析の完了後に対象段落数、成功件数、失敗件数を renderer store の `analysisRunSummary` と AnalysisPane の静かな件数表示で確認できるようにした。結果が返らなかった対象段落は失敗扱いにし、progress や final response で成功した段落の解析結果は残す。0 件時も summary と status message を更新する。`useAppStore.test.ts` に成功、一部失敗、対象0件の回帰テストを追加。検証: `pnpm --filter @litelizard/desktop test -- useAppStore` / `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` 成功。残課題なし
 

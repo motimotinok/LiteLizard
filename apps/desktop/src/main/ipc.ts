@@ -40,6 +40,8 @@ import { ensureProject } from './projectManager.js';
 import {
   getActiveReadingAgentId,
   getLastOpenedFolder,
+  getRecentProjects,
+  removeRecentProject,
   setActiveReadingAgentId,
   setLastOpenedFolder,
 } from './appStore.js';
@@ -250,6 +252,15 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.setLastOpenedFolder, async (_, folderPath: string) => {
     await setLastOpenedFolder(folderPath);
+    return { ok: true as const };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getRecentProjects, async () => {
+    return getRecentProjects();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.removeRecentProject, async (_, folderPath: string) => {
+    await removeRecentProject(folderPath);
     return { ok: true as const };
   });
 

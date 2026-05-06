@@ -388,6 +388,8 @@ export function createMockPreloadApi(): BridgeApi {
     openFolder: async () => mockRootPath,
     getLastOpenedFolder: async () => mockRootPath,
     setLastOpenedFolder: async () => ({ ok: true }),
+    getRecentProjects: async () => [],
+    removeRecentProject: async () => ({ ok: true }),
     onRequestOpenFolder: () => () => {},
 
     listTree: async (_root: string) => clone(state.tree),
