@@ -9,6 +9,7 @@ BATCHES="${RALPH_BATCHES:-2}"
 SLEEP_BETWEEN_BATCHES_SECONDS="${RALPH_SLEEP_BETWEEN_BATCHES_SECONDS:-18000}"
 CODEX_SANDBOX="${RALPH_CODEX_SANDBOX:-workspace-write}"
 CODEX_APPROVAL="${RALPH_CODEX_APPROVAL:-never}"
+CODEX_REASONING_EFFORT="${RALPH_CODEX_REASONING_EFFORT:-high}"
 LOG_DIR="${RALPH_LOG_DIR:-tmp/codex-log}"
 DRY_RUN="${RALPH_DRY_RUN:-0}"
 
@@ -55,6 +56,7 @@ echo "active tickets:"
 find "$TICKET_DIR" -maxdepth 1 -type f -name "*.md" -print | sort
 echo ""
 echo "limits: batches=$BATCHES phases_per_batch=$TOTAL_LIMIT claude_phases_per_batch=$CLAUDE_LIMIT sleep_between_batches_seconds=$SLEEP_BETWEEN_BATCHES_SECONDS"
+echo "codex: sandbox=$CODEX_SANDBOX approval=$CODEX_APPROVAL reasoning_effort=$CODEX_REASONING_EFFORT"
 echo ""
 
 if [ "$BATCHES" -eq 0 ]; then
@@ -104,7 +106,7 @@ run_phase() {
     local log_file
     log_file="${LOG_DIR}/$(date +%Y%m%d-%H%M%S)-phase${phase}-codex.log"
     echo "codex output: $log_file"
-    codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" "$prompt" >"$log_file" 2>&1
+    codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"" "$prompt" >"$log_file" 2>&1
   fi
   echo "=== Phase${phase} (${provider}) 終了 ==="
   echo ""
