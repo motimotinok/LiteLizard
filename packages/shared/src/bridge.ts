@@ -41,6 +41,7 @@ export interface BridgeApi {
     name: string,
   ): Promise<{ ok: true; path: string; type: 'file' | 'folder' }>;
   renameEntry(targetPath: string, nextName: string): Promise<{ ok: true; path: string }>;
+  moveEntry(sourcePath: string, destinationFolderPath: string): Promise<{ ok: true; path: string }>;
   deleteEntry(targetPath: string): Promise<{ ok: true }>;
   loadDocument(filePath: string): Promise<LiteLizardDocument>;
   createDocument(
@@ -96,6 +97,7 @@ export const IPC_CHANNELS = {
   listTree: 'fs:listTree',
   createEntry: 'fs:create',
   renameEntry: 'fs:rename',
+  moveEntry: 'fs:move',
   deleteEntry: 'fs:delete',
   loadDocument: 'doc:load',
   createDocument: 'doc:create',

@@ -34,13 +34,18 @@ describe('createMockPreloadApi', () => {
     const renamedEntry = await api.renameEntry(createdEntry.path, 'renamed');
     expect(renamedEntry.path).toBe(`${mockRootPath}/renamed.lzl`);
 
+    const moveTarget = `${mockRootPath}/drafts`;
+    await api.createEntry(mockRootPath, 'folder', 'drafts');
+    const movedEntry = await api.moveEntry(renamedEntry.path, moveTarget);
+    expect(movedEntry.path).toBe(`${moveTarget}/renamed.lzl`);
+
     const createdDocument = await api.createDocument(mockRootPath, 'top-level');
     expect(createdDocument.filePath).toBe(`${mockRootPath}/top-level.lzl`);
 
     const tree = await api.listTree(mockRootPath);
     expect(flattenFilePaths(tree as TreeNode[])).toEqual(
       expect.arrayContaining([
-        `${mockRootPath}/renamed.lzl`,
+        `${moveTarget}/renamed.lzl`,
         `${mockRootPath}/top-level.lzl`,
       ]),
     );

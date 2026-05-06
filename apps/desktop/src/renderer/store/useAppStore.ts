@@ -131,6 +131,7 @@ interface AppState {
   createDocument: (title: string, parentPath?: string) => Promise<void>;
   createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
   renameEntry: (targetPath: string, nextName: string) => Promise<void>;
+  moveEntry: (sourcePath: string, destinationFolderPath: string) => Promise<void>;
   deleteEntry: (targetPath: string) => Promise<void>;
   importTextFile: (createParent: string) => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
@@ -793,6 +794,46 @@ export const useAppStore = create<AppState>((set, get) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `名前変更に失敗しました: ${message}` });
+    }
+  },
+
+  moveEntry: async (sourcePath: string, destinationFolderPath: string) => {
+    try {
+      const result = await window.litelizard.moveEntry(sourcePath, destinationFolderPath);
+
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      const currentFilePath = get().currentFilePath;
+      if (currentFilePath) {
+        const remapped = remapPathForRename(currentFilePath, sourcePath, result.path);
+        if (remapped !== currentFilePath) {
+          const document = get().document;
+          set({
+            currentFilePath: remapped,
+            revision: 0,
+            document:
+              document && remapped !== currentFilePath
+                ? {
+                    ...document,
+                    title: remapped === result.path ? titleFromPath(remapped) : document.title,
+                    updatedAt: document.updatedAt,
+                    source: document.source
+                      ? { ...document.source, format: document.source.format, originPath: remapped }
+                      : { format: 'litelizard-json', originPath: remapped },
+                  }
+                : document,
+          });
+        }
+      }
+
+      set({ statusMessage: 'ファイルを移動しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `移動に失敗しました: ${message}` });
     }
   },
 

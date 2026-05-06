@@ -214,7 +214,7 @@
 | R-10 | 分析モード選択 UI（スタブ） | — | P2 | S | ✅ | Codex | ralphloop |
 | R-11 | 画面縮小時の表示崩れ修正（旧T26） | — | P2 | M | ✅ | Codex | feat/R-11 |
 | R-12 | 分析カードクリック時アニメーション改善（旧T27） | — | P2 | S | ✅ | Codex | ralphloop |
-| R-13 | エクスプローラー DnD ファイル移動（旧T28） | — | P2 | M | ⬜ | | |
+| R-13 | エクスプローラー DnD ファイル移動（旧T28） | — | P2 | M | ✅ | Codex | ralphloop |
 | R-14 | 既存テキストインポート（ID 自動生成） | E-02 | P1 | M | ✅ | Codex | |
 | R-15 | DnD 並び替えの Undo 対応 | R-03 ✅, S-08 ✅ | P2 | S | ⬜ | | |
 | R-16 | UI 全面刷新（案 A Minimal 採用） | — | P1 | XL | ✅ | Claude | dev |
