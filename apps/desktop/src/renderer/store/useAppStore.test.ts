@@ -14,6 +14,8 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     openFolder: vi.fn(),
     getLastOpenedFolder: vi.fn(),
     setLastOpenedFolder: vi.fn().mockResolvedValue({ ok: true }),
+    getRecentProjects: vi.fn().mockResolvedValue([]),
+    removeRecentProject: vi.fn().mockResolvedValue({ ok: true }),
     onRequestOpenFolder: vi.fn(() => () => {}),
     listTree: vi.fn(),
     createEntry: vi.fn(),
@@ -155,6 +157,59 @@ describe('useAppStore project startup flow', () => {
     expect(state.rootPath).toBeNull();
     expect(state.statusMessage).toContain('復元できませんでした');
     expect(setLastOpenedFolder).not.toHaveBeenCalled();
+  });
+
+  it('restoreLastProject は needs-project になったときに recentProjects も読み込む', async () => {
+    const recentProjects = [
+      { path: '/projects/foo', lastOpenedAt: '2026-05-06T10:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(recentProjects);
+    window.litelizard = createBridge({
+      getLastOpenedFolder: vi.fn().mockResolvedValue(null),
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().restoreLastProject();
+
+    expect(getRecentProjects).toHaveBeenCalled();
+    expect(useAppStore.getState().recentProjects).toEqual(recentProjects);
+  });
+
+  it('openRecentProject は失敗時に対象を recent から削除し再読み込みする', async () => {
+    const removeRecent = vi.fn().mockResolvedValue({ ok: true });
+    const refreshed = [
+      { path: '/projects/keep', lastOpenedAt: '2026-05-06T09:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(refreshed);
+    window.litelizard = createBridge({
+      listTree: vi.fn().mockRejectedValue(new Error('ENOENT')),
+      removeRecentProject: removeRecent,
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().openRecentProject('/projects/missing');
+
+    expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
+    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
+    expect(useAppStore.getState().startupState).toBe('needs-project');
+    expect(useAppStore.getState().statusMessage).toContain('最近リストから除外');
+  });
+
+  it('removeRecentProject は IPC 呼び出し後にリストを再読み込みする', async () => {
+    const removeRecent = vi.fn().mockResolvedValue({ ok: true });
+    const refreshed = [
+      { path: '/projects/other', lastOpenedAt: '2026-05-06T08:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(refreshed);
+    window.litelizard = createBridge({
+      removeRecentProject: removeRecent,
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().removeRecentProject('/projects/drop');
+
+    expect(removeRecent).toHaveBeenCalledWith('/projects/drop');
+    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
   });
 
   it('openFolder はフォルダ切り替え時に編集中ドキュメント状態をリセットする', async () => {

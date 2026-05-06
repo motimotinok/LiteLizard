@@ -7,6 +7,7 @@ import type {
   ParagraphAnalysisPattern,
   ReadingAgent,
   ReadingAgentInput,
+  RecentProjectEntry,
 } from './types.js';
 import type { AnalysisParagraph, AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
 
@@ -30,6 +31,8 @@ export interface BridgeApi {
   openFolder(): Promise<string | null>;
   getLastOpenedFolder(): Promise<string | null>;
   setLastOpenedFolder(folderPath: string): Promise<{ ok: true }>;
+  getRecentProjects(): Promise<RecentProjectEntry[]>;
+  removeRecentProject(folderPath: string): Promise<{ ok: true }>;
   onRequestOpenFolder(listener: () => void): () => void;
   listTree(root: string): Promise<FileNode[]>;
   createEntry(
@@ -87,6 +90,8 @@ export const IPC_CHANNELS = {
   openFolder: 'dialog:openFolder',
   getLastOpenedFolder: 'app:getLastOpenedFolder',
   setLastOpenedFolder: 'app:setLastOpenedFolder',
+  getRecentProjects: 'app:getRecentProjects',
+  removeRecentProject: 'app:removeRecentProject',
   requestOpenFolder: 'menu:requestOpenFolder',
   listTree: 'fs:listTree',
   createEntry: 'fs:create',

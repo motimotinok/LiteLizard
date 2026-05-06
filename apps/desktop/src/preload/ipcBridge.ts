@@ -7,6 +7,9 @@ export function createIpcBridge(): BridgeApi {
     openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.openFolder),
     getLastOpenedFolder: () => ipcRenderer.invoke(IPC_CHANNELS.getLastOpenedFolder),
     setLastOpenedFolder: (folderPath) => ipcRenderer.invoke(IPC_CHANNELS.setLastOpenedFolder, folderPath),
+    getRecentProjects: () => ipcRenderer.invoke(IPC_CHANNELS.getRecentProjects),
+    removeRecentProject: (folderPath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.removeRecentProject, folderPath),
     onRequestOpenFolder: (listener) => {
       const wrapped = () => {
         listener();

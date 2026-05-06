@@ -10,6 +10,7 @@ import {
   type ParagraphAnalysisPattern,
   type ReadingAgent,
   type ReadingAgentInput,
+  type RecentProjectEntry,
 } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
@@ -86,6 +87,7 @@ function cloneAnalysisSettings(): AnalysisSettings {
 interface AppState {
   startupState: StartupState;
   rootPath: string | null;
+  recentProjects: RecentProjectEntry[];
   tree: FileNode[];
   currentFilePath: string | null;
   document: LiteLizardDocument | null;
@@ -117,6 +119,9 @@ interface AppState {
   hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
   restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
+  loadRecentProjects: () => Promise<void>;
+  openRecentProject: (folderPath: string) => Promise<void>;
+  removeRecentProject: (folderPath: string) => Promise<void>;
   createDocument: (title: string, parentPath?: string) => Promise<void>;
   createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
   renameEntry: (targetPath: string, nextName: string) => Promise<void>;
@@ -439,6 +444,7 @@ export const useAppStore = create<AppState>((set, get) => {
   return ({
     startupState: 'loading',
     rootPath: null,
+    recentProjects: [],
     tree: [],
     currentFilePath: null,
     document: null,
@@ -536,6 +542,7 @@ export const useAppStore = create<AppState>((set, get) => {
             ? `前回のフォルダを復元しました: ${rootPath}`
             : `フォルダを開きました: ${rootPath}`,
       });
+      void get().loadRecentProjects();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const previousState = get();
@@ -580,10 +587,14 @@ export const useAppStore = create<AppState>((set, get) => {
       const root = await window.litelizard.getLastOpenedFolder();
       if (!root) {
         set({ startupState: 'needs-project', statusMessage: 'フォルダを選択して始めてください' });
+        await get().loadRecentProjects();
         return;
       }
 
       await get().hydrateProject(root, 'restore');
+      if (get().startupState === 'needs-project') {
+        await get().loadRecentProjects();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Renderer restoreLastProject] failed', error);
@@ -591,7 +602,52 @@ export const useAppStore = create<AppState>((set, get) => {
         startupState: 'needs-project',
         statusMessage: `前回のフォルダ確認に失敗しました: ${message}`,
       });
+      await get().loadRecentProjects();
     }
+  },
+
+  loadRecentProjects: async () => {
+    if (!window.litelizard) {
+      return;
+    }
+    try {
+      const recentProjects = await window.litelizard.getRecentProjects();
+      set({ recentProjects });
+    } catch (error) {
+      console.error('[Renderer loadRecentProjects] failed', error);
+    }
+  },
+
+  openRecentProject: async (folderPath) => {
+    if (!window.litelizard) {
+      return;
+    }
+    set({ startupState: 'loading', statusMessage: `フォルダを開いています: ${folderPath}` });
+    await get().hydrateProject(folderPath, 'restore');
+    if (get().rootPath !== folderPath) {
+      try {
+        await window.litelizard.removeRecentProject(folderPath);
+      } catch (error) {
+        console.error('[Renderer openRecentProject] removeRecentProject failed', error);
+      }
+      await get().loadRecentProjects();
+      set({
+        startupState: 'needs-project',
+        statusMessage: `フォルダを開けなかったため、最近リストから除外しました: ${folderPath}`,
+      });
+    }
+  },
+
+  removeRecentProject: async (folderPath) => {
+    if (!window.litelizard) {
+      return;
+    }
+    try {
+      await window.litelizard.removeRecentProject(folderPath);
+    } catch (error) {
+      console.error('[Renderer removeRecentProject] failed', error);
+    }
+    await get().loadRecentProjects();
   },
 
   openFolder: async () => {

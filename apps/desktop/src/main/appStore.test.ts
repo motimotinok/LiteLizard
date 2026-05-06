@@ -4,6 +4,7 @@ const appStoreMock = vi.hoisted(() => ({
   readFile: vi.fn(),
   mkdir: vi.fn(),
   writeFile: vi.fn(),
+  stat: vi.fn(),
   getPath: vi.fn(() => '/tmp/litelizard-user-data'),
 }));
 
@@ -12,6 +13,7 @@ vi.mock('node:fs/promises', () => ({
     readFile: appStoreMock.readFile,
     mkdir: appStoreMock.mkdir,
     writeFile: appStoreMock.writeFile,
+    stat: appStoreMock.stat,
   },
 }));
 
@@ -24,13 +26,20 @@ vi.mock('electron', () => ({
 import {
   getActiveReadingAgentId,
   getLastOpenedFolder,
+  getRecentProjects,
+  removeRecentProject,
   setActiveReadingAgentId,
   setLastOpenedFolder,
 } from './appStore.js';
 
+function makeDirStat(isDir: boolean) {
+  return { isDirectory: () => isDir } as Awaited<ReturnType<typeof import('node:fs/promises').stat>>;
+}
+
 describe('appStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it('保存済み lastOpenedFolder を返す', async () => {
@@ -45,7 +54,9 @@ describe('appStore', () => {
     await expect(getLastOpenedFolder()).resolves.toBeNull();
   });
 
-  it('lastOpenedFolder を保存する', async () => {
+  it('lastOpenedFolder を保存し、recentProjects も更新する', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-06T10:00:00.000Z'));
     appStoreMock.writeFile.mockResolvedValue(undefined);
     appStoreMock.mkdir.mockResolvedValue(undefined);
     appStoreMock.readFile.mockRejectedValue(new Error('missing'));
@@ -55,9 +66,42 @@ describe('appStore', () => {
     expect(appStoreMock.mkdir).toHaveBeenCalledWith('/tmp/litelizard-user-data', { recursive: true });
     expect(appStoreMock.writeFile).toHaveBeenCalledWith(
       '/tmp/litelizard-user-data/app-store.json',
-      JSON.stringify({ lastOpenedFolder: '/projects/story', activeReadingAgentId: null }, null, 2),
-      'utf8'
+      JSON.stringify(
+        {
+          lastOpenedFolder: '/projects/story',
+          activeReadingAgentId: null,
+          recentProjects: [{ path: '/projects/story', lastOpenedAt: '2026-05-06T10:00:00.000Z' }],
+        },
+        null,
+        2,
+      ),
+      'utf8',
     );
+  });
+
+  it('同じフォルダを再度開くと recentProjects 内で先頭に移動して timestamp が更新される', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-06T11:00:00.000Z'));
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        lastOpenedFolder: '/projects/other',
+        activeReadingAgentId: null,
+        recentProjects: [
+          { path: '/projects/other', lastOpenedAt: '2026-05-06T10:30:00.000Z' },
+          { path: '/projects/story', lastOpenedAt: '2026-05-06T10:00:00.000Z' },
+        ],
+      }),
+    );
+
+    await setLastOpenedFolder('/projects/story');
+
+    const written = JSON.parse(appStoreMock.writeFile.mock.calls.at(-1)?.[1] ?? '{}');
+    expect(written.recentProjects).toEqual([
+      { path: '/projects/story', lastOpenedAt: '2026-05-06T11:00:00.000Z' },
+      { path: '/projects/other', lastOpenedAt: '2026-05-06T10:30:00.000Z' },
+    ]);
   });
 
   it('activeReadingAgentId を保存して復元する', async () => {
@@ -70,10 +114,76 @@ describe('appStore', () => {
     await setActiveReadingAgentId('reader-editor');
     await expect(getActiveReadingAgentId()).resolves.toBe('reader-editor');
 
-    expect(appStoreMock.writeFile).toHaveBeenCalledWith(
-      '/tmp/litelizard-user-data/app-store.json',
-      JSON.stringify({ lastOpenedFolder: '/projects/story', activeReadingAgentId: 'reader-editor' }, null, 2),
-      'utf8',
+    const written = JSON.parse(appStoreMock.writeFile.mock.calls.at(-1)?.[1] ?? '{}');
+    expect(written.activeReadingAgentId).toBe('reader-editor');
+  });
+
+  it('getRecentProjects は exists フラグを付けて返す', async () => {
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        recentProjects: [
+          { path: '/projects/exists', lastOpenedAt: '2026-05-06T10:00:00.000Z' },
+          { path: '/projects/missing', lastOpenedAt: '2026-05-06T09:00:00.000Z' },
+        ],
+      }),
     );
+    appStoreMock.stat.mockImplementation(async (target: string) => {
+      if (target === '/projects/missing') {
+        throw new Error('ENOENT');
+      }
+      return makeDirStat(true);
+    });
+
+    await expect(getRecentProjects()).resolves.toEqual([
+      { path: '/projects/exists', lastOpenedAt: '2026-05-06T10:00:00.000Z', exists: true },
+      { path: '/projects/missing', lastOpenedAt: '2026-05-06T09:00:00.000Z', exists: false },
+    ]);
+  });
+
+  it('getRecentProjects はファイル（ディレクトリでない）パスは exists=false にする', async () => {
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        recentProjects: [{ path: '/projects/file.txt', lastOpenedAt: '2026-05-06T10:00:00.000Z' }],
+      }),
+    );
+    appStoreMock.stat.mockResolvedValue(makeDirStat(false));
+
+    await expect(getRecentProjects()).resolves.toEqual([
+      { path: '/projects/file.txt', lastOpenedAt: '2026-05-06T10:00:00.000Z', exists: false },
+    ]);
+  });
+
+  it('removeRecentProject は指定エントリを除外して保存する', async () => {
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        recentProjects: [
+          { path: '/projects/a', lastOpenedAt: '2026-05-06T10:00:00.000Z' },
+          { path: '/projects/b', lastOpenedAt: '2026-05-06T09:00:00.000Z' },
+        ],
+      }),
+    );
+
+    await removeRecentProject('/projects/a');
+
+    const written = JSON.parse(appStoreMock.writeFile.mock.calls.at(-1)?.[1] ?? '{}');
+    expect(written.recentProjects).toEqual([
+      { path: '/projects/b', lastOpenedAt: '2026-05-06T09:00:00.000Z' },
+    ]);
+  });
+
+  it('removeRecentProject は対象が存在しない場合は書き込みしない', async () => {
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        recentProjects: [{ path: '/projects/a', lastOpenedAt: '2026-05-06T10:00:00.000Z' }],
+      }),
+    );
+
+    await removeRecentProject('/projects/nonexistent');
+
+    expect(appStoreMock.writeFile).not.toHaveBeenCalled();
   });
 });

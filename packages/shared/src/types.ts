@@ -135,6 +135,12 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export interface RecentProjectEntry {
+  path: string;
+  lastOpenedAt: string;
+  exists?: boolean;
+}
+
 export interface Session {
   accessToken: string;
   userId: string;
