@@ -1,3 +1,6 @@
+[2026/05/07]R-07 章サマリー解析表示（マクロ視点時の分析ペイン）
+マクロ視点（`viewScale === 'macro'`）のときの AnalysisPane を、段落カードの代わりに章ごとのサマリーカードに切り替えた。集約ロジックは renderer 内 `apps/desktop/src/renderer/utils/chapterAnalysisAggregation.ts` に純関数 `aggregateChapterAnalyses` として切り出し、章ごとに段落数・解析済み / 要再解析 / 未解析 / 解析中 / 失敗の内訳、`complete` 段落から集計した上位テーマ・感情、`confidence` 平均（`complete` 段落のみ）を返す。未解析は `status === 'stale'` かつ `analyzedAt` 未設定で判定する。表示は `apps/desktop/src/renderer/components/ChapterSummaryList.tsx` に分離して props だけで描画できるようにし、AnalysisPane 側は `viewScale` を `useAppStore` から購読してボディだけを差し替える。新規 LLM 章解析は呼び出さない。helper の単体テスト 7 件と ChapterSummaryList の SSR テスト 5 件を追加。検証: `pnpm -w lint` / `pnpm -w test`（desktop 222 / shared 46 / api 4）/ `pnpm -w build` 成功。残課題: Electron 上の手動表示確認は未実施。
+
 [2026/05/06]R-21 段落と分析カードの fade highlight 連動
 段落と分析カードの対応関係を hover / focus で相互に示す共有ハイライト状態を追加した。editor 側は Lexical の段落 DOM に paragraphId 対応の hover / focus リスナーと控えめな左罫線表示を付与し、AnalysisPane 側は対応カードに `analysis-card-linked-highlight` を付ける。active / stale / dragging 表示を優先する CSS にして既存表示と競合しないようにした。検証: 追加 static render test、`pnpm -w lint` / `pnpm -w test`（shared 46 件、desktop 210 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上の手動 hover 確認は未実施。
 

@@ -1416,6 +1416,136 @@ button {
   color: var(--ink-3);
 }
 
+.analysis-chapter-summary-list {
+  display: block;
+}
+
+.analysis-chapter-summary-card {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analysis-chapter-summary-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.analysis-chapter-summary-index {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+
+.analysis-chapter-summary-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-chapter-summary-total {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+
+.analysis-chapter-summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.analysis-chapter-summary-count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  display: inline-flex;
+  gap: 4px;
+}
+
+.analysis-chapter-summary-count.is-empty {
+  opacity: 0.45;
+}
+
+.analysis-chapter-summary-count.is-complete {
+  color: var(--ink-2);
+}
+
+.analysis-chapter-summary-count.is-stale {
+  color: var(--accent, var(--ink-2));
+}
+
+.analysis-chapter-summary-count.is-pending {
+  color: var(--ink-3);
+}
+
+.analysis-chapter-summary-count.is-failed {
+  color: #b3261e;
+}
+
+.analysis-chapter-summary-count-label {
+  letter-spacing: 0.06em;
+}
+
+.analysis-chapter-summary-count-value {
+  font-feature-settings: 'tnum';
+}
+
+.analysis-chapter-summary-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analysis-chapter-summary-tags-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.analysis-chapter-summary-tag-count {
+  margin-left: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+}
+
+.analysis-chapter-summary-confidence {
+  margin: 0;
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+
+.analysis-chapter-summary-confidence-value {
+  font-size: 12px;
+  color: var(--ink-2);
+  font-feature-settings: 'tnum';
+}
+
 /* =========================================================
  * パネルリサイズハンドル (今回は使わないが互換維持)
  * ========================================================= */
