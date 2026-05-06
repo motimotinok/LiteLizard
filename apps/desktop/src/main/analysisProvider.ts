@@ -1,6 +1,13 @@
 import OpenAI, { AuthenticationError, RateLimitError } from 'openai';
-import type { AnalysisResult, AnalysisRunInput } from '@litelizard/shared';
-import type { AnalysisProviderId, AnalysisSettings, ReadingAgentInput } from '@litelizard/shared';
+import {
+  DEFAULT_ANALYSIS_CONTEXT_POLICY,
+  type AnalysisContextPolicy,
+  type AnalysisProviderId,
+  type AnalysisResult,
+  type AnalysisRunInput,
+  type AnalysisSettings,
+  type ReadingAgentInput,
+} from '@litelizard/shared';
 
 export interface AnalysisProviderRequest {
   paragraphId: string;
@@ -335,18 +342,42 @@ export function resolveAnalysisProvider(
   };
 }
 
+/**
+ * 解析対象段落の前段落を、コンテキストポリシーに従って組み立てる。
+ *
+ * - `scope === 'chapter'`: 対象段落と同じ `chapterId` を持つ前段落だけを使う。
+ *   いずれかの段落で `chapterId` が欠けている場合は document scope と同じ挙動になる。
+ * - `limitMode === 'lastN'`: 末尾 `lastN` 件に絞る。
+ * - `limitMode === 'none'`: 全件をそのまま使う。
+ *
+ * 既存呼び出しとの互換のため、policy を省略すると `DEFAULT_ANALYSIS_CONTEXT_POLICY` が適用される。
+ */
 export function buildContextTexts(
   paragraphs: AnalysisRunInput['documentParagraphs'],
   paragraphId: string,
-  maxItems = 10,
+  policy: AnalysisContextPolicy = DEFAULT_ANALYSIS_CONTEXT_POLICY,
 ): string[] {
   const index = paragraphs.findIndex((paragraph) => paragraph.paragraphId === paragraphId);
   if (index <= 0) {
     return [];
   }
 
-  return paragraphs
-    .slice(Math.max(0, index - maxItems), index)
+  let candidates = paragraphs.slice(0, index);
+
+  if (policy.scope === 'chapter') {
+    const targetChapterId = paragraphs[index]?.chapterId;
+    if (targetChapterId) {
+      candidates = candidates.filter((paragraph) => paragraph.chapterId === targetChapterId);
+    }
+    // chapterId が無い場合は document scope と同じ扱い（互換維持）
+  }
+
+  if (policy.limitMode === 'lastN') {
+    const lastN = Math.max(0, Math.trunc(policy.lastN));
+    candidates = candidates.slice(Math.max(0, candidates.length - lastN));
+  }
+
+  return candidates
     .map((paragraph) => paragraph.text)
     .filter((text) => text.trim().length > 0);
 }

@@ -51,8 +51,7 @@ interface AnalysisTargetParagraph {
 
 - 段落 N の分析時に、対象段落より前の段落をコンテキストとして渡す
 - N+1 以降の段落は参照しない（読者は前から順に読むため）
-- 現行実装は文書全体の前段落から最大10段落を選ぶ
-- 将来拡張として、章境界をまたぐかどうか、段落数上限を設けるかどうかをユーザーが切り替えられるようにする（L-09）
+- コンテキスト候補は §2.1 のコンテキストポリシーに従って絞り込まれる
 
 ```
 段落1: context = []
@@ -63,11 +62,9 @@ interface AnalysisTargetParagraph {
 段落12: context = [段落3, 段落4, ..., 段落11] (直前10段落)
 ```
 
-### 2.1 将来拡張: コンテキストポリシー切替
+### 2.1 コンテキストポリシー切替
 
-分析に固定の最大段落数制限を設けると、長い章・伏線・前章から続く読者体験を拾えず、UX が大きく低下する可能性がある。一方で、常に全文脈を渡すとコスト・速度・モデル上限に影響する。
-
-そのため、将来は以下の設定を切り替え可能にする。
+分析に固定の最大段落数制限を設けると、長い章・伏線・前章から続く読者体験を拾えず、UX が大きく低下する可能性がある。一方で、常に全文脈を渡すとコスト・速度・モデル上限に影響する。そのため、設定で以下を切り替えられる。
 
 ```typescript
 type AnalysisContextScope = 'document' | 'chapter';
@@ -76,7 +73,7 @@ type AnalysisContextLimitMode = 'none' | 'lastN';
 interface AnalysisContextPolicy {
   scope: AnalysisContextScope;
   limitMode: AnalysisContextLimitMode;
-  lastN?: number;
+  lastN: number; // limitMode === 'lastN' のときに使う件数。1..999
 }
 ```
 
@@ -87,7 +84,11 @@ interface AnalysisContextPolicy {
 | `limitMode: 'none'` | 段落数上限を設けない | 文脈を広く渡せる | コスト・速度・モデル上限に注意が必要 |
 | `limitMode: 'lastN'` | 直前 N 段落だけを渡す | コストと速度が安定する | 長い文脈を拾いきれない |
 
-L-09 で設定 UI・保存形式・main 側の context 生成・回帰テストをまとめて設計する。既定値は L-09 着手時に決める。UX を優先するなら `scope: 'document'`, `limitMode: 'none'`、コストと速度の安定を優先するなら `scope: 'document'`, `limitMode: 'lastN'` が候補になる。
+実装上の挙動:
+- `scope: 'chapter'` で対象段落の `chapterId` が欠けている場合は document scope と同等に振る舞い、互換を保つ。
+- `lastN` は 1〜999 にクランプされる。
+- 既定値は `{ scope: 'document', limitMode: 'lastN', lastN: 10 }`（従来挙動と一致）。
+- 設定は `analysis-settings.json` の `contextPolicy` フィールドに保存される。設定画面の「分析エンジン > 分析コンテキスト」セクションから変更できる。
 
 ---
 

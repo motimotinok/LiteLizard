@@ -600,6 +600,9 @@ export function createMockPreloadApi(): BridgeApi {
           defaultModel: input.localLlm.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.defaultModel,
           configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
         },
+        contextPolicy: input.contextPolicy
+          ? { ...input.contextPolicy }
+          : { ...state.analysisSettings.contextPolicy },
       };
       return { ok: true };
     },
