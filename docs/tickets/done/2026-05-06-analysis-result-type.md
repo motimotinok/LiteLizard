@@ -1,7 +1,7 @@
 ---
-status: todo
+status: done
 started_at:
-completed_at:
+completed_at: 2026-05-06T10:01:50+09:00
 ---
 
 # 段落分析結果の型定義追加
@@ -32,19 +32,19 @@ GitHub Issue #66 では、`packages/shared/src/types.ts` の `ParagraphAnalysisP
 
 ## 受け入れ条件
 
-- [ ] `ParagraphAnalysisResult` が `emotion`, `theme`, `deepMeaning`, `confidence`, `model` などの標準フィールドを持つ
-- [ ] `ParagraphAnalysisPattern.result` が `Record<string, unknown>` ではなく `ParagraphAnalysisResult` を参照する
-- [ ] `migrateFromV1` や分析履歴表示ロジックが型エラーなく動く
-- [ ] 既存の保存済み分析データを読み込む想定が壊れていない
-- [ ] shared / desktop / api の型チェックとテストが通る
+- [x] `ParagraphAnalysisResult` が `emotion`, `theme`, `deepMeaning`, `confidence`, `model` などの標準フィールドを持つ
+- [x] `ParagraphAnalysisPattern.result` が `Record<string, unknown>` ではなく `ParagraphAnalysisResult` を参照する
+- [x] `migrateFromV1` や分析履歴表示ロジックが型エラーなく動く
+- [x] 既存の保存済み分析データを読み込む想定が壊れていない
+- [x] shared / desktop / api の型チェックとテストが通る
 
 ## 検証方法
 
-- [ ] 関連する既存テストを確認する
-- [ ] 必要なテストを追加または更新する
-- [ ] `pnpm -w lint`
-- [ ] `pnpm -w test`
-- [ ] `pnpm -w build`
+- [x] 関連する既存テストを確認する
+- [x] 必要なテストを追加または更新する
+- [x] `pnpm -w lint`
+- [x] `pnpm -w test`
+- [x] `pnpm -w build`
 
 ## 完了メモ
 
