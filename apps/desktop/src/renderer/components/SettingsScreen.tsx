@@ -35,6 +35,7 @@ export function SettingsScreen() {
   const openEditorPanel = useAppStore((s) => s.openEditorPanel);
   const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
+  const openSearchPanel = useAppStore((s) => s.openSearchPanel);
   const analysisSettings = useAppStore((s) => s.analysisSettings);
   const saveProviderApiKey = useAppStore((s) => s.saveProviderApiKey);
   const clearProviderApiKey = useAppStore((s) => s.clearProviderApiKey);
@@ -112,6 +113,7 @@ export function SettingsScreen() {
     if (panel === 'editor') openEditorPanel();
     else if (panel === 'agents') openAgentsPanel();
     else if (panel === 'settings') openSettingsPanel();
+    else if (panel === 'search') openSearchPanel();
   };
 
   const sidebar = (

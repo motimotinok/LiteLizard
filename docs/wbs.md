@@ -1,7 +1,7 @@
 # LiteLizard WBS（Work Breakdown Structure）
 
 > **目的**: 仕様 v003 → 製品完成までの全タスクを網羅し、Codex 並列開発を可能にする
-> **最終更新**: 2026-05-06
+> **最終更新**: 2026-05-07
 > **仕様参照**: `docs/LiteLizard_spec_v003.md`
 
 ---
@@ -221,7 +221,7 @@
 | R-17 | Tweaks 切替 UI（明朝/ゴシック・本文サイズ・行間・黄ばみ強度・パネル横並び/オーバーレイ） | R-16 ✅ | P2 | M | ⬜ | | |
 | R-18 | Reading Agent の永続化・プロンプト適用エンジン（GitHub Issue #75〜#81 に 7 サブタスク分割済み） | R-16 ✅ | P1 | XL | ✅ | Codex | dev |
 | R-19 | Recent files 永続化（main-side ストア + ウェルカムの最近リスト復活） | R-16 ✅ | P2 | M | ✅ | Claude | ralphloop |
-| R-20 | 検索画面の中身（左メニュー検索ボタン有効化） | — | P2 | L | ⬜ | | |
+| R-20 | 検索画面の中身（左メニュー検索ボタン有効化） | — | P2 | L | ✅ | Codex | ralphloop |
 | R-21 | 段落 ↔ 分析カードの fade highlight 連動アニメーション | R-16 ✅ | P2 | S | ✅ | Codex | ralphloop |
 | R-22 | Web フォントのローカル同梱（オフライン対応） | R-16 ✅ | P3 | S | ⬜ | | |
 

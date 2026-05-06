@@ -2047,6 +2047,98 @@ button {
   letter-spacing: 0.04em;
 }
 
+/* =========================================================
+ * 検索画面
+ * ========================================================= */
+.search-input-row {
+  margin-bottom: 28px;
+}
+
+.search-empty-state,
+.search-summary {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 13.5px;
+  line-height: 1.85;
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.search-summary {
+  margin-bottom: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  text-align: left;
+}
+
+.search-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.search-result-button {
+  width: 100%;
+  min-height: 72px;
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result-button:hover,
+.search-result-button:focus-visible {
+  border-color: var(--rule-strong);
+  background: color-mix(in oklch, var(--paper) 88%, white);
+  outline: none;
+}
+
+.search-result-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.search-result-kind {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.search-result-chapter {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.search-result-snippet {
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.search-result-snippet mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--accent) 16%, transparent);
+  color: var(--ink);
+}
+
 .settings-actions-row {
   display: flex;
   justify-content: space-between;

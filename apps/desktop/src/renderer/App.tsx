@@ -6,6 +6,7 @@ import { LeftIconRail } from './components/LeftIconRail.js';
 import { ProjectSetupScreen } from './components/ProjectSetupScreen.js';
 import { SettingsScreen } from './components/SettingsScreen.js';
 import { AgentsScreen } from './components/AgentsScreen.js';
+import { SearchScreen } from './components/SearchScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { IconPanel } from './components/ui/icons.js';
 
@@ -17,11 +18,14 @@ function WorkspaceShell() {
     document: currentDocument,
     dirty,
     activeWorkspacePanel,
+    pendingParagraphNavigation,
     viewScale,
     openFolder,
     openEditorPanel,
     openSettingsPanel,
     openAgentsPanel,
+    openSearchPanel,
+    consumePendingParagraphNavigation,
     createDocument,
     createEntry,
     renameEntry,
@@ -78,6 +82,21 @@ function WorkspaceShell() {
   }, [currentDocument, activeParagraphId, linkedHighlightParagraphId]);
 
   useEffect(() => {
+    if (!pendingParagraphNavigation) {
+      return;
+    }
+
+    const paragraphExists = currentDocument?.paragraphs.some(
+      (paragraph) => paragraph.id === pendingParagraphNavigation.paragraphId,
+    );
+    if (paragraphExists) {
+      setActiveParagraphId(pendingParagraphNavigation.paragraphId);
+      setScrollRequest(pendingParagraphNavigation);
+    }
+    consumePendingParagraphNavigation();
+  }, [consumePendingParagraphNavigation, currentDocument, pendingParagraphNavigation]);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const modifier = event.metaKey || event.ctrlKey;
       if (!modifier) {
@@ -112,6 +131,10 @@ function WorkspaceShell() {
     return <AgentsScreen />;
   }
 
+  if (activeWorkspacePanel === 'search') {
+    return <SearchScreen />;
+  }
+
   const titleText = currentDocument?.title ?? null;
   const statusLabel = currentDocument ? (dirty ? '下書き' : '保存済み') : null;
   const showAnalysisPanel = analysisPanelOpen && Boolean(currentDocument);
@@ -124,6 +147,7 @@ function WorkspaceShell() {
           if (panel === 'editor') openEditorPanel();
           else if (panel === 'settings') openSettingsPanel();
           else if (panel === 'agents') openAgentsPanel();
+          else if (panel === 'search') openSearchPanel();
         }}
       />
       <aside className="workspace-sidebar">
