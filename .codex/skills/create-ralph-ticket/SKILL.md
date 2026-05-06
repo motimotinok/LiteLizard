@@ -16,6 +16,8 @@ LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 配下に Markdown 
 - `docs/wbs.md` は更新しない。
 - チケットは LLM が 1 回の作業単位として扱える粒度にする。
 - 実装手順を細かく固定せず、ゴール、スコープ、非ゴール、受け入れ条件、検証方法を中心に書く。
+- チケットの front matter に `status: todo`、空の `started_at`、空の `completed_at` を必ず入れる。
+- `started_at` / `completed_at` は Ralph Loop が更新する欄で、値が入る場合は `YYYY-MM-DDTHH:mm:ss+09:00` 形式にする。
 - 検証方法には、原則として `pnpm -w lint`、`pnpm -w test`、`pnpm -w build` を含める。
 
 ## ファイル配置
@@ -37,6 +39,12 @@ YYYY-MM-DD-short-title.md
 ## テンプレート
 
 ```markdown
+---
+status: todo
+started_at:
+completed_at:
+---
+
 # <チケットタイトル>
 
 ## 背景

@@ -1,3 +1,9 @@
+---
+status: todo
+started_at:
+completed_at:
+---
+
 # 段落分析結果の型定義追加
 
 ## 背景
