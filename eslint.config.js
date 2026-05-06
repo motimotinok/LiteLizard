@@ -3,6 +3,17 @@ import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 
 export default [
+  {
+    ignores: [
+      'apps/desktop/src/renderer/**/*.js',
+      'apps/desktop/src/renderer/**/*.js.map',
+      'apps/desktop/src/renderer/**/*.d.ts',
+      '!apps/desktop/src/renderer/global.d.ts',
+      'apps/desktop/src/preload/**/*.js',
+      'apps/desktop/src/preload/**/*.js.map',
+      'apps/desktop/src/preload/**/*.d.ts',
+    ],
+  },
   js.configs.recommended,
   {
     files: ['**/*.ts', '**/*.tsx'],

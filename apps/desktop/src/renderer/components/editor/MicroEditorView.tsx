@@ -48,7 +48,6 @@ export function MicroEditorView({
   scrollRequest,
   setActiveParagraphId,
   onSyncStructure,
-  onReorderParagraphs,
 }: Props) {
   const [structureSnapshot, setStructureSnapshot] = useState<StructureSnapshot>({ chapters: [], paragraphs: [] });
   const [chapterNodeKeys, setChapterNodeKeys] = useState<string[]>([]);

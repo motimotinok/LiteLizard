@@ -76,24 +76,6 @@ function cloneAnalysisSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
 }
 
-function toAnalysisSettingsInput(settings: AnalysisSettings): AnalysisSettingsInput {
-  return {
-    defaultProvider: settings.defaultProvider,
-    providers: {
-      openai: {
-        defaultModel: settings.providers.openai.defaultModel,
-      },
-      anthropic: {
-        defaultModel: settings.providers.anthropic.defaultModel,
-      },
-    },
-    localLlm: {
-      endpoint: settings.localLlm.endpoint,
-      defaultModel: settings.localLlm.defaultModel,
-    },
-  };
-}
-
 interface AppState {
   startupState: StartupState;
   rootPath: string | null;
