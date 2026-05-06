@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import type { GenerationalAnalysisFile, LiteLizardAnalysisFile, ParagraphAnalysisPattern } from '@litelizard/shared';
 import {
   listGenerations,
