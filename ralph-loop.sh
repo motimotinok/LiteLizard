@@ -9,6 +9,7 @@ BATCHES="${RALPH_BATCHES:-2}"
 SLEEP_BETWEEN_BATCHES_SECONDS="${RALPH_SLEEP_BETWEEN_BATCHES_SECONDS:-18000}"
 CODEX_SANDBOX="${RALPH_CODEX_SANDBOX:-workspace-write}"
 CODEX_APPROVAL="${RALPH_CODEX_APPROVAL:-never}"
+LOG_DIR="${RALPH_LOG_DIR:-tmp/codex-log}"
 DRY_RUN="${RALPH_DRY_RUN:-0}"
 
 is_non_negative_int() {
@@ -99,7 +100,11 @@ run_phase() {
   if [ "$provider" = "claude" ]; then
     claude -p "$prompt" --dangerously-skip-permissions
   else
-    codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" "$prompt"
+    mkdir -p "$LOG_DIR"
+    local log_file
+    log_file="${LOG_DIR}/$(date +%Y%m%d-%H%M%S)-phase${phase}-codex.log"
+    echo "codex output: $log_file"
+    codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" "$prompt" >"$log_file" 2>&1
   fi
   echo "=== Phase${phase} (${provider}) 終了 ==="
   echo ""
