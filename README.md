@@ -1,32 +1,38 @@
-# LiteLizard MVP Monorepo
+# LiteLizard
 
-LiteLizard is an Electron desktop editor that keeps `light` (text) and `lizard` (AI analysis) side-by-side per paragraph.
+LiteLizard は、文章を「生成する」ためではなく、文章がどう読まれるかを観測するためのデスクトップ執筆環境です。
 
-詳細仕様: docs/LiteLizard_spec_v003.md
+## コンセプト
 
-## Workspaces
-- `apps/api`: Legacy Fastify relay API (kept for compatibility/testing).
-- `apps/desktop`: Electron + React editor, file tree, DnD paragraph cards, stale-only analysis, autosave, direct OpenAI calls.
-- `packages/shared`: Shared types, API contracts, JSON schema validation.
-- `tests/e2e`: Playwright smoke test for Electron launch.
+文章を書く主体は、あくまでも人間です。
 
-## Quick start
-1. Install dependencies: `pnpm install`
-2. Start desktop: `pnpm --filter @litelizard/desktop dev`
-3. Open `Settings` in the desktop app and save your OpenAI API key (`sk-...`).
-4. Optional: start legacy API only when needed with `pnpm --filter @litelizard/api dev`
+LiteLizard は、書き手が自分の文章と向き合うための静かな場所を保ちながら、AI が段落単位で伴走できるようにすることを目指しています。AI はひとつの固定された役割ではなく、仮想読者、編集者、添削者、読みの観測者など、書き手が必要とする視点を切り替えながら担います。
 
-## Environment
-- API env file: `apps/api/.env.example`
-- Desktop analysis model can be overridden via `OPENAI_MODEL` (default `gpt-4o-mini`).
+中心にあるのは「読まれ方を観測する」という考え方です。
 
-## Test
+書き手は、段落ごとに本文と AI の読みを並べて確認できます。読者にはどう受け取られそうか、どのような解釈が起きそうか、どこに違和感や弱さがあるか、どの方向に直す余地があるか。そうした情報を、AI に文章の主導権を渡すのではなく、書き手自身が判断するための材料として扱います。
+
+AI に対してただ「この文章はどうですか」と聞くと、過度に肯定的な応答になったり、逆に問題点を無限に列挙したりして、書き手がどこへ進めばよいのかわからなくなることがあります。LiteLizard では、プロンプトによって分析の観点を方向づけ、構造化された視点から文章を読むことで、感想・解釈・添削提案をより扱いやすい形で返すことを重視します。
+
+UI はミニマルで、執筆の邪魔をしないことを大切にします。一方で、必要なときには読者視点、編集視点、構造分析、修正の方向性などを深く掘り下げられる。複雑な機能を前面に並べるのではなく、書き手が必要な深さまで潜れる道具であることを目指します。
+
+## 開発
+
+詳細仕様: `docs/LiteLizard_spec_v003.md`
+
+### Workspaces
+
+- `apps/api`: 互換性・テスト用に残している legacy API
+- `apps/desktop`: Electron + React のデスクトップアプリ
+- `packages/shared`: 共有型、API 契約、JSON schema
+- `tests/e2e`: Electron 起動の Playwright smoke test
+
+### Quick start
+
+1. 依存関係をインストール: `pnpm install`
+2. デスクトップアプリを起動: `pnpm --filter @litelizard/desktop dev`
+
+### Test
+
 - Unit/integration: `pnpm test`
 - E2E: `RUN_E2E_ELECTRON=1 pnpm --filter @litelizard/e2e test`
-
-## Notes
-- Desktop document storage uses `.md` + `*.litelizard.analysis.json`.
-- OpenAI API key is stored as encrypted local file (PBKDF2 + AES-GCM).
-- 暫定対応として、現在の preload bridge は IPC ではなくモックデータを返す実装です（UI動作確認優先）。
-- このモック運用中は、preload 経由で実ファイルI/Oおよび実API呼び出しは行いません。
-- モック状態は preload 内メモリのみで保持され、アプリ再起動時に初期化されます。
