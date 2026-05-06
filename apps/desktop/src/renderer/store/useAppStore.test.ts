@@ -622,3 +622,142 @@ describe('useAppStore L-06 analysis state', () => {
     expect(useAppStore.getState().analysisHistoriesByParagraphId).toEqual({});
   });
 });
+
+describe('useAppStore R-15 DnD reorder undo/redo', () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
+    useAppStore.setState(baseState, true);
+  });
+
+  function createMultiChapterDocument(): LiteLizardDocument {
+    return {
+      version: 2,
+      documentId: 'doc_lzl_dnd',
+      title: 'draft',
+      personaMode: 'general-reader',
+      createdAt: '2026-04-11T00:00:00.000Z',
+      updatedAt: '2026-04-11T00:00:00.000Z',
+      source: { format: 'lzl-v1', originPath: '/projects/novel/draft.lzl' },
+      chapters: [
+        { id: 'c1', order: 1, title: '章1' },
+        { id: 'c2', order: 2, title: '章2' },
+      ],
+      paragraphs: [
+        {
+          id: 'p1',
+          chapterId: 'c1',
+          order: 1,
+          light: { text: 'a1', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+        {
+          id: 'p2',
+          chapterId: 'c1',
+          order: 2,
+          light: { text: 'a2', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+        {
+          id: 'p3',
+          chapterId: 'c2',
+          order: 3,
+          light: { text: 'b1', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+      ],
+    };
+  }
+
+  it('段落 DnD 並び替え前のスナップショットから undo で並び順を戻せる', () => {
+    const document = createLzlDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderParagraphs(['p2', 'p1']);
+
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p2', 'p1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const target = useAppStore.getState().undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    expect(target).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(target!);
+
+    const restored = useAppStore.getState().document!;
+    expect(restored.paragraphs.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(restored.paragraphs.find((p) => p.id === 'p1')!.order).toBe(1);
+    expect(restored.paragraphs.find((p) => p.id === 'p2')!.order).toBe(2);
+  });
+
+  it('章 DnD 並び替え前のスナップショットから undo で章順と段落の chapterId が戻る', () => {
+    const document = createMultiChapterDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderChapters(['c2', 'c1']);
+
+    const reordered = useAppStore.getState().document!;
+    expect(reordered.chapters.map((c) => c.id)).toEqual(['c2', 'c1']);
+
+    const target = useAppStore.getState().undoWithCurrentSnapshot({ documentSnapshot: reordered });
+    expect(target).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(target!);
+
+    const restored = useAppStore.getState().document!;
+    expect(restored.chapters.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(restored.paragraphs.find((p) => p.id === 'p1')!.chapterId).toBe('c1');
+    expect(restored.paragraphs.find((p) => p.id === 'p2')!.chapterId).toBe('c1');
+    expect(restored.paragraphs.find((p) => p.id === 'p3')!.chapterId).toBe('c2');
+  });
+
+  it('段落 DnD reorder 後の undo / redo を往復できる', () => {
+    const document = createLzlDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderParagraphs(['p2', 'p1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const undoTarget = useAppStore
+      .getState()
+      .undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    useAppStore.getState().restoreSnapshot(undoTarget!);
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p1', 'p2']);
+
+    const afterUndo = useAppStore.getState().document!;
+    const redoTarget = useAppStore
+      .getState()
+      .redoWithCurrentSnapshot({ documentSnapshot: afterUndo });
+    expect(redoTarget).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(redoTarget!);
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p2', 'p1']);
+  });
+
+  it('lexicalStateJson を持たないスナップショットも undo / redo で利用できる', () => {
+    const document = createMultiChapterDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    // chapter DnD は editor 不在なので lexicalStateJson は省略する
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderChapters(['c2', 'c1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const undoTarget = useAppStore
+      .getState()
+      .undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    expect(undoTarget?.lexicalStateJson).toBeUndefined();
+    useAppStore.getState().restoreSnapshot(undoTarget!);
+    expect(useAppStore.getState().document!.chapters.map((c) => c.id)).toEqual(['c1', 'c2']);
+
+    const afterUndo = useAppStore.getState().document!;
+    const redoTarget = useAppStore
+      .getState()
+      .redoWithCurrentSnapshot({ documentSnapshot: afterUndo });
+    expect(redoTarget?.lexicalStateJson).toBeUndefined();
+    useAppStore.getState().restoreSnapshot(redoTarget!);
+    expect(useAppStore.getState().document!.chapters.map((c) => c.id)).toEqual(['c2', 'c1']);
+  });
+});
