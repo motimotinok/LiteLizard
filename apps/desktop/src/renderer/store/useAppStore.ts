@@ -43,7 +43,7 @@ export interface AnalysisRunSummary {
 }
 
 export interface UndoSnapshot {
-  lexicalStateJson: string;
+  lexicalStateJson?: string;
   documentSnapshot: LiteLizardDocument;
 }
 
