@@ -1,7 +1,7 @@
 ---
-status: todo
-started_at:
-completed_at:
+status: done
+started_at: 2026-05-06T14:39:18+09:00
+completed_at: 2026-05-06T14:41:46+09:00
 ---
 
 # preload モック解析ストアのステート管理を整える
@@ -32,23 +32,25 @@ mock モードでも解析結果の保存、読み込み、世代作成がイン
 
 ## 受け入れ条件
 
-- [ ] `loadAnalysis` が保存済みの解析ファイルを `documentId` ごとに返せる
-- [ ] `saveAnalysisResult` が段落ごとの `patterns` を蓄積できる
-- [ ] `createAnalysisGeneration` が世代番号をインクリメントし、新しい世代を作成できる
-- [ ] mock モードの解析保存・読み込みに関するテストが存在し、現行仕様と整合している
-- [ ] 既存の解析実行、履歴保存、Reading Agent 適用が壊れていない
+- [x] `loadAnalysis` が保存済みの解析ファイルを `documentId` ごとに返せる
+- [x] `saveAnalysisResult` が段落ごとの `patterns` を蓄積できる
+- [x] `createAnalysisGeneration` が世代番号をインクリメントし、新しい世代を作成できる
+- [x] mock モードの解析保存・読み込みに関するテストが存在し、現行仕様と整合している
+- [x] 既存の解析実行、履歴保存、Reading Agent 適用が壊れていない
 
 ## 検証方法
 
-- [ ] 関連する既存テストを確認する
-- [ ] 必要なテストを追加または更新する
-- [ ] `pnpm -w lint`
-- [ ] `pnpm -w test`
-- [ ] `pnpm -w build`
+- [x] 関連する既存テストを確認する
+- [x] 必要なテストを追加または更新する
+- [x] `pnpm -w lint`
+- [x] `pnpm -w test`
+- [x] `pnpm -w build`
 
 ## 完了メモ
 
-未着手。
+- 現行 `preloadMockApi.ts` を確認したところ、`loadAnalysis` / `saveAnalysisResult` / `createAnalysisGeneration` はすでに `documentId` ごとに `GenerationalAnalysisFile` をインメモリで保持し、main 側仕様 (`loadLatestAnalysis` を返す / `appendParagraphPattern` で patterns 追記 / `createGeneration` で世代番号インクリメント＋空 paragraphs) と整合する実装になっていた。
+- 仕様を回帰テストで固定するため、`apps/desktop/src/preload/preloadMockApi.test.ts` に「保存前の null」「同一段落への複数 pattern 蓄積」「異なる documentId 独立」「戻り値の deep clone」「世代インクリメントで paragraphs リセット」「未保存 documentId でも generation:1 から」のケースを追加。実装側の変更はなし。
+- `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` をすべてパス。残課題なし。
 
 ## 元 Issue
 

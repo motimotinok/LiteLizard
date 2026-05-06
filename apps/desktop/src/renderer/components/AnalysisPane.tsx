@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
+import type { AnalysisMode } from '../store/useAppStore.js';
 import { reorderByKey } from '../utils/arrayUtils.js';
 import { useAppStore } from '../store/useAppStore.js';
 import {
@@ -70,6 +71,26 @@ function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
   };
 }
 
+const analysisModeOptions: Array<{
+  id: AnalysisMode;
+  label: string;
+  status: string;
+}> = [
+  { id: 'paragraph', label: '段落', status: '実行可' },
+  { id: 'chapter', label: '章', status: '準備中' },
+  { id: 'document', label: '全体', status: '準備中' },
+];
+
+function analysisModeRunLabel(mode: AnalysisMode) {
+  if (mode === 'paragraph') {
+    return '段落を読ませる';
+  }
+  if (mode === 'chapter') {
+    return '章解析は準備中です';
+  }
+  return '全体解析は準備中です';
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
@@ -82,6 +103,9 @@ export function AnalysisPane({
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
   const analysisSettings = useAppStore((s) => s.analysisSettings);
+  const analysisMode = useAppStore((s) => s.analysisMode);
+  const setAnalysisMode = useAppStore((s) => s.setAnalysisMode);
+  const analysisRunSummary = useAppStore((s) => s.analysisRunSummary);
   const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
   const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
   const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
@@ -93,7 +117,9 @@ export function AnalysisPane({
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-  const generateAllDisabled = staleCount === 0 || hasPending || !providerUi.runnable || !activeAgentId;
+  const selectedModeImplemented = analysisMode === 'paragraph';
+  const generateAllDisabled =
+    !selectedModeImplemented || staleCount === 0 || hasPending || !providerUi.runnable || !activeAgentId;
 
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
@@ -153,13 +179,15 @@ export function AnalysisPane({
 
   const runButtonTitle = !providerUi.runnable
     ? providerUi.disabledTitle
-    : !activeAgentId
-      ? '分析エージェントを選択してください'
-      : hasPending
-        ? '解析実行中です'
-        : staleCount === 0
-          ? '再解析が必要な段落はありません'
-          : `${staleCount}件の段落を解析`;
+    : !selectedModeImplemented
+      ? '章解析と全体解析は今後の実装対象です'
+      : !activeAgentId
+        ? '分析エージェントを選択してください'
+        : hasPending
+          ? '解析実行中です'
+          : staleCount === 0
+            ? '再解析が必要な段落はありません'
+            : `${staleCount}件の段落を解析`;
 
   return (
     <aside className="analysis-shell" aria-label="analysis-panel">
@@ -222,6 +250,25 @@ export function AnalysisPane({
             </div>
           ) : null}
         </div>
+        <div className="analysis-mode-control" role="radiogroup" aria-label="分析モード">
+          {analysisModeOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={
+                option.id === analysisMode
+                  ? 'analysis-mode-option is-active'
+                  : 'analysis-mode-option'
+              }
+              role="radio"
+              aria-checked={option.id === analysisMode}
+              onClick={() => setAnalysisMode(option.id)}
+            >
+              <span className="analysis-mode-option-label">{option.label}</span>
+              <span className="analysis-mode-option-status">{option.status}</span>
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="analysis-run-button"
@@ -229,8 +276,15 @@ export function AnalysisPane({
           disabled={generateAllDisabled}
           title={runButtonTitle}
         >
-          <IconPlay size={10} /> 段落を読ませる
+          <IconPlay size={10} /> {analysisModeRunLabel(analysisMode)}
         </button>
+        {analysisRunSummary ? (
+          <div className="analysis-run-summary" aria-label="解析実行結果">
+            <span>対象 {analysisRunSummary.targetCount}</span>
+            <span>成功 {analysisRunSummary.successCount}</span>
+            <span>失敗 {analysisRunSummary.failureCount}</span>
+          </div>
+        ) : null}
       </header>
 
       {!document ? (

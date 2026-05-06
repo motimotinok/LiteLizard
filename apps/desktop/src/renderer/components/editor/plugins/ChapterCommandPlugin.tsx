@@ -16,6 +16,10 @@ import {
 } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useAppStore } from '../../../store/useAppStore.js';
+import {
+  decideBackspaceAction,
+  mergeAdjacentParagraphTexts,
+} from '../utils/backspaceMerge.js';
 
 /** 指定ノードより前に章ノードが存在するか（先頭章判定に使用）*/
 function hasPrecedingChapterNode(node: LexicalNode, chapterNodeKeySet: Set<string>): boolean {
@@ -219,20 +223,39 @@ export function ChapterCommandPlugin({
         // editor.getEditorState().read() はコミット済みの古い selection を返すため使わない。
         // また editor.update() を内部で呼ぶとキューに積まれ return より後に実行されるため使わない。
         const selection = $getSelection();
-        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false;
+        if (!$isRangeSelection(selection)) return false;
 
         const topLevel = selection.anchor.getNode().getTopLevelElement();
-        if (!topLevel || !$isParagraphNode(topLevel)) return false;
+        const topLevelIsParagraph = Boolean(topLevel && $isParagraphNode(topLevel));
+        const topLevelParagraph = topLevelIsParagraph ? (topLevel as ParagraphNode) : null;
+        const prevSibling = topLevelParagraph?.getPreviousSibling() ?? null;
+        const prevIsParagraph = Boolean(prevSibling && $isParagraphNode(prevSibling));
+        const prevParagraph = prevIsParagraph ? (prevSibling as ParagraphNode) : null;
 
-        if (selection.anchor.offset !== 0) return false;
+        const decision = decideBackspaceAction({
+          isCollapsed: selection.isCollapsed(),
+          topLevelIsParagraph,
+          anchorOffset: selection.anchor.offset,
+          topLevelIsChapter: Boolean(
+            topLevelParagraph && chapterNodeKeySetRef.current.has(topLevelParagraph.getKey()),
+          ),
+          hasPrecedingChapterNode: topLevelParagraph
+            ? hasPrecedingChapterNode(topLevelParagraph, chapterNodeKeySetRef.current)
+            : false,
+          prevSiblingIsParagraph: prevIsParagraph,
+          prevSiblingIsChapter: Boolean(
+            prevParagraph && chapterNodeKeySetRef.current.has(prevParagraph.getKey()),
+          ),
+        });
 
-        if (chapterNodeKeySetRef.current.has(topLevel.getKey())) {
-          // 章タイトルノード上での Backspace
-          if (!hasPrecedingChapterNode(topLevel, chapterNodeKeySetRef.current)) {
-            event?.preventDefault();
-            return true; // 先頭章タイトル → no-op
-          }
-          // 非先頭章タイトル → 格下げ
+        if (decision.kind === 'pass-through') return false;
+
+        if (decision.kind === 'noop') {
+          event?.preventDefault();
+          return true;
+        }
+
+        if (decision.kind === 'demote-chapter') {
           event?.preventDefault();
           const demoteStore = useAppStore.getState();
           const demoteDoc = demoteStore.document;
@@ -242,23 +265,14 @@ export function ChapterCommandPlugin({
               documentSnapshot: demoteDoc,
             });
           }
-          const demoteKey = topLevel.getKey();
+          const demoteKey = topLevelParagraph!.getKey();
           editor.update(() => {
             chapterNodeKeySetRef.current.delete(demoteKey);
           }, { tag: 'structural' });
           return true;
         }
 
-        // 本文段落の先頭で Backspace
-        const prevSibling = topLevel.getPreviousSibling();
-        if (!prevSibling || !$isParagraphNode(prevSibling)) return false;
-
-        if (chapterNodeKeySetRef.current.has(prevSibling.getKey())) {
-          event?.preventDefault();
-          return true; // 章の最初の段落 → no-op
-        }
-
-        // 同一章内の2番目以降の段落 → 段落統合
+        // merge-with-prev
         event?.preventDefault();
         const mergeStore = useAppStore.getState();
         const mergeDoc = mergeStore.document;
@@ -268,23 +282,22 @@ export function ChapterCommandPlugin({
             documentSnapshot: mergeDoc,
           });
         }
-        const prevSiblingKey = prevSibling.getKey();
-        const topLevelKey = topLevel.getKey();
-        const prevText = prevSibling.getTextContent();
-        const currText = topLevel.getTextContent();
+        const prevSiblingKey = prevParagraph!.getKey();
+        const topLevelKey = topLevelParagraph!.getKey();
+        const prevText = prevParagraph!.getTextContent();
+        const currText = topLevelParagraph!.getTextContent();
+        const { mergedText, cursorOffset } = mergeAdjacentParagraphTexts(prevText, currText);
         editor.update(() => {
           const allNodes = $getRoot().getChildren().filter((n): n is ParagraphNode => $isParagraphNode(n));
           const prevNode = allNodes.find((n) => n.getKey() === prevSiblingKey);
           const currNode = allNodes.find((n) => n.getKey() === topLevelKey);
           if (!prevNode || !currNode) return;
-          const mergeOffset = prevText.length;
-          const mergedText = prevText + currText;
           prevNode.clear();
           currNode.remove();
           if (mergedText.length > 0) {
             const mergedTextNode = $createTextNode(mergedText);
             prevNode.append(mergedTextNode);
-            mergedTextNode.select(mergeOffset, mergeOffset);
+            mergedTextNode.select(cursorOffset, cursorOffset);
           } else {
             prevNode.selectEnd();
           }
