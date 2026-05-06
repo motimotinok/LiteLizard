@@ -1,3 +1,9 @@
+---
+status: todo
+started_at:
+completed_at:
+---
+
 # analysisStore の競合書き込み対策
 
 ## 背景
