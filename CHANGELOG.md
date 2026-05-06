@@ -1,3 +1,6 @@
+[2026/05/06]WBS L-09/T-05 整合性更新
+L-09 分析コンテキストポリシー切替と T-05 回帰テストは実装済みだったため、WBS の状態・完了メモ・集計を実態に合わせて更新した
+
 [2026/05/06]L-09 分析コンテキストポリシー切替を実装
 解析時の前段落コンテキストを `scope: document/chapter` × `limitMode: none/lastN` の組み合わせで切替できるようにした。`AnalysisContextPolicy` を shared 型に追加し、`AnalysisSettings.contextPolicy` で既定値 `{document, lastN, 10}`（従来挙動）として保存。`buildContextTexts` を policy 受け取りに拡張、`apiBridge.runAnalysis` / `dryRunReadingAgent` で main 側 settings を伝搬、renderer の `toAnalysisParagraphInput` に `chapterId` を追加、SettingsScreen に分析コンテキスト UI を追加。`AnalysisParagraphSchema.chapterId` は optional で互換維持し、欠落時は document scope に fallback。回帰テストは settings store 3 件、buildContextTexts 4 件、ipc 引数検証 2 件を追加。仕様 `docs/specs/analysis-api.md` §2.1 を「将来拡張」から実装済みに書き換え。残課題: トークン上限ベースの自動 trim、UI の disabled スタイル整備
 
