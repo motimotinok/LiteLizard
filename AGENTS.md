@@ -39,6 +39,10 @@
   2. **Electron ごと起動する Playwright** — `_electron` fixture を使う
   3. **Lexical unit test** — Plugin 単体テスト
 
+### renderer の SSR テスト時の zustand 注意
+- 既存の renderer テストは `renderToStaticMarkup` を使う node 環境のテストが多い。zustand v5 の `useStore` は SSR 時に `useSyncExternalStore` の `getServerSnapshot` を経由し、**ストアの初期状態**を返す。`useAppStore.setState(...)` で値を変えても `renderToStaticMarkup` 内の `useAppStore(selector)` には反映されない。
+- ストア値で分岐する JSX を SSR テストで検証したいときは、props 駆動の小コンポーネントに分離してそちらを直接 `renderToStaticMarkup` する。AnalysisPane 配下の `ChapterSummaryList` がその例。
+
 ---
 
 ## ファイルの役割分担
