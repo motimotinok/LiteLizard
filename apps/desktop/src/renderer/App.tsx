@@ -37,6 +37,7 @@ function WorkspaceShell() {
   } = useAppStore();
 
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
+  const [linkedHighlightParagraphId, setLinkedHighlightParagraphId] = useState<string | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(true);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
 
@@ -57,6 +58,7 @@ function WorkspaceShell() {
   useEffect(() => {
     if (!currentDocument?.paragraphs.length) {
       setActiveParagraphId(null);
+      setLinkedHighlightParagraphId(null);
       return;
     }
 
@@ -66,7 +68,14 @@ function WorkspaceShell() {
     ) {
       setActiveParagraphId(currentDocument.paragraphs[0].id);
     }
-  }, [currentDocument, activeParagraphId]);
+
+    if (
+      linkedHighlightParagraphId &&
+      !currentDocument.paragraphs.some((paragraph) => paragraph.id === linkedHighlightParagraphId)
+    ) {
+      setLinkedHighlightParagraphId(null);
+    }
+  }, [currentDocument, activeParagraphId, linkedHighlightParagraphId]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -168,8 +177,10 @@ function WorkspaceShell() {
           document={currentDocument}
           dirty={dirty}
           activeParagraphId={activeParagraphId}
+          linkedHighlightParagraphId={linkedHighlightParagraphId}
           scrollRequest={scrollRequest}
           setActiveParagraphId={setActiveParagraphId}
+          onPreviewParagraphLink={setLinkedHighlightParagraphId}
           viewScale={viewScale}
           onSetViewScale={setViewScale}
           onSyncStructure={(input) => syncDocumentStructure(input)}
@@ -190,7 +201,9 @@ function WorkspaceShell() {
           <AnalysisPane
             document={currentDocument}
             activeParagraphId={activeParagraphId}
+            linkedHighlightParagraphId={linkedHighlightParagraphId}
             onSetActiveParagraphId={setActiveParagraphId}
+            onPreviewParagraphLink={setLinkedHighlightParagraphId}
             onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
             onRequestScrollToParagraph={(paragraphId) => {
               setScrollRequest({ paragraphId, nonce: Date.now() });

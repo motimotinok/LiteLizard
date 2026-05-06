@@ -624,8 +624,14 @@ button {
   box-shadow: inset 1.5px 0 0 var(--accent);
 }
 
+.editor-paragraph-row-linked-highlight:not(.editor-paragraph-row-active):not(.editor-paragraph-row-dragging) {
+  background: rgba(28, 40, 80, 0.025);
+  box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--accent) 52%, transparent);
+}
+
 .editor-paragraph-row:hover::before,
-.editor-paragraph-row-active::before {
+.editor-paragraph-row-active::before,
+.editor-paragraph-row-linked-highlight::before {
   color: var(--accent);
 }
 
@@ -1158,6 +1164,11 @@ button {
 
 .analysis-card:hover {
   background: var(--paper-soft);
+}
+
+.analysis-card-linked-highlight:not(.analysis-card-active):not(.analysis-card-dragging) {
+  background: var(--paper-soft);
+  box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--accent) 52%, transparent);
 }
 
 .analysis-card-active {

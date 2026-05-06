@@ -1,3 +1,9 @@
+[2026/05/06]R-21 段落と分析カードの fade highlight 連動
+段落と分析カードの対応関係を hover / focus で相互に示す共有ハイライト状態を追加した。editor 側は Lexical の段落 DOM に paragraphId 対応の hover / focus リスナーと控えめな左罫線表示を付与し、AnalysisPane 側は対応カードに `analysis-card-linked-highlight` を付ける。active / stale / dragging 表示を優先する CSS にして既存表示と競合しないようにした。検証: 追加 static render test、`pnpm -w lint` / `pnpm -w test`（shared 46 件、desktop 210 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上の手動 hover 確認は未実施。
+
+[2026/05/06]Ralph API キー設定経路の補完
+API キー未設定時に AnalysisPane から設定画面へ進める導線を静的レンダリングテストで固定し、SettingsScreen のローカル LLM 入力欄直下にも保存ボタンを追加した。OpenAI / Anthropic の API キー保存、既定 provider / model、ローカル LLM 設定の現行 IPC / store 経路は既存実装と関連テストで確認。検証: 関連 targeted test / `pnpm -w lint` / `pnpm -w test`（desktop 209 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし
+
 [2026/05/06]R-15 DnD 並び替えを Undo/Redo 対象にした
 段落 DnD（`DragHandlePlugin`）と章 DnD（`MacroView`）を `pushUndo` 経由で Undo/Redo 履歴に乗せた。段落 DnD は editor が mount されているため Lexical state と document の両方を保存し、`editor.update` には `tag: 'structural'` を付けて UndoPlugin の auto-snapshot 重複を防ぐ。章 DnD は macro view で Lexical が unmount されているため document スナップショットのみ保存し、Undo 時は `applyDocumentToLexicalRoot` で document から Lexical を再構築する（`MicroEditorView.initialConfig.editorState` と共通化）。MacroView に macro 専用の Ctrl+Z / Ctrl+Y キーハンドラを追加し、編集系フォーカス時はネイティブ Undo に譲る。`UndoSnapshot.lexicalStateJson` を optional に変更し、`UndoPlugin` の UNDO/REDO ハンドラは `applySnapshotToEditor` で lexicalStateJson の有無に応じて `setEditorState` / 再構築を切り替える。`useAppStore.test.ts` に段落 DnD undo、章 DnD undo（chapterId 整合）、undo→redo 往復、lexicalStateJson 省略パスの 4 ケースを追加。検証: `pnpm -w lint` / `pnpm -w test`（207/207）/ `pnpm -w build` 成功。残課題: Electron 上の手動確認は未実施。Undo 時の analysis 履歴復元は既存制約（restoreSnapshot は managed doc の解析状態をリセット）通りで、本チケットでは触らない。
 

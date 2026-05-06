@@ -13,7 +13,9 @@ import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js'
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
+  linkedHighlightParagraphId?: string | null;
   onSetActiveParagraphId?: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onRequestScrollToParagraph?: (id: string) => void;
 }
@@ -94,7 +96,9 @@ function analysisModeRunLabel(mode: AnalysisMode) {
 export function AnalysisPane({
   document,
   activeParagraphId,
+  linkedHighlightParagraphId = null,
   onSetActiveParagraphId,
+  onPreviewParagraphLink,
   onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
@@ -308,6 +312,7 @@ export function AnalysisPane({
             {document.paragraphs.map((paragraph, index) => {
               const expanded = Boolean(expandedByParagraphId[paragraph.id]);
               const active = paragraph.id === activeParagraphId;
+              const isLinkedHighlight = paragraph.id === linkedHighlightParagraphId;
               const isDragging = draggingParagraphId === paragraph.id;
               const isDropTarget = dropTargetParagraphId === paragraph.id;
               const isComplete = paragraph.lizard.status === 'complete';
@@ -344,6 +349,7 @@ export function AnalysisPane({
                   className={[
                     'analysis-card',
                     active ? 'analysis-card-active' : '',
+                    isLinkedHighlight ? 'analysis-card-linked-highlight' : '',
                     isDragging ? 'analysis-card-dragging' : '',
                     isDropTarget ? 'analysis-card-drop-target' : '',
                     isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
@@ -354,6 +360,10 @@ export function AnalysisPane({
                     onSetActiveParagraphId?.(paragraph.id);
                     onRequestScrollToParagraph?.(paragraph.id);
                   }}
+                  onMouseEnter={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onMouseLeave={() => onPreviewParagraphLink?.(null)}
+                  onFocus={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onBlur={() => onPreviewParagraphLink?.(null)}
                 >
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
