@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { type CSSProperties, useEffect, useState } from 'react';
+import type { EditorTweaks } from '@litelizard/shared';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
 import { EditorPane } from './components/editor/index.js';
@@ -10,6 +11,24 @@ import { SearchScreen } from './components/SearchScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { IconPanel } from './components/ui/icons.js';
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getEditorTweaksStyle(editorTweaks: EditorTweaks): CSSProperties {
+  const paperWarmth = clampNumber(editorTweaks.paperWarmth, 0, 100) / 100;
+  const lightness = 99 - paperWarmth * 2.5;
+  const chroma = 0.004 + paperWarmth * 0.021;
+  const hue = 96 - paperWarmth * 14;
+
+  return {
+    '--editor-typeface': editorTweaks.typeface === 'sans' ? 'var(--sans)' : 'var(--serif)',
+    '--editor-body-font-size': `${clampNumber(editorTweaks.bodyFontSize, 15, 22)}px`,
+    '--editor-line-height': String(clampNumber(editorTweaks.lineHeight, 1.4, 2.4)),
+    '--editor-paper': `oklch(${lightness.toFixed(2)}% ${chroma.toFixed(3)} ${hue.toFixed(1)})`,
+  } as CSSProperties;
+}
+
 function WorkspaceShell() {
   const {
     rootPath,
@@ -20,6 +39,7 @@ function WorkspaceShell() {
     activeWorkspacePanel,
     pendingParagraphNavigation,
     viewScale,
+    analysisSettings,
     openFolder,
     openEditorPanel,
     openSettingsPanel,
@@ -139,9 +159,16 @@ function WorkspaceShell() {
   const titleText = currentDocument?.title ?? null;
   const statusLabel = currentDocument ? (dirty ? '下書き' : '保存済み') : null;
   const showAnalysisPanel = analysisPanelOpen && Boolean(currentDocument);
+  const analysisPanelMode = analysisSettings.editorTweaks.analysisPanelMode;
+  const workspaceMainClass = [
+    showAnalysisPanel ? 'workspace-main with-panel' : 'workspace-main',
+    showAnalysisPanel && analysisPanelMode === 'overlay' ? 'analysis-overlay-mode' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <div className="workspace-root">
+    <div className="workspace-root" style={getEditorTweaksStyle(analysisSettings.editorTweaks)}>
       <LeftIconRail
         activePanel="editor"
         onSelectPanel={(panel) => {
@@ -165,7 +192,7 @@ function WorkspaceShell() {
         />
       </aside>
 
-      <main className={showAnalysisPanel ? 'workspace-main with-panel' : 'workspace-main'}>
+      <main className={workspaceMainClass}>
         <div className="workspace-titlebar">
           <span className="workspace-titlebar-spacer" />
           <div className="workspace-titlebar-center">

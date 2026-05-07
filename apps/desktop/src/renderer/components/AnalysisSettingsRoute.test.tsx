@@ -66,4 +66,14 @@ describe('analysis settings route', () => {
 
     expect(html).toContain('ローカル LLM 設定を保存');
   });
+
+  it('SettingsScreen のエディタタブで Tweaks 保存導線を表示する', () => {
+    const html = renderToStaticMarkup(<SettingsScreen initialTab="editor" />);
+
+    expect(html).toContain('明朝');
+    expect(html).toContain('ゴシック');
+    expect(html).toContain('黄ばみ強度');
+    expect(html).toContain('オーバーレイ');
+    expect(html).toContain('エディタ設定を保存');
+  });
 });
