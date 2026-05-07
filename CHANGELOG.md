@@ -1,3 +1,6 @@
+[2026/05/07]Ralph Loop の上限回数制御
+`ralph-loop.sh` のバッチ内フェーズ数をチケット枚数ではなく `RALPH_TOTAL_LIMIT` 固定で回すようにし、LLM の使用上限などで途中停止した未完了チケットを次フェーズ/次バッチで拾い直せるようにした。各バッチ/フェーズ開始時に `docs/tickets/` 直下の Markdown が存在しなければ全処理を終了する。検証: `bash -n ralph-loop.sh` と dry-run でチケットなし即終了、チケットあり時の上限回数実行を確認。
+
 [2026/05/07]update-product-map スキル追加と read-github-issues 削除
 GitHub Issue を現役キューから外した運用に合わせて `read-github-issues` スキルを削除し、思いつき・将来方向・チケット化前の判断テーマを `docs/product-map.md` に整理する `update-product-map` スキルを追加した。product-map をタスク台帳化せず、実装は `create-ralph-ticket`、完了履歴は `update-changelog` に分ける制約を明記した。検証: スキル一覧と参照検索で削除・追加後の構成を確認。
 
