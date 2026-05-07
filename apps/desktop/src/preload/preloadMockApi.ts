@@ -635,6 +635,9 @@ export function createMockPreloadApi(): BridgeApi {
         contextPolicy: input.contextPolicy
           ? { ...input.contextPolicy }
           : { ...state.analysisSettings.contextPolicy },
+        editorTweaks: input.editorTweaks
+          ? { ...input.editorTweaks }
+          : { ...state.analysisSettings.editorTweaks },
       };
       return { ok: true };
     },

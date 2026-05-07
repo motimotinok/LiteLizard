@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
+  AnalysisPanelMode,
   AnalysisContextLimitMode,
   AnalysisContextScope,
   AnalysisProviderId,
+  EditorTypeface,
 } from '@litelizard/shared';
 import { useAppStore } from '../store/useAppStore.js';
 import { AuxShell } from './ui/AuxShell.js';
@@ -19,7 +21,7 @@ interface SettingsTab {
 const TABS: SettingsTab[] = [
   { id: 'analysis', label: '分析エンジン' },
   { id: 'agents', label: 'エージェント', comingSoon: true },
-  { id: 'editor', label: 'エディタ', comingSoon: true },
+  { id: 'editor', label: 'エディタ' },
   { id: 'appearance', label: '外観', comingSoon: true },
   { id: 'keyboard', label: 'キーボード', comingSoon: true },
   { id: 'about', label: 'LiteLizard について', comingSoon: true },
@@ -31,7 +33,11 @@ const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string }> = [
   { value: 'local-llm', label: 'Local LLM' },
 ];
 
-export function SettingsScreen() {
+interface SettingsScreenProps {
+  initialTab?: SettingsTab['id'];
+}
+
+export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps = {}) {
   const openEditorPanel = useAppStore((s) => s.openEditorPanel);
   const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
@@ -42,7 +48,7 @@ export function SettingsScreen() {
   const saveAnalysisSettings = useAppStore((s) => s.saveAnalysisSettings);
   const testLocalLlmConnection = useAppStore((s) => s.testLocalLlmConnection);
 
-  const [activeTab, setActiveTab] = useState<SettingsTab['id']>('analysis');
+  const [activeTab, setActiveTab] = useState<SettingsTab['id']>(initialTab);
   const [draftKeys, setDraftKeys] = useState<Record<'openai' | 'anthropic', string>>({
     openai: '',
     anthropic: '',
@@ -56,6 +62,11 @@ export function SettingsScreen() {
     contextScope: analysisSettings.contextPolicy.scope,
     contextLimitMode: analysisSettings.contextPolicy.limitMode,
     contextLastN: analysisSettings.contextPolicy.lastN,
+    editorTypeface: analysisSettings.editorTweaks.typeface,
+    editorBodyFontSize: analysisSettings.editorTweaks.bodyFontSize,
+    editorLineHeight: analysisSettings.editorTweaks.lineHeight,
+    editorPaperWarmth: analysisSettings.editorTweaks.paperWarmth,
+    analysisPanelMode: analysisSettings.editorTweaks.analysisPanelMode,
   });
   const [localLlmStatus, setLocalLlmStatus] = useState<string>('未接続');
 
@@ -69,6 +80,11 @@ export function SettingsScreen() {
       contextScope: analysisSettings.contextPolicy.scope,
       contextLimitMode: analysisSettings.contextPolicy.limitMode,
       contextLastN: analysisSettings.contextPolicy.lastN,
+      editorTypeface: analysisSettings.editorTweaks.typeface,
+      editorBodyFontSize: analysisSettings.editorTweaks.bodyFontSize,
+      editorLineHeight: analysisSettings.editorTweaks.lineHeight,
+      editorPaperWarmth: analysisSettings.editorTweaks.paperWarmth,
+      analysisPanelMode: analysisSettings.editorTweaks.analysisPanelMode,
     });
   }, [analysisSettings]);
 
@@ -84,6 +100,15 @@ export function SettingsScreen() {
     const lastN = Number.isFinite(settingsDraft.contextLastN)
       ? Math.min(Math.max(Math.trunc(settingsDraft.contextLastN), 1), 999)
       : analysisSettings.contextPolicy.lastN;
+    const editorBodyFontSize = Number.isFinite(settingsDraft.editorBodyFontSize)
+      ? Math.min(Math.max(Math.trunc(settingsDraft.editorBodyFontSize), 15), 22)
+      : analysisSettings.editorTweaks.bodyFontSize;
+    const editorLineHeight = Number.isFinite(settingsDraft.editorLineHeight)
+      ? Math.min(Math.max(settingsDraft.editorLineHeight, 1.4), 2.4)
+      : analysisSettings.editorTweaks.lineHeight;
+    const editorPaperWarmth = Number.isFinite(settingsDraft.editorPaperWarmth)
+      ? Math.min(Math.max(Math.trunc(settingsDraft.editorPaperWarmth), 0), 100)
+      : analysisSettings.editorTweaks.paperWarmth;
     await saveAnalysisSettings({
       defaultProvider: settingsDraft.defaultProvider,
       providers: {
@@ -105,6 +130,13 @@ export function SettingsScreen() {
         scope: settingsDraft.contextScope,
         limitMode: settingsDraft.contextLimitMode,
         lastN,
+      },
+      editorTweaks: {
+        typeface: settingsDraft.editorTypeface,
+        bodyFontSize: editorBodyFontSize,
+        lineHeight: editorLineHeight,
+        paperWarmth: editorPaperWarmth,
+        analysisPanelMode: settingsDraft.analysisPanelMode,
       },
     });
   };
@@ -470,6 +502,166 @@ export function SettingsScreen() {
                     onClick={() => void saveDraftSettings()}
                   >
                     設定を保存
+                  </button>
+                </div>
+              </div>
+            </Section>
+          </>
+        ) : activeTab === 'editor' ? (
+          <>
+            <CenteredHeader
+              overline="settings"
+              title="エディタの表示"
+              subtitle={
+                <>
+                  本文の書き味に関わる表示だけを調整します。
+                  <br />
+                  変更は保存後、執筆画面へ反映されます。
+                </>
+              }
+            />
+
+            <Section label={toKanjiIndex(1)} title="本文">
+              <Row label="書体">
+                <div className="settings-radio-group">
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="editor-typeface"
+                      value="serif"
+                      checked={settingsDraft.editorTypeface === 'serif'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          editorTypeface: 'serif' as EditorTypeface,
+                        }))
+                      }
+                    />
+                    明朝
+                  </label>
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="editor-typeface"
+                      value="sans"
+                      checked={settingsDraft.editorTypeface === 'sans'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          editorTypeface: 'sans' as EditorTypeface,
+                        }))
+                      }
+                    />
+                    ゴシック
+                  </label>
+                </div>
+              </Row>
+              <Row label="本文サイズ" hint="15〜22px">
+                <input
+                  type="range"
+                  min={15}
+                  max={22}
+                  step={1}
+                  className="settings-range"
+                  value={settingsDraft.editorBodyFontSize}
+                  onChange={(event) =>
+                    setSettingsDraft((current) => ({
+                      ...current,
+                      editorBodyFontSize: Number.parseInt(event.target.value, 10),
+                    }))
+                  }
+                />
+                <span className="settings-range-value">
+                  {settingsDraft.editorBodyFontSize}px
+                </span>
+              </Row>
+              <Row label="行間" hint="1.4〜2.4">
+                <input
+                  type="range"
+                  min={1.4}
+                  max={2.4}
+                  step={0.05}
+                  className="settings-range"
+                  value={settingsDraft.editorLineHeight}
+                  onChange={(event) =>
+                    setSettingsDraft((current) => ({
+                      ...current,
+                      editorLineHeight: Number.parseFloat(event.target.value),
+                    }))
+                  }
+                />
+                <span className="settings-range-value">
+                  {settingsDraft.editorLineHeight.toFixed(2)}
+                </span>
+              </Row>
+            </Section>
+
+            <Section label={toKanjiIndex(2)} title="紙面">
+              <Row label="黄ばみ強度" hint="0〜100">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  className="settings-range"
+                  value={settingsDraft.editorPaperWarmth}
+                  onChange={(event) =>
+                    setSettingsDraft((current) => ({
+                      ...current,
+                      editorPaperWarmth: Number.parseInt(event.target.value, 10),
+                    }))
+                  }
+                />
+                <span className="settings-range-value">
+                  {settingsDraft.editorPaperWarmth}
+                </span>
+              </Row>
+            </Section>
+
+            <Section label={toKanjiIndex(3)} title="分析パネル">
+              <Row label="表示方式">
+                <div className="settings-radio-group">
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="analysis-panel-mode"
+                      value="side"
+                      checked={settingsDraft.analysisPanelMode === 'side'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          analysisPanelMode: 'side' as AnalysisPanelMode,
+                        }))
+                      }
+                    />
+                    横並び
+                  </label>
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="analysis-panel-mode"
+                      value="overlay"
+                      checked={settingsDraft.analysisPanelMode === 'overlay'}
+                      onChange={() =>
+                        setSettingsDraft((current) => ({
+                          ...current,
+                          analysisPanelMode: 'overlay' as AnalysisPanelMode,
+                        }))
+                      }
+                    />
+                    オーバーレイ
+                  </label>
+                </div>
+              </Row>
+              <div className="settings-actions-row">
+                <span>執筆表示</span>
+                <div className="settings-actions-buttons">
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveDraftSettings()}
+                  >
+                    エディタ設定を保存
                   </button>
                 </div>
               </div>

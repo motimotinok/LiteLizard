@@ -1640,6 +1640,9 @@ export const useAppStore = create<AppState>((set, get) => {
         contextPolicy: input.contextPolicy
           ? { ...input.contextPolicy }
           : { ...current.contextPolicy },
+        editorTweaks: input.editorTweaks
+          ? { ...input.editorTweaks }
+          : { ...current.editorTweaks },
       };
       set({ analysisSettings, statusMessage: '分析設定を保存しました' });
     } catch (error) {

@@ -125,6 +125,40 @@ describe('useAppStore project startup flow', () => {
     expect(useAppStore.getState().analysisMode).toBe('document');
   });
 
+  it('saveAnalysisSettings は editor tweaks を renderer state に反映する', async () => {
+    const saveAnalysisSettings = vi.fn().mockResolvedValue({ ok: true });
+    window.litelizard = createBridge({ saveAnalysisSettings });
+
+    await useAppStore.getState().saveAnalysisSettings({
+      defaultProvider: 'openai',
+      providers: {
+        openai: { defaultModel: 'gpt-4o-mini' },
+        anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.1:8b',
+      },
+      contextPolicy: { scope: 'chapter', limitMode: 'none', lastN: 8 },
+      editorTweaks: {
+        typeface: 'sans',
+        bodyFontSize: 20,
+        lineHeight: 2.1,
+        paperWarmth: 20,
+        analysisPanelMode: 'overlay',
+      },
+    });
+
+    expect(saveAnalysisSettings).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().analysisSettings.editorTweaks).toEqual({
+      typeface: 'sans',
+      bodyFontSize: 20,
+      lineHeight: 2.1,
+      paperWarmth: 20,
+      analysisPanelMode: 'overlay',
+    });
+  });
+
   it('restoreLastProject は保存済みフォルダを復元して ready にする', async () => {
     const setLastOpenedFolder = vi.fn().mockResolvedValue({ ok: true });
     window.litelizard = createBridge({

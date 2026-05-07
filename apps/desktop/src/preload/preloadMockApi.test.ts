@@ -74,6 +74,39 @@ describe('createMockPreloadApi', () => {
     expect(settings.localLlm.configured).toBe(true);
   });
 
+  it('editor tweaks を保存して再読込できる', async () => {
+    const api = createMockPreloadApi();
+
+    await api.saveAnalysisSettings({
+      defaultProvider: 'openai',
+      providers: {
+        openai: { defaultModel: 'gpt-4o-mini' },
+        anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.1:8b',
+      },
+      editorTweaks: {
+        typeface: 'sans',
+        bodyFontSize: 19,
+        lineHeight: 2.05,
+        paperWarmth: 35,
+        analysisPanelMode: 'overlay',
+      },
+    });
+
+    const settings = await api.loadAnalysisSettings();
+
+    expect(settings.editorTweaks).toEqual({
+      typeface: 'sans',
+      bodyFontSize: 19,
+      lineHeight: 2.05,
+      paperWarmth: 35,
+      analysisPanelMode: 'overlay',
+    });
+  });
+
   it('Anthropic を既定 provider として保持できる', async () => {
     const api = createMockPreloadApi();
 

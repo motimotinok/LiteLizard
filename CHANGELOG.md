@@ -1,5 +1,11 @@
+[2026/05/07]R-17 エディター Tweaks 切替 UI
+SettingsScreen のエディタタブから明朝/ゴシック、本文サイズ、行間、黄ばみ強度、分析パネルの横並び/オーバーレイを保存できるようにした。既存の設定保存 IPC に `editorTweaks` を追加し、renderer は CSS 変数でエディター本文と分析パネル配置へ反映する。検証: 追加 settings store / preload mock / renderer store / SettingsScreen SSR tests、`pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上での手動表示確認は未実施。
+
 [2026/05/07]R-13 エクスプローラー DnD ファイル移動
 Explorer の `.lzl` ファイルをフォルダへドラッグして移動できるようにし、main / preload / renderer store / mock bridge に `moveEntry` IPC を追加した。移動先同名ファイルは上書きせず拒否し、プロジェクト外や別 project root への移動も拒否する。開いている文書を移動した場合は `currentFilePath` と document source を新しい保存先へ更新し、解析 sidecar も同時に移動する。検証: 追加 IPC / preload / mock / store tests、`pnpm --filter @litelizard/shared build`、`pnpm --filter @litelizard/desktop test -- ipc ipcBridge preloadMockApi useAppStore`、`pnpm -w lint` / `pnpm -w test`（desktop 243 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上の手動ドラッグ操作確認は未実施。
+
+[2026/05/07]R-22 Web フォントのローカル同梱
+renderer の Google Fonts 依存を外し、Shippori Mincho / Noto Sans JP 相当 / IBM Plex Sans / JetBrains Mono のローカル font asset とライセンス記録、回帰テストを追加した。オフラインでも仕様上のタイポグラフィを保つための変更。検証: fontAssets test、`pnpm -w lint` / `pnpm -w test`（desktop 240 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
 
 [2026/05/07]R-20 現在の文書内検索画面
 左メニューの検索ボタンを有効化し、現在開いている文書の title / chapter title / paragraph text を対象にした検索画面を追加した。検索結果は段落単位で表示し、クリックするとエディターへ戻って対象段落を active にし、既存のスクロールリクエスト経路で該当段落へ移動する。空検索・該当なし・文書未選択の表示も整えた。検証: `searchInDocument` helper / SearchScreen / store action のテスト追加、`pnpm -w lint` / `pnpm -w test`（desktop 237 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: プロジェクト全体検索、ファイル名検索、正規表現検索、置換は非ゴール。

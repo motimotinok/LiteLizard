@@ -3,16 +3,26 @@ import path from 'node:path';
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_ANALYSIS_SETTINGS,
+  DEFAULT_EDITOR_TWEAKS,
+  type AnalysisPanelMode,
   type AnalysisContextLimitMode,
   type AnalysisContextPolicy,
   type AnalysisContextScope,
   type AnalysisSettings,
   type AnalysisSettingsInput,
+  type EditorTweaks,
+  type EditorTypeface,
 } from '@litelizard/shared';
 
 const SETTINGS_FILE_NAME = 'analysis-settings.json';
 const MIN_LAST_N = 1;
 const MAX_LAST_N = 999;
+const MIN_BODY_FONT_SIZE = 15;
+const MAX_BODY_FONT_SIZE = 22;
+const MIN_LINE_HEIGHT = 1.4;
+const MAX_LINE_HEIGHT = 2.4;
+const MIN_PAPER_WARMTH = 0;
+const MAX_PAPER_WARMTH = 100;
 
 function cloneDefaultSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
@@ -35,6 +45,47 @@ function normalizeContextPolicy(
       ? Math.min(Math.max(Math.trunc(rawLastN), MIN_LAST_N), MAX_LAST_N)
       : DEFAULT_ANALYSIS_CONTEXT_POLICY.lastN;
   return { scope, limitMode, lastN };
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.min(Math.max(value, min), max);
+}
+
+function normalizeEditorTweaks(input?: Partial<EditorTweaks> | null): EditorTweaks {
+  const typeface: EditorTypeface =
+    input?.typeface === 'serif' || input?.typeface === 'sans'
+      ? input.typeface
+      : DEFAULT_EDITOR_TWEAKS.typeface;
+  const analysisPanelMode: AnalysisPanelMode =
+    input?.analysisPanelMode === 'side' || input?.analysisPanelMode === 'overlay'
+      ? input.analysisPanelMode
+      : DEFAULT_EDITOR_TWEAKS.analysisPanelMode;
+
+  return {
+    typeface,
+    bodyFontSize: clampNumber(
+      input?.bodyFontSize,
+      MIN_BODY_FONT_SIZE,
+      MAX_BODY_FONT_SIZE,
+      DEFAULT_EDITOR_TWEAKS.bodyFontSize,
+    ),
+    lineHeight: clampNumber(
+      input?.lineHeight,
+      MIN_LINE_HEIGHT,
+      MAX_LINE_HEIGHT,
+      DEFAULT_EDITOR_TWEAKS.lineHeight,
+    ),
+    paperWarmth: clampNumber(
+      input?.paperWarmth,
+      MIN_PAPER_WARMTH,
+      MAX_PAPER_WARMTH,
+      DEFAULT_EDITOR_TWEAKS.paperWarmth,
+    ),
+    analysisPanelMode,
+  };
 }
 
 function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): AnalysisSettingsInput {
@@ -63,6 +114,7 @@ function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): Analy
       defaultModel: localDefaultModel,
     },
     contextPolicy: normalizeContextPolicy(input?.contextPolicy),
+    editorTweaks: normalizeEditorTweaks(input?.editorTweaks),
   };
 }
 
@@ -83,6 +135,7 @@ export function mergeAnalysisSettings(
   settings.localLlm.configured = Boolean(normalized.localLlm.endpoint && normalized.localLlm.defaultModel);
   // normalizeSettings 内で必ず値を埋めているが、型上 optional のため fallback を残す
   settings.contextPolicy = normalized.contextPolicy ?? { ...DEFAULT_ANALYSIS_CONTEXT_POLICY };
+  settings.editorTweaks = normalized.editorTweaks ?? { ...DEFAULT_EDITOR_TWEAKS };
 
   return settings;
 }
