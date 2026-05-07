@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
 import type { AnalysisMode } from '../store/useAppStore.js';
 import { reorderByKey } from '../utils/arrayUtils.js';
+import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
+import { ChapterSummaryList } from './ChapterSummaryList.js';
 import { useAppStore } from '../store/useAppStore.js';
 import {
   getVisiblePatternIndices,
@@ -13,7 +15,9 @@ import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js'
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
+  linkedHighlightParagraphId?: string | null;
   onSetActiveParagraphId?: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onRequestScrollToParagraph?: (id: string) => void;
 }
@@ -94,7 +98,9 @@ function analysisModeRunLabel(mode: AnalysisMode) {
 export function AnalysisPane({
   document,
   activeParagraphId,
+  linkedHighlightParagraphId = null,
   onSetActiveParagraphId,
+  onPreviewParagraphLink,
   onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
@@ -113,7 +119,9 @@ export function AnalysisPane({
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
   const setActiveAgent = useAppStore((s) => s.setActiveAgent);
+  const viewScale = useAppStore((s) => s.viewScale);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
+  const chapterSummaries = useMemo(() => aggregateChapterAnalyses(document), [document]);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
@@ -304,10 +312,14 @@ export function AnalysisPane({
               </button>
             </div>
           ) : null}
+          {viewScale === 'macro' ? (
+            <ChapterSummaryList summaries={chapterSummaries} />
+          ) : (
           <div className="analysis-card-list">
             {document.paragraphs.map((paragraph, index) => {
               const expanded = Boolean(expandedByParagraphId[paragraph.id]);
               const active = paragraph.id === activeParagraphId;
+              const isLinkedHighlight = paragraph.id === linkedHighlightParagraphId;
               const isDragging = draggingParagraphId === paragraph.id;
               const isDropTarget = dropTargetParagraphId === paragraph.id;
               const isComplete = paragraph.lizard.status === 'complete';
@@ -344,6 +356,7 @@ export function AnalysisPane({
                   className={[
                     'analysis-card',
                     active ? 'analysis-card-active' : '',
+                    isLinkedHighlight ? 'analysis-card-linked-highlight' : '',
                     isDragging ? 'analysis-card-dragging' : '',
                     isDropTarget ? 'analysis-card-drop-target' : '',
                     isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
@@ -354,6 +367,10 @@ export function AnalysisPane({
                     onSetActiveParagraphId?.(paragraph.id);
                     onRequestScrollToParagraph?.(paragraph.id);
                   }}
+                  onMouseEnter={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onMouseLeave={() => onPreviewParagraphLink?.(null)}
+                  onFocus={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onBlur={() => onPreviewParagraphLink?.(null)}
                 >
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
@@ -526,8 +543,10 @@ export function AnalysisPane({
               );
             })}
           </div>
+          )}
         </div>
       )}
     </aside>
   );
 }
+

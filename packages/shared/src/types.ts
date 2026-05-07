@@ -135,6 +135,12 @@ export interface FileNode {
   children?: FileNode[];
 }
 
+export interface RecentProjectEntry {
+  path: string;
+  lastOpenedAt: string;
+  exists?: boolean;
+}
+
 export interface Session {
   accessToken: string;
   userId: string;
@@ -194,6 +200,25 @@ export const DEFAULT_ANALYSIS_CONTEXT_POLICY: AnalysisContextPolicy = {
   lastN: 10,
 };
 
+export type EditorTypeface = 'serif' | 'sans';
+export type AnalysisPanelMode = 'side' | 'overlay';
+
+export interface EditorTweaks {
+  typeface: EditorTypeface;
+  bodyFontSize: number;
+  lineHeight: number;
+  paperWarmth: number;
+  analysisPanelMode: AnalysisPanelMode;
+}
+
+export const DEFAULT_EDITOR_TWEAKS: EditorTweaks = {
+  typeface: 'serif',
+  bodyFontSize: 17,
+  lineHeight: 1.95,
+  paperWarmth: 50,
+  analysisPanelMode: 'side',
+};
+
 export interface AnalysisSettings {
   defaultProvider: AnalysisProviderId;
   providers: {
@@ -202,6 +227,7 @@ export interface AnalysisSettings {
   };
   localLlm: LocalLlmSettings;
   contextPolicy: AnalysisContextPolicy;
+  editorTweaks: EditorTweaks;
 }
 
 export interface AnalysisSettingsInput {
@@ -220,6 +246,8 @@ export interface AnalysisSettingsInput {
   };
   // 旧クライアント互換のため optional。未指定時は DEFAULT_ANALYSIS_CONTEXT_POLICY が使われる。
   contextPolicy?: AnalysisContextPolicy;
+  // 旧クライアント互換のため optional。未指定時は DEFAULT_EDITOR_TWEAKS が使われる。
+  editorTweaks?: EditorTweaks;
 }
 
 export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
@@ -240,4 +268,5 @@ export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
     configured: false,
   },
   contextPolicy: { ...DEFAULT_ANALYSIS_CONTEXT_POLICY },
+  editorTweaks: { ...DEFAULT_EDITOR_TWEAKS },
 };

@@ -7,6 +7,9 @@ export function createIpcBridge(): BridgeApi {
     openFolder: () => ipcRenderer.invoke(IPC_CHANNELS.openFolder),
     getLastOpenedFolder: () => ipcRenderer.invoke(IPC_CHANNELS.getLastOpenedFolder),
     setLastOpenedFolder: (folderPath) => ipcRenderer.invoke(IPC_CHANNELS.setLastOpenedFolder, folderPath),
+    getRecentProjects: () => ipcRenderer.invoke(IPC_CHANNELS.getRecentProjects),
+    removeRecentProject: (folderPath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.removeRecentProject, folderPath),
     onRequestOpenFolder: (listener) => {
       const wrapped = () => {
         listener();
@@ -21,6 +24,8 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.createEntry, root, type, name),
     renameEntry: (targetPath, nextName) =>
       ipcRenderer.invoke(IPC_CHANNELS.renameEntry, targetPath, nextName),
+    moveEntry: (sourcePath, destinationFolderPath) =>
+      ipcRenderer.invoke(IPC_CHANNELS.moveEntry, sourcePath, destinationFolderPath),
     deleteEntry: (targetPath) =>
       ipcRenderer.invoke(IPC_CHANNELS.deleteEntry, targetPath),
     loadDocument: (filePath) =>

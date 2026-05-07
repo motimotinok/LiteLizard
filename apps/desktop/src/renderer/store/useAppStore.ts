@@ -10,6 +10,7 @@ import {
   type ParagraphAnalysisPattern,
   type ReadingAgent,
   type ReadingAgentInput,
+  type RecentProjectEntry,
 } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
@@ -33,7 +34,12 @@ export type EditorMode = 'writing' | 'structure' | 'reader';
 export type ViewScale = 'micro' | 'macro';
 export type AnalysisMode = 'paragraph' | 'chapter' | 'document';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
-export type WorkspacePanel = 'editor' | 'settings' | 'agents';
+export type WorkspacePanel = 'editor' | 'settings' | 'agents' | 'search';
+
+export interface PendingParagraphNavigation {
+  paragraphId: string;
+  nonce: number;
+}
 
 export interface AnalysisRunSummary {
   targetCount: number;
@@ -42,7 +48,7 @@ export interface AnalysisRunSummary {
 }
 
 export interface UndoSnapshot {
-  lexicalStateJson: string;
+  lexicalStateJson?: string;
   documentSnapshot: LiteLizardDocument;
 }
 
@@ -86,6 +92,7 @@ function cloneAnalysisSettings(): AnalysisSettings {
 interface AppState {
   startupState: StartupState;
   rootPath: string | null;
+  recentProjects: RecentProjectEntry[];
   tree: FileNode[];
   currentFilePath: string | null;
   document: LiteLizardDocument | null;
@@ -106,6 +113,7 @@ interface AppState {
   analysisMode: AnalysisMode;
   analysisLayerOpen: boolean;
   statusMessage: string;
+  pendingParagraphNavigation: PendingParagraphNavigation | null;
   undoStack: UndoSnapshot[];
   redoStack: UndoSnapshot[];
   pushUndo: (snapshot: UndoSnapshot) => void;
@@ -117,9 +125,13 @@ interface AppState {
   hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
   restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
+  loadRecentProjects: () => Promise<void>;
+  openRecentProject: (folderPath: string) => Promise<void>;
+  removeRecentProject: (folderPath: string) => Promise<void>;
   createDocument: (title: string, parentPath?: string) => Promise<void>;
   createEntry: (parentPath: string, type: 'file' | 'folder', name: string) => Promise<void>;
   renameEntry: (targetPath: string, nextName: string) => Promise<void>;
+  moveEntry: (sourcePath: string, destinationFolderPath: string) => Promise<void>;
   deleteEntry: (targetPath: string) => Promise<void>;
   importTextFile: (createParent: string) => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
@@ -141,6 +153,9 @@ interface AppState {
   openSettingsPanel: () => void;
   openEditorPanel: () => void;
   openAgentsPanel: () => void;
+  openSearchPanel: () => void;
+  requestNavigateToParagraph: (paragraphId: string) => void;
+  consumePendingParagraphNavigation: () => void;
   setAnalysisLayerOpen: (open: boolean) => void;
   toggleAnalysisLayer: () => void;
   loadAgents: () => Promise<void>;
@@ -439,6 +454,7 @@ export const useAppStore = create<AppState>((set, get) => {
   return ({
     startupState: 'loading',
     rootPath: null,
+    recentProjects: [],
     tree: [],
     currentFilePath: null,
     document: null,
@@ -456,6 +472,7 @@ export const useAppStore = create<AppState>((set, get) => {
     analysisMode: 'paragraph',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
+    pendingParagraphNavigation: null,
 
   pushUndo: (snapshot) => {
     set((state) => {
@@ -536,6 +553,7 @@ export const useAppStore = create<AppState>((set, get) => {
             ? `前回のフォルダを復元しました: ${rootPath}`
             : `フォルダを開きました: ${rootPath}`,
       });
+      void get().loadRecentProjects();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const previousState = get();
@@ -580,10 +598,14 @@ export const useAppStore = create<AppState>((set, get) => {
       const root = await window.litelizard.getLastOpenedFolder();
       if (!root) {
         set({ startupState: 'needs-project', statusMessage: 'フォルダを選択して始めてください' });
+        await get().loadRecentProjects();
         return;
       }
 
       await get().hydrateProject(root, 'restore');
+      if (get().startupState === 'needs-project') {
+        await get().loadRecentProjects();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Renderer restoreLastProject] failed', error);
@@ -591,7 +613,52 @@ export const useAppStore = create<AppState>((set, get) => {
         startupState: 'needs-project',
         statusMessage: `前回のフォルダ確認に失敗しました: ${message}`,
       });
+      await get().loadRecentProjects();
     }
+  },
+
+  loadRecentProjects: async () => {
+    if (!window.litelizard) {
+      return;
+    }
+    try {
+      const recentProjects = await window.litelizard.getRecentProjects();
+      set({ recentProjects });
+    } catch (error) {
+      console.error('[Renderer loadRecentProjects] failed', error);
+    }
+  },
+
+  openRecentProject: async (folderPath) => {
+    if (!window.litelizard) {
+      return;
+    }
+    set({ startupState: 'loading', statusMessage: `フォルダを開いています: ${folderPath}` });
+    await get().hydrateProject(folderPath, 'restore');
+    if (get().rootPath !== folderPath) {
+      try {
+        await window.litelizard.removeRecentProject(folderPath);
+      } catch (error) {
+        console.error('[Renderer openRecentProject] removeRecentProject failed', error);
+      }
+      await get().loadRecentProjects();
+      set({
+        startupState: 'needs-project',
+        statusMessage: `フォルダを開けなかったため、最近リストから除外しました: ${folderPath}`,
+      });
+    }
+  },
+
+  removeRecentProject: async (folderPath) => {
+    if (!window.litelizard) {
+      return;
+    }
+    try {
+      await window.litelizard.removeRecentProject(folderPath);
+    } catch (error) {
+      console.error('[Renderer removeRecentProject] failed', error);
+    }
+    await get().loadRecentProjects();
   },
 
   openFolder: async () => {
@@ -727,6 +794,46 @@ export const useAppStore = create<AppState>((set, get) => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ statusMessage: `名前変更に失敗しました: ${message}` });
+    }
+  },
+
+  moveEntry: async (sourcePath: string, destinationFolderPath: string) => {
+    try {
+      const result = await window.litelizard.moveEntry(sourcePath, destinationFolderPath);
+
+      const rootPath = get().rootPath;
+      if (rootPath) {
+        const tree = await window.litelizard.listTree(rootPath);
+        set({ tree });
+      }
+
+      const currentFilePath = get().currentFilePath;
+      if (currentFilePath) {
+        const remapped = remapPathForRename(currentFilePath, sourcePath, result.path);
+        if (remapped !== currentFilePath) {
+          const document = get().document;
+          set({
+            currentFilePath: remapped,
+            revision: 0,
+            document:
+              document && remapped !== currentFilePath
+                ? {
+                    ...document,
+                    title: remapped === result.path ? titleFromPath(remapped) : document.title,
+                    updatedAt: document.updatedAt,
+                    source: document.source
+                      ? { ...document.source, format: document.source.format, originPath: remapped }
+                      : { format: 'litelizard-json', originPath: remapped },
+                  }
+                : document,
+          });
+        }
+      }
+
+      set({ statusMessage: 'ファイルを移動しました' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `移動に失敗しました: ${message}` });
     }
   },
 
@@ -1298,6 +1405,22 @@ export const useAppStore = create<AppState>((set, get) => {
     set({ activeWorkspacePanel: 'editor', statusMessage: 'ドキュメント表示に戻りました' });
   },
 
+  openSearchPanel: () => {
+    set({ activeWorkspacePanel: 'search', statusMessage: '検索を開きました' });
+  },
+
+  requestNavigateToParagraph: (paragraphId: string) => {
+    set({
+      activeWorkspacePanel: 'editor',
+      pendingParagraphNavigation: { paragraphId, nonce: Date.now() },
+      statusMessage: '段落へ移動しました',
+    });
+  },
+
+  consumePendingParagraphNavigation: () => {
+    set({ pendingParagraphNavigation: null });
+  },
+
   setAnalysisLayerOpen: (open: boolean) => {
     if (get().activeWorkspacePanel !== 'editor') {
       set({ analysisLayerOpen: false });
@@ -1517,6 +1640,9 @@ export const useAppStore = create<AppState>((set, get) => {
         contextPolicy: input.contextPolicy
           ? { ...input.contextPolicy }
           : { ...current.contextPolicy },
+        editorTweaks: input.editorTweaks
+          ? { ...input.editorTweaks }
+          : { ...current.editorTweaks },
       };
       set({ analysisSettings, statusMessage: '分析設定を保存しました' });
     } catch (error) {
