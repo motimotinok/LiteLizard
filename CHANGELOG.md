@@ -1,3 +1,30 @@
+[2026/05/07]R-17 エディター Tweaks 切替 UI
+SettingsScreen のエディタタブから明朝/ゴシック、本文サイズ、行間、黄ばみ強度、分析パネルの横並び/オーバーレイを保存できるようにした。既存の設定保存 IPC に `editorTweaks` を追加し、renderer は CSS 変数でエディター本文と分析パネル配置へ反映する。検証: 追加 settings store / preload mock / renderer store / SettingsScreen SSR tests、`pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上での手動表示確認は未実施。
+
+[2026/05/07]R-13 エクスプローラー DnD ファイル移動
+Explorer の `.lzl` ファイルをフォルダへドラッグして移動できるようにし、main / preload / renderer store / mock bridge に `moveEntry` IPC を追加した。移動先同名ファイルは上書きせず拒否し、プロジェクト外や別 project root への移動も拒否する。開いている文書を移動した場合は `currentFilePath` と document source を新しい保存先へ更新し、解析 sidecar も同時に移動する。検証: 追加 IPC / preload / mock / store tests、`pnpm --filter @litelizard/shared build`、`pnpm --filter @litelizard/desktop test -- ipc ipcBridge preloadMockApi useAppStore`、`pnpm -w lint` / `pnpm -w test`（desktop 243 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上の手動ドラッグ操作確認は未実施。
+
+[2026/05/07]R-22 Web フォントのローカル同梱
+renderer の Google Fonts 依存を外し、Shippori Mincho / Noto Sans JP 相当 / IBM Plex Sans / JetBrains Mono のローカル font asset とライセンス記録、回帰テストを追加した。オフラインでも仕様上のタイポグラフィを保つための変更。検証: fontAssets test、`pnpm -w lint` / `pnpm -w test`（desktop 240 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
+
+[2026/05/07]R-20 現在の文書内検索画面
+左メニューの検索ボタンを有効化し、現在開いている文書の title / chapter title / paragraph text を対象にした検索画面を追加した。検索結果は段落単位で表示し、クリックするとエディターへ戻って対象段落を active にし、既存のスクロールリクエスト経路で該当段落へ移動する。空検索・該当なし・文書未選択の表示も整えた。検証: `searchInDocument` helper / SearchScreen / store action のテスト追加、`pnpm -w lint` / `pnpm -w test`（desktop 237 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: プロジェクト全体検索、ファイル名検索、正規表現検索、置換は非ゴール。
+
+[2026/05/07]R-07 章サマリー解析表示（マクロ視点時の分析ペイン）
+マクロ視点（`viewScale === 'macro'`）のときの AnalysisPane を、段落カードの代わりに章ごとのサマリーカードに切り替えた。集約ロジックは renderer 内 `apps/desktop/src/renderer/utils/chapterAnalysisAggregation.ts` に純関数 `aggregateChapterAnalyses` として切り出し、章ごとに段落数・解析済み / 要再解析 / 未解析 / 解析中 / 失敗の内訳、`complete` 段落から集計した上位テーマ・感情、`confidence` 平均（`complete` 段落のみ）を返す。未解析は `status === 'stale'` かつ `analyzedAt` 未設定で判定する。表示は `apps/desktop/src/renderer/components/ChapterSummaryList.tsx` に分離して props だけで描画できるようにし、AnalysisPane 側は `viewScale` を `useAppStore` から購読してボディだけを差し替える。新規 LLM 章解析は呼び出さない。helper の単体テスト 7 件と ChapterSummaryList の SSR テスト 5 件を追加。検証: `pnpm -w lint` / `pnpm -w test`（desktop 222 / shared 46 / api 4）/ `pnpm -w build` 成功。残課題: Electron 上の手動表示確認は未実施。
+
+[2026/05/06]R-21 段落と分析カードの fade highlight 連動
+段落と分析カードの対応関係を hover / focus で相互に示す共有ハイライト状態を追加した。editor 側は Lexical の段落 DOM に paragraphId 対応の hover / focus リスナーと控えめな左罫線表示を付与し、AnalysisPane 側は対応カードに `analysis-card-linked-highlight` を付ける。active / stale / dragging 表示を優先する CSS にして既存表示と競合しないようにした。検証: 追加 static render test、`pnpm -w lint` / `pnpm -w test`（shared 46 件、desktop 210 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上の手動 hover 確認は未実施。
+
+[2026/05/06]Ralph API キー設定経路の補完
+API キー未設定時に AnalysisPane から設定画面へ進める導線を静的レンダリングテストで固定し、SettingsScreen のローカル LLM 入力欄直下にも保存ボタンを追加した。OpenAI / Anthropic の API キー保存、既定 provider / model、ローカル LLM 設定の現行 IPC / store 経路は既存実装と関連テストで確認。検証: 関連 targeted test / `pnpm -w lint` / `pnpm -w test`（desktop 209 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし
+
+[2026/05/06]R-15 DnD 並び替えを Undo/Redo 対象にした
+段落 DnD（`DragHandlePlugin`）と章 DnD（`MacroView`）を `pushUndo` 経由で Undo/Redo 履歴に乗せた。段落 DnD は editor が mount されているため Lexical state と document の両方を保存し、`editor.update` には `tag: 'structural'` を付けて UndoPlugin の auto-snapshot 重複を防ぐ。章 DnD は macro view で Lexical が unmount されているため document スナップショットのみ保存し、Undo 時は `applyDocumentToLexicalRoot` で document から Lexical を再構築する（`MicroEditorView.initialConfig.editorState` と共通化）。MacroView に macro 専用の Ctrl+Z / Ctrl+Y キーハンドラを追加し、編集系フォーカス時はネイティブ Undo に譲る。`UndoSnapshot.lexicalStateJson` を optional に変更し、`UndoPlugin` の UNDO/REDO ハンドラは `applySnapshotToEditor` で lexicalStateJson の有無に応じて `setEditorState` / 再構築を切り替える。`useAppStore.test.ts` に段落 DnD undo、章 DnD undo（chapterId 整合）、undo→redo 往復、lexicalStateJson 省略パスの 4 ケースを追加。検証: `pnpm -w lint` / `pnpm -w test`（207/207）/ `pnpm -w build` 成功。残課題: Electron 上の手動確認は未実施。Undo 時の analysis 履歴復元は既存制約（restoreSnapshot は managed doc の解析状態をリセット）通りで、本チケットでは触らない。
+
+[2026/05/06]R-19 Recent files 永続化
+ウェルカム画面でモック表示のみだった最近フォルダリストを永続化した。`app-store.json` の schema に `recentProjects` を追加し、`setLastOpenedFolder` 経由で重複排除＋先頭追加＋件数上限 10 件を保つ純粋ヘルパー (`appendRecentProject`) を `apps/desktop/src/main/recentProjects.ts` に切り出して unit test で固定。`getRecentProjects` IPC は `fs.stat` でディレクトリ存在を判定し `exists` フラグ付きで返す。`removeRecentProject` IPC を追加し、renderer の `useAppStore` は `hydrateProject` 成功後と `restoreLastProject` の `needs-project` フォールバック時に最近リストを refresh、`openRecentProject` 失敗時は対象を自動的にリストから除外する。`ProjectSetupScreen` に既存の `welcome-recent-*` スタイルを使った最近リスト UI を実装し、存在しないエントリは薄表示でクリックすると除外する。検証: `pnpm -w lint` / `pnpm -w test`（203/203）/ `pnpm -w build` 成功。残課題: `.lzl` ファイル単位の最近リストはスコープ外。
+
 [2026/05/06]R-08 全体解析の成功/失敗件数表示
 全体解析の完了後に対象段落数、成功件数、失敗件数を renderer store の `analysisRunSummary` と AnalysisPane の静かな件数表示で確認できるようにした。結果が返らなかった対象段落は失敗扱いにし、progress や final response で成功した段落の解析結果は残す。0 件時も summary と status message を更新する。`useAppStore.test.ts` に成功、一部失敗、対象0件の回帰テストを追加。検証: `pnpm --filter @litelizard/desktop test -- useAppStore` / `pnpm -w lint` / `pnpm -w test` / `pnpm -w build` 成功。残課題なし
 

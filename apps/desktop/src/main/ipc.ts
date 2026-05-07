@@ -40,6 +40,8 @@ import { ensureProject } from './projectManager.js';
 import {
   getActiveReadingAgentId,
   getLastOpenedFolder,
+  getRecentProjects,
+  removeRecentProject,
   setActiveReadingAgentId,
   setLastOpenedFolder,
 } from './appStore.js';
@@ -253,6 +255,15 @@ export function registerIpcHandlers() {
     return { ok: true as const };
   });
 
+  ipcMain.handle(IPC_CHANNELS.getRecentProjects, async () => {
+    return getRecentProjects();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.removeRecentProject, async (_, folderPath: string) => {
+    await removeRecentProject(folderPath);
+    return { ok: true as const };
+  });
+
   ipcMain.handle(IPC_CHANNELS.listTree, async (_, root: string) => {
     try {
       const projectRoot = await assertProjectRoot(root);
@@ -339,6 +350,56 @@ export function registerIpcHandlers() {
     } catch (error) {
       console.error('[IPC fs:rename] failed', error);
       throw new Error(`RENAME_ENTRY_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.moveEntry, async (_, sourcePath: string, destinationFolderPath: string) => {
+    try {
+      const validatedSource = await assertPathInsideDetectedProject(sourcePath);
+      const validatedDestination = await assertPathInsideDetectedProject(destinationFolderPath);
+
+      if (validatedSource.projectRoot !== validatedDestination.projectRoot) {
+        throw new Error('Destination must be inside the same project root.');
+      }
+
+      const sourceStats = await fs.stat(validatedSource.path);
+      if (sourceStats.isDirectory()) {
+        throw new Error('Folders cannot be moved with this operation.');
+      }
+
+      const destinationStats = await fs.stat(validatedDestination.path);
+      if (!destinationStats.isDirectory()) {
+        throw new Error('Destination must be a folder.');
+      }
+
+      const nextPath = path.join(validatedDestination.path, path.basename(validatedSource.path));
+      await assertResolvedInsideProject(validatedSource.projectRoot, nextPath);
+      await assertRenameTargetAvailable(validatedSource.path, nextPath);
+
+      if (/\.(md|lzl)$/i.test(validatedSource.path)) {
+        const oldAnalysisPath = fileService.toAnalysisPath(validatedSource.path);
+        const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
+
+        if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(nextAnalysisPath))) {
+          throw new Error(`Target analysis file already exists: ${nextAnalysisPath}`);
+        }
+      }
+
+      await fs.rename(validatedSource.path, nextPath);
+
+      if (/\.(md|lzl)$/i.test(validatedSource.path)) {
+        const oldAnalysisPath = fileService.toAnalysisPath(validatedSource.path);
+        const nextAnalysisPath = fileService.toAnalysisPath(nextPath);
+
+        if (oldAnalysisPath !== nextAnalysisPath && (await fileExists(oldAnalysisPath))) {
+          await fs.rename(oldAnalysisPath, nextAnalysisPath);
+        }
+      }
+
+      return { ok: true as const, path: nextPath };
+    } catch (error) {
+      console.error('[IPC fs:move] failed', error);
+      throw new Error(`MOVE_ENTRY_FAILED: ${getErrorMessage(error)}`);
     }
   });
 

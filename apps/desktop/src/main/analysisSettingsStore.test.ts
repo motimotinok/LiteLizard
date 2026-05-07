@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_ANALYSIS_SETTINGS,
+  DEFAULT_EDITOR_TWEAKS,
 } from '@litelizard/shared';
 import { mergeAnalysisSettings } from './analysisSettingsStore.js';
 
@@ -101,5 +102,68 @@ describe('mergeAnalysisSettings', () => {
     expect(merged.contextPolicy.scope).toBe(DEFAULT_ANALYSIS_CONTEXT_POLICY.scope);
     expect(merged.contextPolicy.limitMode).toBe(DEFAULT_ANALYSIS_CONTEXT_POLICY.limitMode);
     expect(merged.contextPolicy.lastN).toBe(999);
+  });
+
+  it('editorTweaks が未指定の場合は既定値で補完する', () => {
+    const merged = mergeAnalysisSettings(undefined, { openai: false, anthropic: false });
+
+    expect(merged.editorTweaks).toEqual(DEFAULT_EDITOR_TWEAKS);
+  });
+
+  it('editorTweaks の有効な値はそのまま反映する', () => {
+    const merged = mergeAnalysisSettings(
+      {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { defaultModel: 'gpt-4o-mini' },
+          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: { endpoint: 'http://x', defaultModel: 'm' },
+        editorTweaks: {
+          typeface: 'sans',
+          bodyFontSize: 19,
+          lineHeight: 2.1,
+          paperWarmth: 72,
+          analysisPanelMode: 'overlay',
+        },
+      },
+      { openai: false, anthropic: false },
+    );
+
+    expect(merged.editorTweaks).toEqual({
+      typeface: 'sans',
+      bodyFontSize: 19,
+      lineHeight: 2.1,
+      paperWarmth: 72,
+      analysisPanelMode: 'overlay',
+    });
+  });
+
+  it('editorTweaks の不正値は既定値に戻し、数値は安全範囲にクランプする', () => {
+    const merged = mergeAnalysisSettings(
+      {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { defaultModel: 'gpt-4o-mini' },
+          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: { endpoint: 'http://x', defaultModel: 'm' },
+        editorTweaks: {
+          typeface: 'invalid' as unknown as 'serif',
+          bodyFontSize: 30,
+          lineHeight: 0.8,
+          paperWarmth: 120,
+          analysisPanelMode: 'invalid' as unknown as 'side',
+        },
+      },
+      { openai: false, anthropic: false },
+    );
+
+    expect(merged.editorTweaks).toEqual({
+      ...DEFAULT_EDITOR_TWEAKS,
+      bodyFontSize: 22,
+      lineHeight: 1.4,
+      paperWarmth: 100,
+    });
   });
 });

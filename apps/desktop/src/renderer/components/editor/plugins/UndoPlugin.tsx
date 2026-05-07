@@ -1,8 +1,30 @@
 import React, { useEffect, useRef } from 'react';
-import { REDO_COMMAND, UNDO_COMMAND, COMMAND_PRIORITY_CRITICAL } from 'lexical';
+import { REDO_COMMAND, UNDO_COMMAND, COMMAND_PRIORITY_CRITICAL, type LexicalEditor } from 'lexical';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { useAppStore } from '../../../store/useAppStore.js';
 import type { UndoSnapshot } from '../../../store/useAppStore.js';
+import { applyDocumentToLexicalRoot } from '../utils/buildLexicalFromDocument.js';
+
+function applySnapshotToEditor(
+  editor: LexicalEditor,
+  snapshot: UndoSnapshot,
+  chapterNodeKeySetRef: React.MutableRefObject<Set<string>>,
+  tag: 'undo' | 'redo',
+) {
+  chapterNodeKeySetRef.current.clear();
+  if (snapshot.lexicalStateJson) {
+    editor.setEditorState(editor.parseEditorState(snapshot.lexicalStateJson), { tag });
+    return;
+  }
+  // DnD 並び替えなど editor が一時的に存在しないタイミングで保存されたスナップショットは
+  // documentSnapshot から Lexical を再構築する。
+  editor.update(
+    () => {
+      applyDocumentToLexicalRoot(snapshot.documentSnapshot, chapterNodeKeySetRef.current);
+    },
+    { tag },
+  );
+}
 
 const TEXT_DEBOUNCE_MS = 500;
 
@@ -97,8 +119,7 @@ export function UndoPlugin({
         pendingSnapshotRef.current = null;
 
         // undo/redo 復元時の StructureStatePlugin による上書きを防ぐため 'undo' タグを付与
-        chapterNodeKeySetRef.current.clear();
-        editor.setEditorState(editor.parseEditorState(target.lexicalStateJson), { tag: 'undo' });
+        applySnapshotToEditor(editor, target, chapterNodeKeySetRef, 'undo');
         store.restoreSnapshot(target);
         return true;
       },
@@ -126,8 +147,7 @@ export function UndoPlugin({
         }
         pendingSnapshotRef.current = null;
 
-        chapterNodeKeySetRef.current.clear();
-        editor.setEditorState(editor.parseEditorState(target.lexicalStateJson), { tag: 'redo' });
+        applySnapshotToEditor(editor, target, chapterNodeKeySetRef, 'redo');
         store.restoreSnapshot(target);
         return true;
       },

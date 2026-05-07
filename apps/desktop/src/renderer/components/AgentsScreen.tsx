@@ -96,6 +96,7 @@ export function AgentsScreen() {
   const openEditorPanel = useAppStore((s) => s.openEditorPanel);
   const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
+  const openSearchPanel = useAppStore((s) => s.openSearchPanel);
   const agents = useAppStore((s) => s.agents);
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
@@ -140,6 +141,7 @@ export function AgentsScreen() {
     if (panel === 'editor') openEditorPanel();
     else if (panel === 'agents') openAgentsPanel();
     else if (panel === 'settings') openSettingsPanel();
+    else if (panel === 'search') openSearchPanel();
   };
 
   const handleNew = () => {

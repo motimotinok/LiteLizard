@@ -14,10 +14,13 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     openFolder: vi.fn(),
     getLastOpenedFolder: vi.fn(),
     setLastOpenedFolder: vi.fn().mockResolvedValue({ ok: true }),
+    getRecentProjects: vi.fn().mockResolvedValue([]),
+    removeRecentProject: vi.fn().mockResolvedValue({ ok: true }),
     onRequestOpenFolder: vi.fn(() => () => {}),
     listTree: vi.fn(),
     createEntry: vi.fn(),
     renameEntry: vi.fn(),
+    moveEntry: vi.fn(),
     deleteEntry: vi.fn(),
     loadDocument: vi.fn(),
     createDocument: vi.fn(),
@@ -122,6 +125,40 @@ describe('useAppStore project startup flow', () => {
     expect(useAppStore.getState().analysisMode).toBe('document');
   });
 
+  it('saveAnalysisSettings は editor tweaks を renderer state に反映する', async () => {
+    const saveAnalysisSettings = vi.fn().mockResolvedValue({ ok: true });
+    window.litelizard = createBridge({ saveAnalysisSettings });
+
+    await useAppStore.getState().saveAnalysisSettings({
+      defaultProvider: 'openai',
+      providers: {
+        openai: { defaultModel: 'gpt-4o-mini' },
+        anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.1:8b',
+      },
+      contextPolicy: { scope: 'chapter', limitMode: 'none', lastN: 8 },
+      editorTweaks: {
+        typeface: 'sans',
+        bodyFontSize: 20,
+        lineHeight: 2.1,
+        paperWarmth: 20,
+        analysisPanelMode: 'overlay',
+      },
+    });
+
+    expect(saveAnalysisSettings).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().analysisSettings.editorTweaks).toEqual({
+      typeface: 'sans',
+      bodyFontSize: 20,
+      lineHeight: 2.1,
+      paperWarmth: 20,
+      analysisPanelMode: 'overlay',
+    });
+  });
+
   it('restoreLastProject は保存済みフォルダを復元して ready にする', async () => {
     const setLastOpenedFolder = vi.fn().mockResolvedValue({ ok: true });
     window.litelizard = createBridge({
@@ -155,6 +192,59 @@ describe('useAppStore project startup flow', () => {
     expect(state.rootPath).toBeNull();
     expect(state.statusMessage).toContain('復元できませんでした');
     expect(setLastOpenedFolder).not.toHaveBeenCalled();
+  });
+
+  it('restoreLastProject は needs-project になったときに recentProjects も読み込む', async () => {
+    const recentProjects = [
+      { path: '/projects/foo', lastOpenedAt: '2026-05-06T10:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(recentProjects);
+    window.litelizard = createBridge({
+      getLastOpenedFolder: vi.fn().mockResolvedValue(null),
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().restoreLastProject();
+
+    expect(getRecentProjects).toHaveBeenCalled();
+    expect(useAppStore.getState().recentProjects).toEqual(recentProjects);
+  });
+
+  it('openRecentProject は失敗時に対象を recent から削除し再読み込みする', async () => {
+    const removeRecent = vi.fn().mockResolvedValue({ ok: true });
+    const refreshed = [
+      { path: '/projects/keep', lastOpenedAt: '2026-05-06T09:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(refreshed);
+    window.litelizard = createBridge({
+      listTree: vi.fn().mockRejectedValue(new Error('ENOENT')),
+      removeRecentProject: removeRecent,
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().openRecentProject('/projects/missing');
+
+    expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
+    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
+    expect(useAppStore.getState().startupState).toBe('needs-project');
+    expect(useAppStore.getState().statusMessage).toContain('最近リストから除外');
+  });
+
+  it('removeRecentProject は IPC 呼び出し後にリストを再読み込みする', async () => {
+    const removeRecent = vi.fn().mockResolvedValue({ ok: true });
+    const refreshed = [
+      { path: '/projects/other', lastOpenedAt: '2026-05-06T08:00:00.000Z', exists: true },
+    ];
+    const getRecentProjects = vi.fn().mockResolvedValue(refreshed);
+    window.litelizard = createBridge({
+      removeRecentProject: removeRecent,
+      getRecentProjects,
+    });
+
+    await useAppStore.getState().removeRecentProject('/projects/drop');
+
+    expect(removeRecent).toHaveBeenCalledWith('/projects/drop');
+    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
   });
 
   it('openFolder はフォルダ切り替え時に編集中ドキュメント状態をリセットする', async () => {
@@ -195,6 +285,42 @@ describe('useAppStore project startup flow', () => {
     expect(state.revision).toBe(0);
     expect(state.dirty).toBe(false);
     expect(setLastOpenedFolder).toHaveBeenCalledWith('/projects/next');
+  });
+
+  it('moveEntry は開いているファイルの保存先パスとツリーを更新する', async () => {
+    const movedPath = '/projects/novel/archive/draft.lzl';
+    const moveEntry = vi.fn().mockResolvedValue({ ok: true, path: movedPath });
+    const refreshedTree = [
+      {
+        path: '/projects/novel/archive',
+        name: 'archive',
+        type: 'directory' as const,
+        children: [{ path: movedPath, name: 'draft.lzl', type: 'file' as const }],
+      },
+    ];
+    window.litelizard = createBridge({
+      moveEntry,
+      listTree: vi.fn().mockResolvedValue(refreshedTree),
+    });
+
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      tree: [],
+      currentFilePath: '/projects/novel/draft.lzl',
+      document: createLzlDocument(),
+      revision: 3,
+    });
+
+    await useAppStore.getState().moveEntry('/projects/novel/draft.lzl', '/projects/novel/archive');
+
+    const state = useAppStore.getState();
+    expect(moveEntry).toHaveBeenCalledWith('/projects/novel/draft.lzl', '/projects/novel/archive');
+    expect(state.tree).toEqual(refreshedTree);
+    expect(state.currentFilePath).toBe(movedPath);
+    expect(state.document?.title).toBe('draft');
+    expect(state.document?.source?.originPath).toBe(movedPath);
+    expect(state.revision).toBe(0);
+    expect(state.statusMessage).toBe('ファイルを移動しました');
   });
 });
 
@@ -565,5 +691,166 @@ describe('useAppStore L-06 analysis state', () => {
 
     expect(saveAnalysisResult).not.toHaveBeenCalled();
     expect(useAppStore.getState().analysisHistoriesByParagraphId).toEqual({});
+  });
+});
+
+describe('useAppStore R-15 DnD reorder undo/redo', () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
+    useAppStore.setState(baseState, true);
+  });
+
+  function createMultiChapterDocument(): LiteLizardDocument {
+    return {
+      version: 2,
+      documentId: 'doc_lzl_dnd',
+      title: 'draft',
+      personaMode: 'general-reader',
+      createdAt: '2026-04-11T00:00:00.000Z',
+      updatedAt: '2026-04-11T00:00:00.000Z',
+      source: { format: 'lzl-v1', originPath: '/projects/novel/draft.lzl' },
+      chapters: [
+        { id: 'c1', order: 1, title: '章1' },
+        { id: 'c2', order: 2, title: '章2' },
+      ],
+      paragraphs: [
+        {
+          id: 'p1',
+          chapterId: 'c1',
+          order: 1,
+          light: { text: 'a1', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+        {
+          id: 'p2',
+          chapterId: 'c1',
+          order: 2,
+          light: { text: 'a2', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+        {
+          id: 'p3',
+          chapterId: 'c2',
+          order: 3,
+          light: { text: 'b1', charCount: 2 },
+          lizard: { status: 'stale' },
+        },
+      ],
+    };
+  }
+
+  it('段落 DnD 並び替え前のスナップショットから undo で並び順を戻せる', () => {
+    const document = createLzlDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderParagraphs(['p2', 'p1']);
+
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p2', 'p1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const target = useAppStore.getState().undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    expect(target).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(target!);
+
+    const restored = useAppStore.getState().document!;
+    expect(restored.paragraphs.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(restored.paragraphs.find((p) => p.id === 'p1')!.order).toBe(1);
+    expect(restored.paragraphs.find((p) => p.id === 'p2')!.order).toBe(2);
+  });
+
+  it('章 DnD 並び替え前のスナップショットから undo で章順と段落の chapterId が戻る', () => {
+    const document = createMultiChapterDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderChapters(['c2', 'c1']);
+
+    const reordered = useAppStore.getState().document!;
+    expect(reordered.chapters.map((c) => c.id)).toEqual(['c2', 'c1']);
+
+    const target = useAppStore.getState().undoWithCurrentSnapshot({ documentSnapshot: reordered });
+    expect(target).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(target!);
+
+    const restored = useAppStore.getState().document!;
+    expect(restored.chapters.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(restored.paragraphs.find((p) => p.id === 'p1')!.chapterId).toBe('c1');
+    expect(restored.paragraphs.find((p) => p.id === 'p2')!.chapterId).toBe('c1');
+    expect(restored.paragraphs.find((p) => p.id === 'p3')!.chapterId).toBe('c2');
+  });
+
+  it('段落 DnD reorder 後の undo / redo を往復できる', () => {
+    const document = createLzlDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderParagraphs(['p2', 'p1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const undoTarget = useAppStore
+      .getState()
+      .undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    useAppStore.getState().restoreSnapshot(undoTarget!);
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p1', 'p2']);
+
+    const afterUndo = useAppStore.getState().document!;
+    const redoTarget = useAppStore
+      .getState()
+      .redoWithCurrentSnapshot({ documentSnapshot: afterUndo });
+    expect(redoTarget).not.toBeNull();
+    useAppStore.getState().restoreSnapshot(redoTarget!);
+    expect(useAppStore.getState().document!.paragraphs.map((p) => p.id)).toEqual(['p2', 'p1']);
+  });
+
+  it('openSearchPanel は activeWorkspacePanel を search にする', () => {
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('editor');
+    useAppStore.getState().openSearchPanel();
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('search');
+    expect(useAppStore.getState().statusMessage).toBe('検索を開きました');
+  });
+
+  it('requestNavigateToParagraph は editor へ戻して pending navigation を立てる', () => {
+    useAppStore.setState({ activeWorkspacePanel: 'search', pendingParagraphNavigation: null });
+    useAppStore.getState().requestNavigateToParagraph('p42');
+    const state = useAppStore.getState();
+    expect(state.activeWorkspacePanel).toBe('editor');
+    expect(state.pendingParagraphNavigation?.paragraphId).toBe('p42');
+    expect(typeof state.pendingParagraphNavigation?.nonce).toBe('number');
+  });
+
+  it('consumePendingParagraphNavigation は pending navigation を消す', () => {
+    useAppStore.setState({ pendingParagraphNavigation: { paragraphId: 'p1', nonce: 1 } });
+    useAppStore.getState().consumePendingParagraphNavigation();
+    expect(useAppStore.getState().pendingParagraphNavigation).toBeNull();
+  });
+
+  it('lexicalStateJson を持たないスナップショットも undo / redo で利用できる', () => {
+    const document = createMultiChapterDocument();
+    useAppStore.setState({ document });
+
+    const before = useAppStore.getState().document!;
+    // chapter DnD は editor 不在なので lexicalStateJson は省略する
+    useAppStore.getState().pushUndo({ documentSnapshot: before });
+    useAppStore.getState().reorderChapters(['c2', 'c1']);
+
+    const afterReorder = useAppStore.getState().document!;
+    const undoTarget = useAppStore
+      .getState()
+      .undoWithCurrentSnapshot({ documentSnapshot: afterReorder });
+    expect(undoTarget?.lexicalStateJson).toBeUndefined();
+    useAppStore.getState().restoreSnapshot(undoTarget!);
+    expect(useAppStore.getState().document!.chapters.map((c) => c.id)).toEqual(['c1', 'c2']);
+
+    const afterUndo = useAppStore.getState().document!;
+    const redoTarget = useAppStore
+      .getState()
+      .redoWithCurrentSnapshot({ documentSnapshot: afterUndo });
+    expect(redoTarget?.lexicalStateJson).toBeUndefined();
+    useAppStore.getState().restoreSnapshot(redoTarget!);
+    expect(useAppStore.getState().document!.chapters.map((c) => c.id)).toEqual(['c2', 'c1']);
   });
 });
