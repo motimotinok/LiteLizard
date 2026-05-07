@@ -1,0 +1,4 @@
+interface:
+  display_name: "Update Changelog"
+  short_description: "完了作業をCHANGELOG先頭に記録する"
+  default_prompt: "Prepend a two-line entry to CHANGELOG.md for a completed LiteLizard task. Do not update WBS or task ledgers."

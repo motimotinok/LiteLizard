@@ -1,4 +1,0 @@
-interface:
-  display_name: "Update WBS Changelog"
-  short_description: "WBS完了更新とCHANGELOG先頭追記を同時に行う"
-  default_prompt: "Update docs/wbs.md and prepend a two-line entry to CHANGELOG.md for a completed task."

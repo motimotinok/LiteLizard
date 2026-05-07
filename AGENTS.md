@@ -5,26 +5,25 @@
 
 ## Codex の役割
 
-### Codex が担うこと
 - **仕様策定・設計判断**: ユーザーとの対話を通じて仕様を詰め、設計を決定する
 - **実装全般**: すべての実装タスクを Codex が担う
-- **タスク管理**: 新規タスクは原則 GitHub Issue として管理し、`docs/wbs.md` への新規追加はユーザーが明示した場合だけ行う
-- **WBS の更新**: 既存 WBS タスクの完了反映や整合性更新を行う
-- **変更履歴の管理**: `CHANGELOG.md` に変更の背景・意図・残課題を記録する
-- PR 修正後にローカルで `dev` へマージする際は、`CHANGELOG.md` を更新し、既存 WBS タスクに紐づく場合だけ `docs/wbs.md` も更新する
-- **設計判断の記録**: `docs/decisions.md` に技術選択の理由を記録する
+- **タスク管理**: 実装可能な作業は `docs/tickets/` の Ralph Loop チケットとして管理する
+- **全体像の整理**: 次に見るべきもの、将来方向、チケット化前の検討テーマは `docs/product-map.md` に集約する
+- **変更履歴の管理**: 完了したコード・仕様・UI・テスト変更は `CHANGELOG.md` に背景・意図・検証・残課題を記録する
+- **設計判断の記録**: 確定した技術選択は `docs/decisions.md` に理由を記録する
 
 ---
 
 ## 作業方針
 
 - ゴール、成功条件、制約、検証方法を先に確認する
-- 既存コード、仕様、WBS、CHANGELOG を根拠に判断する
+- 既存コード、仕様、`docs/product-map.md`、`CHANGELOG.md`、関連チケットを根拠に判断する
 - 実装経路は必要以上に固定せず、既存設計に沿って最小変更を選ぶ
 - 可能な範囲でテスト、ビルド、レビューを行い、結果を報告する
 - 不明点は勝手に大きく解釈せず、影響が大きい場合だけユーザーに確認する
-- 後から湧いた新規タスク・残課題は、明示がなければ WBS ではなく GitHub Issue に残す
-- タスク完了時に、今回の作業で得た再利用可能な学びを振り返る。次回以降の精度向上に効く具体的な改善があれば、`AGENTS.md` または該当する `.codex/skills/*/SKILL.md` に最小限の追記を行う
+- 後から湧いた具体的な残課題・バグ・追加改善は、明示があれば `docs/tickets/` に Ralph Loop チケットとして残す
+- 仕様検討・将来構想・外部参照として残したいものだけ、ユーザーが明示した場合に GitHub Issue を使う
+- タスク中または完了時に、再利用可能な学び・作業ルール・プロンプト改善点が見つかった場合は、`AGENTS.md` または該当する `.codex/skills/*/SKILL.md` に最小限の追記を行ってよい
 - 自己改善の追記は、安定した運用ルール・再発防止・検証手順の改善に絞る。一時的な作業メモ、今回限りの判断、未確定の実験フローは `AGENTS.md` に固定しない
 
 ---
@@ -47,37 +46,48 @@
 
 ## ファイルの役割分担
 
-| ファイル | 管理 | 役割 |
-|---------|------|------|
-| `docs/wbs.md` | git | 既存タスク台帳（新規追加は明示依頼時のみ） |
-| `CHANGELOG.md` | git | 変更履歴（何を、なぜ変えたか・残課題の記録） |
-| `docs/decisions.md` | git | 設計判断ログ |
-| `docs/LiteLizard_spec_v003.md` | git | 仕様書 |
-| `docs/specs/*.md` | git | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
-| `docs/agent-flow.md` | git | 自律エージェント運用ルール（ラベル定義・衝突判定・PR ルール） |
-| `prompts/agent-pickup.md` | git | リモート VM 上で自律実行するエージェント向けプロンプト本体 |
+| ファイル | 役割 |
+|---------|------|
+| `README.md` | プロダクトのコンセプト、開発構成、起動・テスト方法の入口 |
+| `docs/product-map.md` | プロダクト全体像・将来方向・人間が判断するテーマ・チケット化前の思いつきの地図。細かい作業台帳にはしない |
+| `docs/tickets/*.md` | Ralph Loop が実行する未完了チケット |
+| `docs/tickets/done/*.md` | 完了済みチケットのアーカイブ |
+| `CHANGELOG.md` | 完了した変更の履歴（何を、なぜ変えたか・検証・残課題） |
+| `docs/decisions.md` | 設計判断ログ |
+| `docs/LiteLizard_spec_v003.md` | 仕様書 |
+| `docs/specs/*.md` | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
+| `docs/old/wbs.md` | 退役済み WBS。履歴参照のみで更新しない |
+| `docs/old/agent-flow.md` | 退役済み GitHub Issue 自律エージェント運用 |
+| `prompts/old/agent-pickup.md` | 退役済み Issue pickup プロンプト |
 
 ---
-
-## 自律エージェント運用
-
-GitHub Issue を自律エージェント（Web Claude Code, クラウド Codex 等）が拾って PR を作るフローを採用している。詳細ルールは `docs/agent-flow.md`、エージェントが読む実行プロンプトは `prompts/agent-pickup.md` を参照。
-
-主要な点:
-- `agent-ready` ラベルが付いた Issue だけが自律エージェントの対象
-- `in-progress` ラベル付きは着手中。同時 in-progress 上限は 2
-- ブランチは必ず `dev` から切り、PR の base も `dev` を指定
-- 完了時は `update-wbs-changelog` スキル経由で `CHANGELOG.md`（および該当 WBS 行）を更新し、PR 差分に含める
 
 ## Ralph Loop
 
-`prompts/ralph-loop.md` を使う Ralph Loop は、GitHub Issue 駆動の自律エージェント運用とは別のローカルチケット運用として扱う。未完了チケットは `docs/tickets/`、完了済みチケットは `docs/tickets/done/` に置き、Ralph Loop 中に発見した具体的な残課題・バグ・追加改善は同プロンプトの制約に従って `docs/tickets/` に新規 `todo` チケットとして残してよい。GitHub Issue、`agent-ready`、`in-progress`、`docs/agent-flow.md`、`prompts/agent-pickup.md` の運用には混ぜない。
+`prompts/ralph-loop.md` を使う Ralph Loop を、現役の自律開発フローとして扱う。
 
----
+- 未完了チケットは `docs/tickets/` 直下に置く
+- 完了済みチケットは `docs/tickets/done/` に移動する
+- チケットは、背景・ゴール・スコープ・非ゴール・受け入れ条件・検証方法が書ける粒度にする
+- 完了したコード・仕様・UI・テスト変更は `CHANGELOG.md` に残す
+- 作業中に今回へ混ぜない残課題が見つかった場合は、次回以降の `todo` チケットとして残す
+- GitHub Issue、`agent-ready`、`in-progress`、旧 `agent-pickup` 運用、退役済み WBS には混ぜない
 
-## サブエージェント利用ルール
+## GitHub Issue / WBS の扱い
 
-サブエージェントは自己判断で自由に使ってよい。ユーザーへの確認は不要。調査・実装・レビュー・テストなど、必要と判断したら積極的に活用すること。
+- GitHub Issue は、現役の実装キューではなく、将来構想・検討メモ・外部参照として必要な時だけ使う
+- `agent-ready` / `in-progress` ラベル運用は退役済み。参照が必要な場合は `docs/old/agent-flow.md` と `prompts/old/agent-pickup.md` を見る
+- `docs/old/wbs.md` は退役済み。新規追加・完了更新はしない
 
-### コードベース調査
-コードベースの広範な調査が必要な場合は **Explore エージェント**を使う。単純な検索は Glob / Grep を直接使う。
+## タスク化の流れ
+
+- 思いつきや将来方向は、まず `docs/product-map.md` の判断テーマや今後の方向に置く
+- 実装すると決めたら、1 回で実装・検証できる粒度で `docs/tickets/` に Ralph Loop チケットを作る
+- Ralph Loop は `docs/tickets/` の未完了チケットだけを実行キューとして扱う
+- 完了後はチケットを `docs/tickets/done/` に移動し、コード・仕様・UI・テスト変更は `CHANGELOG.md` に記録する
+
+関連スキル:
+
+- `update-product-map`: 思いつき・将来方向・判断テーマを `docs/product-map.md` に整理する
+- `create-ralph-ticket`: 実装すると決めた内容を `docs/tickets/` に切り出す
+- `update-changelog`: 完了した変更を `CHANGELOG.md` に記録する

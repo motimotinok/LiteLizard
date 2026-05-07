@@ -1,3 +1,15 @@
+[2026/05/07]update-product-map スキル追加と read-github-issues 削除
+GitHub Issue を現役キューから外した運用に合わせて `read-github-issues` スキルを削除し、思いつき・将来方向・チケット化前の判断テーマを `docs/product-map.md` に整理する `update-product-map` スキルを追加した。product-map をタスク台帳化せず、実装は `create-ralph-ticket`、完了履歴は `update-changelog` に分ける制約を明記した。検証: スキル一覧と参照検索で削除・追加後の構成を確認。
+
+[2026/05/07]update-changelog スキルへ改名
+WBS 更新を含んでいた旧 `update-wbs-changelog` スキルを `update-changelog` に改名し、内容を `CHANGELOG.md` 先頭追記専用に整理した。WBS や他の台帳は更新しない制約を明記し、関連スキルと退役済み agent-pickup プロンプトの参照も新名へ更新した。検証: スキル参照検索と差分レビューで旧スキル名の現役参照が残らないことを確認。
+
+[2026/05/07]NOW.md 廃止と product-map 集約
+更新漏れしやすい現在地スナップショットとしての `NOW.md` を廃止し、全体像・思いつき・チケット化前の判断テーマを `docs/product-map.md` に集約した。`AGENTS.md`、`prompts/ralph-loop.md`、Issue確認スキルの参照順も product-map 起点に更新した。検証: 参照検索と `git diff --check` で `NOW.md` の現役参照が残らないことを確認。
+
+[2026/05/07]開発フローを Ralph Loop 中心へ移行
+WBS と Issue pickup 運用を退役扱いにし、`docs/old/wbs.md` と `prompts/old/agent-pickup.md` へ移動した。現役の全体像は `docs/product-map.md`、実装キューは `docs/tickets/`、実行プロンプトは `prompts/ralph-loop.md` に整理した。検証: 参照検索と差分レビューで旧パスの現役参照が残らないことを確認。
+
 [2026/05/07]R-17 エディター Tweaks 切替 UI
 SettingsScreen のエディタタブから明朝/ゴシック、本文サイズ、行間、黄ばみ強度、分析パネルの横並び/オーバーレイを保存できるようにした。既存の設定保存 IPC に `editorTweaks` を追加し、renderer は CSS 変数でエディター本文と分析パネル配置へ反映する。検証: 追加 settings store / preload mock / renderer store / SettingsScreen SSR tests、`pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 上での手動表示確認は未実施。
 

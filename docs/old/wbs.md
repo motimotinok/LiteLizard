@@ -1,5 +1,7 @@
 # LiteLizard WBS（Work Breakdown Structure）
 
+> **退役済み**: この WBS は履歴参照用。現役の実装キューは `docs/tickets/`、現在地は `NOW.md`、全体像は `docs/product-map.md` を参照する。今後このファイルへ新規タスク追加・完了更新は行わない。
+
 > **目的**: 仕様 v003 → 製品完成までの全タスクを網羅し、Codex 並列開発を可能にする
 > **最終更新**: 2026-05-07
 > **仕様参照**: `docs/LiteLizard_spec_v003.md`
