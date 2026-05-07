@@ -55,7 +55,7 @@ echo "pwd: $(pwd)"
 echo "active tickets:"
 find "$TICKET_DIR" -maxdepth 1 -type f -name "*.md" -print | sort
 echo ""
-echo "limits: batches=$BATCHES phases_per_batch=$TOTAL_LIMIT claude_phases_per_batch=$CLAUDE_LIMIT sleep_between_batches_seconds=$SLEEP_BETWEEN_BATCHES_SECONDS"
+echo "limits: batches=$BATCHES phase_limit_per_batch=$TOTAL_LIMIT claude_phases_per_batch=$CLAUDE_LIMIT sleep_between_batches_seconds=$SLEEP_BETWEEN_BATCHES_SECONDS"
 echo "codex: sandbox=$CODEX_SANDBOX approval=$CODEX_APPROVAL reasoning_effort=$CODEX_REASONING_EFFORT"
 echo ""
 
@@ -121,16 +121,17 @@ run_batch() {
   local phase
 
   active_count="$(active_ticket_count)"
-  phase_limit="$active_count"
+  phase_limit="$TOTAL_LIMIT"
   batch_claude_limit="$CLAUDE_LIMIT"
 
   if [ "$phase_limit" -eq 0 ]; then
-    echo "No active tickets found before Batch${batch}."
+    echo "RALPH_TOTAL_LIMIT=0. Nothing to run for Batch${batch}."
     return 1
   fi
 
-  if [ "$phase_limit" -gt "$TOTAL_LIMIT" ]; then
-    phase_limit="$TOTAL_LIMIT"
+  if [ "$active_count" -eq 0 ]; then
+    echo "No active tickets found before Batch${batch}."
+    return 1
   fi
 
   if [ "$batch_claude_limit" -gt "$phase_limit" ]; then
@@ -144,6 +145,12 @@ run_batch() {
   count=0
 
   while [ "$count" -lt "$phase_limit" ]; do
+    active_count="$(active_ticket_count)"
+    if [ "$active_count" -eq 0 ]; then
+      echo "No active tickets found before Phase$((count + 1)) in Batch${batch}. Stopping all processing."
+      return 1
+    fi
+
     phase=$((count + 1))
     if [ "$count" -lt "$batch_claude_limit" ]; then
       run_phase "$phase" "claude"
@@ -153,9 +160,6 @@ run_batch() {
     count=$((count + 1))
   done
 
-  if [ "$active_count" -gt "$phase_limit" ]; then
-    echo "Batch${batch} stopped at RALPH_TOTAL_LIMIT=$TOTAL_LIMIT. Remaining tickets may be handled by a later batch."
-  fi
   echo "=== Batch${batch} 終了 ==="
   echo ""
   return 0
