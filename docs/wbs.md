@@ -216,7 +216,7 @@
 | R-12 | 分析カードクリック時アニメーション改善（旧T27） | — | P2 | S | ✅ | Codex | ralphloop |
 | R-13 | エクスプローラー DnD ファイル移動（旧T28） | — | P2 | M | ✅ | Codex | ralphloop |
 | R-14 | 既存テキストインポート（ID 自動生成） | E-02 | P1 | M | ✅ | Codex | |
-| R-15 | DnD 並び替えの Undo 対応 | R-03 ✅, S-08 ✅ | P2 | S | ⬜ | | |
+| R-15 | DnD 並び替えの Undo 対応 | R-03 ✅, S-08 ✅ | P2 | S | ✅ | Codex | ralphloop |
 | R-16 | UI 全面刷新（案 A Minimal 採用） | — | P1 | XL | ✅ | Claude | dev |
 | R-17 | Tweaks 切替 UI（明朝/ゴシック・本文サイズ・行間・黄ばみ強度・パネル横並び/オーバーレイ） | R-16 ✅ | P2 | M | ✅ | Codex | ralphloop |
 | R-18 | Reading Agent の永続化・プロンプト適用エンジン（GitHub Issue #75〜#81 に 7 サブタスク分割済み） | R-16 ✅ | P1 | XL | ✅ | Codex | dev |
