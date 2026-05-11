@@ -1,3 +1,6 @@
+[2026/05/12]PRIVACY.md を追加
+ルートに `PRIVACY.md` を追加し、LiteLizard のデータ取り扱いを現行実装の事実ベースで説明できるようにした。原稿はユーザー選択フォルダ配下、分析結果は `<projectRoot>/.litelizard/analysis/` 配下、設定と API キーは Electron userData 配下（`safeStorage` 可なら `api-keys.bin` で暗号化、不可なら `api-keys.plaintext` で平文）に保存されること、分析実行時のみ OpenAI / Anthropic / ユーザー設定 Local LLM endpoint に本文・前段落・system prompt を送信すること、LiteLizard 自体のサーバーは存在せず telemetry / analytics SDK も組み込まれていないことを記述した。README に「プライバシー」セクションを追加して `PRIVACY.md` への導線を整備。検証: `pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
+
 [2026/05/12]MIT ライセンスを追加
 ルートに `LICENSE`（MIT License, Copyright (c) 2026 motimotinok）を追加し、外部公開時の利用条件を明確にした。著作権者名は git author の `motimotinok` を採用。README に「ライセンス」見出しを追加して `LICENSE` と既存の bundled font 用 `apps/desktop/src/renderer/assets/fonts/LICENSES.md`（SIL Open Font License 1.1）への導線を分けて示し、MIT 本文と OFL 1.1 が独立した著作物であることが分かるようにした。検証: `pnpm -w lint` / `pnpm -w build` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）成功。残課題なし。
 
