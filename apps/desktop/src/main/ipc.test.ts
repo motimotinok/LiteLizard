@@ -7,6 +7,7 @@ import { DEFAULT_ANALYSIS_SETTINGS, IPC_CHANNELS, type AnalysisResult } from '@l
 const electronMock = vi.hoisted(() => ({
   handle: vi.fn(),
   showOpenDialog: vi.fn(),
+  showSaveDialog: vi.fn(),
   getPath: vi.fn(() => '/tmp/litelizard-user-data'),
 }));
 
@@ -61,6 +62,7 @@ vi.mock('electron', () => ({
   },
   dialog: {
     showOpenDialog: electronMock.showOpenDialog,
+    showSaveDialog: electronMock.showSaveDialog,
   },
   ipcMain: {
     handle: electronMock.handle,
@@ -324,7 +326,9 @@ describe('registerIpcHandlers', () => {
       const listTreeHandler = getRequiredHandler(IPC_CHANNELS.listTree);
       const loadDocumentHandler = getRequiredHandler(IPC_CHANNELS.loadDocument);
       const saveDocumentHandler = getRequiredHandler(IPC_CHANNELS.saveDocument);
+      const exportDocumentTextHandler = getRequiredHandler(IPC_CHANNELS.exportDocumentText);
       const documentPath = path.join(projectRoot, 'draft.lzl');
+      const exportPath = path.join(path.dirname(projectRoot), 'draft.txt');
 
       await expect(listTreeHandler(undefined as never, projectRoot as never)).resolves.toEqual([]);
       await expect(loadDocumentHandler(undefined as never, documentPath as never)).resolves.toEqual({
@@ -334,10 +338,93 @@ describe('registerIpcHandlers', () => {
         saveDocumentHandler(undefined as never, documentPath as never, { documentId: 'd_abcdefghij' } as never, 1 as never),
       ).resolves.toEqual({ ok: true, revision: 2 });
 
+      electronMock.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: exportPath });
+      await expect(
+        exportDocumentTextHandler(
+          undefined as never,
+          documentPath as never,
+          {
+            version: 2,
+            documentId: 'd_abcdefghij',
+            title: 'draft',
+            personaMode: 'general-reader',
+            createdAt: '2026-05-12T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+            chapters: [{ id: 'c_abcdefghij', order: 1, title: '章1' }],
+            paragraphs: [
+              {
+                id: 'p_abcdefghij',
+                chapterId: 'c_abcdefghij',
+                order: 1,
+                light: { text: '本文', charCount: 2 },
+                lizard: { status: 'complete', deepMeaning: '内部分析' },
+              },
+            ],
+          } as never,
+        ),
+      ).resolves.toEqual({ ok: true, filePath: exportPath });
+      await expect(fs.readFile(exportPath, 'utf8')).resolves.toBe('draft\n\n章1\n\n本文\n');
+
       expect(fileServiceMock.listTree).toHaveBeenCalledWith(projectRoot);
       expect(fileServiceMock.load).toHaveBeenCalledWith(documentPath);
       expect(fileServiceMock.save).toHaveBeenCalledWith(documentPath, { documentId: 'd_abcdefghij' }, 1);
     });
+  });
+
+  it('does not write export text when the save dialog is canceled', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      const documentPath = path.join(projectRoot, 'draft.lzl');
+      electronMock.showSaveDialog.mockResolvedValueOnce({ canceled: true, filePath: undefined });
+
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.exportDocumentText)(
+          undefined as never,
+          documentPath as never,
+          {
+            version: 2,
+            documentId: 'd_abcdefghij',
+            title: 'draft',
+            personaMode: 'general-reader',
+            createdAt: '2026-05-12T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+            chapters: [],
+            paragraphs: [],
+          } as never,
+        ),
+      ).resolves.toBeNull();
+    });
+  });
+
+  it('exports text without a source file path for unsaved documents', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'litelizard-export-'));
+    const exportPath = path.join(dir, 'unsaved.txt');
+    electronMock.showSaveDialog.mockResolvedValueOnce({ canceled: false, filePath: exportPath });
+
+    try {
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.exportDocumentText)(
+          undefined as never,
+          null as never,
+          {
+            version: 2,
+            documentId: 'd_abcdefghij',
+            title: 'unsaved',
+            personaMode: 'general-reader',
+            createdAt: '2026-05-12T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+            chapters: [],
+            paragraphs: [],
+          } as never,
+        ),
+      ).resolves.toEqual({ ok: true, filePath: exportPath });
+      await expect(fs.readFile(exportPath, 'utf8')).resolves.toBe('unsaved\n');
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('moves a .lzl file into another project folder with its analysis sidecar', async () => {

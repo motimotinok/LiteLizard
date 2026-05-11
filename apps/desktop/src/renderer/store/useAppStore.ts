@@ -134,6 +134,7 @@ interface AppState {
   moveEntry: (sourcePath: string, destinationFolderPath: string) => Promise<void>;
   deleteEntry: (targetPath: string) => Promise<void>;
   importTextFile: (createParent: string) => Promise<void>;
+  exportCurrentDocumentText: () => Promise<void>;
   loadDocument: (filePath: string) => Promise<void>;
   updateParagraph: (paragraphId: string, text: string) => void;
   reorderParagraphs: (orderedIds: string[]) => void;
@@ -893,6 +894,26 @@ export const useAppStore = create<AppState>((set, get) => {
         return;
       }
       set({ statusMessage: `インポートに失敗しました: ${message}` });
+    }
+  },
+
+  exportCurrentDocumentText: async () => {
+    const { currentFilePath, document } = get();
+    if (!document) {
+      set({ statusMessage: '書き出すドキュメントがありません' });
+      return;
+    }
+
+    try {
+      const result = await window.litelizard.exportDocumentText(currentFilePath, document);
+      if (!result) {
+        set({ statusMessage: 'テキスト書き出しをキャンセルしました' });
+        return;
+      }
+      set({ statusMessage: `テキストを書き出しました: ${result.filePath}` });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `テキスト書き出しに失敗しました: ${message}` });
     }
   },
 

@@ -53,6 +53,10 @@ export interface BridgeApi {
     doc: LiteLizardDocument,
     revision: number,
   ): Promise<{ ok: boolean; code?: string; revision: number }>;
+  exportDocumentText(
+    filePath: string | null,
+    doc: LiteLizardDocument,
+  ): Promise<{ ok: true; filePath: string } | null>;
   runAnalysis(input: AnalysisRunInput): Promise<AnalysisRunResult>;
   loadAnalysis(projectRoot: string, documentId: string, filePath?: string): Promise<GenerationalAnalysisFile | null>;
   saveAnalysisResult(
@@ -102,6 +106,7 @@ export const IPC_CHANNELS = {
   loadDocument: 'doc:load',
   createDocument: 'doc:create',
   saveDocument: 'doc:save',
+  exportDocumentText: 'doc:exportText',
   runAnalysis: 'analysis:run',
   loadAnalysis: 'analysis:load',
   saveAnalysisResult: 'analysis:save',

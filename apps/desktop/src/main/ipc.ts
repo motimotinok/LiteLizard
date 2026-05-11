@@ -6,6 +6,7 @@ import {
   createChapterId,
   createDocumentId,
   createParagraphId,
+  exportDocumentToPlainText,
   IPC_CHANNELS,
   type AnalysisProgressEvent,
   parseTextToImportResult,
@@ -462,6 +463,30 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.saveDocument, async (_, filePath: string, doc: LiteLizardDocument, revision: number) => {
     const validatedFilePath = (await assertPathInsideDetectedProject(filePath)).path;
     return fileService.save(validatedFilePath, doc, revision);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.exportDocumentText, async (_, filePath: string | null, doc: LiteLizardDocument) => {
+    try {
+      const defaultFileName = `${sanitizeFileStem(doc.title)}.txt`;
+      const defaultPath = filePath
+        ? path.join(path.dirname((await assertPathInsideDetectedProject(filePath)).path), defaultFileName)
+        : defaultFileName;
+      const result = await dialog.showSaveDialog({
+        defaultPath,
+        filters: [{ name: 'Text Files', extensions: ['txt'] }],
+      });
+
+      if (result.canceled || !result.filePath) {
+        return null;
+      }
+
+      const outputPath = path.extname(result.filePath) ? result.filePath : `${result.filePath}.txt`;
+      await fs.writeFile(outputPath, exportDocumentToPlainText(doc), 'utf8');
+      return { ok: true as const, filePath: outputPath };
+    } catch (error) {
+      console.error('[IPC doc:exportText] failed', error);
+      throw new Error(`EXPORT_TEXT_FAILED: ${getErrorMessage(error)}`);
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.loadAnalysisSettings, async () => {

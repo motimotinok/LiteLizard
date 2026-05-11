@@ -9,7 +9,7 @@ import { SettingsScreen } from './components/SettingsScreen.js';
 import { AgentsScreen } from './components/AgentsScreen.js';
 import { SearchScreen } from './components/SearchScreen.js';
 import { useAppStore } from './store/useAppStore.js';
-import { IconPanel } from './components/ui/icons.js';
+import { IconExport, IconPanel } from './components/ui/icons.js';
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -52,6 +52,7 @@ function WorkspaceShell() {
     moveEntry,
     deleteEntry,
     importTextFile,
+    exportCurrentDocumentText,
     loadDocument,
     reorderParagraphs,
     reorderChapters,
@@ -209,6 +210,17 @@ function WorkspaceShell() {
             ) : null}
           </div>
           <div className="workspace-titlebar-actions">
+            {currentDocument ? (
+              <button
+                type="button"
+                className="titlebar-icon-button"
+                onClick={() => void exportCurrentDocumentText()}
+                title="テキストを書き出す"
+                aria-label="テキストを書き出す"
+              >
+                <IconExport size={15} />
+              </button>
+            ) : null}
             {currentDocument ? (
               <button
                 type="button"

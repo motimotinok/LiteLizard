@@ -33,6 +33,7 @@ describe('createIpcBridge', () => {
     await api.loadDocument('/project/draft.lzl');
     await api.createDocument('/project', 'draft');
     await api.saveDocument('/project/draft.lzl', {} as never, 3);
+    await api.exportDocumentText('/project/draft.lzl', {} as never);
     await api.runAnalysis({} as never);
     await api.loadAnalysis('/project', 'd_123', '/project/draft.lzl');
     await api.saveAnalysisResult('/project', 'd_123', 'p_123', {} as never);
@@ -81,6 +82,7 @@ describe('createIpcBridge', () => {
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.loadDocument, '/project/draft.lzl');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.createDocument, '/project', 'draft');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.saveDocument, '/project/draft.lzl', {}, 3);
+    expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.exportDocumentText, '/project/draft.lzl', {});
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.runAnalysis, {});
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.loadAnalysis, '/project', 'd_123', '/project/draft.lzl');
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.saveAnalysisResult, '/project', 'd_123', 'p_123', {});

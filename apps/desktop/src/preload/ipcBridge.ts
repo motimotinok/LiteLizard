@@ -34,6 +34,8 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.createDocument, root, title),
     saveDocument: (filePath, doc, revision) =>
       ipcRenderer.invoke(IPC_CHANNELS.saveDocument, filePath, doc, revision),
+    exportDocumentText: (filePath, doc) =>
+      ipcRenderer.invoke(IPC_CHANNELS.exportDocumentText, filePath, doc),
     runAnalysis: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.runAnalysis, input),
     loadAnalysis: (projectRoot, documentId, filePath) =>
