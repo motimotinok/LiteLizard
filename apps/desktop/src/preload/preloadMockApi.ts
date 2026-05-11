@@ -1,6 +1,7 @@
 import {
   buildImportedDocument,
   DEFAULT_ANALYSIS_SETTINGS,
+  exportDocumentToPlainText,
   parseTextToImportResult,
   type AnalysisRunInput,
   type AnalysisSettings,
@@ -24,6 +25,7 @@ interface MockState {
   tree: FileNode[];
   documents: Map<string, LiteLizardDocument>;
   revisions: Map<string, number>;
+  exportedTextFiles: Map<string, string>;
   analysisFiles: Map<string, GenerationalAnalysisFile>;
   analysisSettings: AnalysisSettings;
   readingAgents: Map<string, ReadingAgent>;
@@ -369,6 +371,7 @@ export function createMockPreloadApi(): BridgeApi {
       Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])
     ),
     revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
+    exportedTextFiles: new Map(),
     analysisFiles: new Map(),
     analysisSettings: {
       ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
@@ -561,6 +564,13 @@ export function createMockPreloadApi(): BridgeApi {
       state.revisions.set(normalizedPath, nextRevision);
 
       return { ok: true, revision: nextRevision };
+    },
+
+    exportDocumentText: async (filePath: string | null, doc: LiteLizardDocument) => {
+      const sourcePath = filePath ? normalizePath(filePath) : joinPath(mockRootPath, `${doc.title || 'Untitled'}.lzl`);
+      const outputPath = sourcePath.replace(/\.[^.]+$/, '.txt');
+      state.exportedTextFiles.set(outputPath, exportDocumentToPlainText(doc));
+      return { ok: true as const, filePath: outputPath };
     },
 
     runAnalysis: async (input: AnalysisRunInput) => {

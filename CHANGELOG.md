@@ -1,3 +1,6 @@
+[2026/05/12]作成文章のテキストエクスポート
+現在開いている `.lzl` 文書を、documentId や paragraphId、analysis 情報を含まないプレーンテキストとして保存ダイアログ経由で外部ファイルへ書き出せるようにした。検証: `pnpm -w lint` / `pnpm -w test`（shared 49 件、desktop 253 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 実機での保存ダイアログ手動確認は未実施。
+
 [2026/05/12]SECURITY.md を追加
 ルートに `SECURITY.md` を追加し、外部公開前に脆弱性報告方法、公開初期のサポート対象、Electron IPC / API キー保存 / ローカルファイル / 外部 provider 送信の安全上の前提を実装事実ベースで確認できるようにした。README に「セキュリティ」セクションを追加して `SECURITY.md` への導線を整備。検証: `pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
 

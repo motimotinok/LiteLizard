@@ -25,6 +25,7 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     loadDocument: vi.fn(),
     createDocument: vi.fn(),
     saveDocument: vi.fn(),
+    exportDocumentText: vi.fn(),
     runAnalysis: vi.fn(),
     loadAnalysis: vi.fn().mockResolvedValue(null),
     saveAnalysisResult: vi.fn().mockResolvedValue(undefined),
@@ -321,6 +322,48 @@ describe('useAppStore project startup flow', () => {
     expect(state.document?.source?.originPath).toBe(movedPath);
     expect(state.revision).toBe(0);
     expect(state.statusMessage).toBe('ファイルを移動しました');
+  });
+
+  it('exportCurrentDocumentText は現在の文書を IPC に渡し成功メッセージを更新する', async () => {
+    const document = createLzlDocument();
+    const exportDocumentText = vi.fn().mockResolvedValue({ ok: true, filePath: '/exports/draft.txt' });
+    window.litelizard = createBridge({ exportDocumentText });
+
+    useAppStore.setState({
+      currentFilePath: '/projects/novel/draft.lzl',
+      document,
+      dirty: true,
+      statusMessage: '本文を編集中',
+    });
+
+    await useAppStore.getState().exportCurrentDocumentText();
+
+    expect(exportDocumentText).toHaveBeenCalledWith('/projects/novel/draft.lzl', document);
+    expect(useAppStore.getState().dirty).toBe(true);
+    expect(useAppStore.getState().statusMessage).toBe('テキストを書き出しました: /exports/draft.txt');
+  });
+
+  it('exportCurrentDocumentText は保存キャンセル時に文書状態を変えない', async () => {
+    const document = createLzlDocument();
+    const exportDocumentText = vi.fn().mockResolvedValue(null);
+    window.litelizard = createBridge({ exportDocumentText });
+
+    useAppStore.setState({
+      currentFilePath: '/projects/novel/draft.lzl',
+      document,
+      revision: 7,
+      dirty: true,
+      statusMessage: '本文を編集中',
+    });
+
+    await useAppStore.getState().exportCurrentDocumentText();
+
+    const state = useAppStore.getState();
+    expect(exportDocumentText).toHaveBeenCalledWith('/projects/novel/draft.lzl', document);
+    expect(state.document).toBe(document);
+    expect(state.revision).toBe(7);
+    expect(state.dirty).toBe(true);
+    expect(state.statusMessage).toBe('テキスト書き出しをキャンセルしました');
   });
 });
 

@@ -124,6 +124,14 @@ export const IconImport = (props: IconProps) => (
   </BaseIcon>
 );
 
+export const IconExport = (props: IconProps) => (
+  <BaseIcon {...props}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+    <path d="M14 3v5h5" />
+    <path d="M12 17v-6m-2.5 2.5L12 11l2.5 2.5" />
+  </BaseIcon>
+);
+
 export const IconRefresh = (props: IconProps) => (
   <BaseIcon {...props}>
     <path d="M3 12a9 9 0 0 1 15.5-6.3L21 8" />
