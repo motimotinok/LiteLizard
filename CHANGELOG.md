@@ -1,3 +1,6 @@
+[2026/05/12]SECURITY.md を追加
+ルートに `SECURITY.md` を追加し、外部公開前に脆弱性報告方法、公開初期のサポート対象、Electron IPC / API キー保存 / ローカルファイル / 外部 provider 送信の安全上の前提を実装事実ベースで確認できるようにした。README に「セキュリティ」セクションを追加して `SECURITY.md` への導線を整備。検証: `pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
+
 [2026/05/12]PRIVACY.md を追加
 ルートに `PRIVACY.md` を追加し、LiteLizard のデータ取り扱いを現行実装の事実ベースで説明できるようにした。原稿はユーザー選択フォルダ配下、分析結果は `<projectRoot>/.litelizard/analysis/` 配下、設定と API キーは Electron userData 配下（`safeStorage` 可なら `api-keys.bin` で暗号化、不可なら `api-keys.plaintext` で平文）に保存されること、分析実行時のみ OpenAI / Anthropic / ユーザー設定 Local LLM endpoint に本文・前段落・system prompt を送信すること、LiteLizard 自体のサーバーは存在せず telemetry / analytics SDK も組み込まれていないことを記述した。README に「プライバシー」セクションを追加して `PRIVACY.md` への導線を整備。検証: `pnpm -w lint` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
 
