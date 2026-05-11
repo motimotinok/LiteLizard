@@ -1,3 +1,6 @@
+[2026/05/12]MIT ライセンスを追加
+ルートに `LICENSE`（MIT License, Copyright (c) 2026 motimotinok）を追加し、外部公開時の利用条件を明確にした。著作権者名は git author の `motimotinok` を採用。README に「ライセンス」見出しを追加して `LICENSE` と既存の bundled font 用 `apps/desktop/src/renderer/assets/fonts/LICENSES.md`（SIL Open Font License 1.1）への導線を分けて示し、MIT 本文と OFL 1.1 が独立した著作物であることが分かるようにした。検証: `pnpm -w lint` / `pnpm -w build` / `pnpm -w test`（desktop 249 件、shared 46 件、api 4 件、e2e 6 skipped）成功。残課題なし。
+
 [2026/05/07]Ralph Loop の上限回数制御
 `ralph-loop.sh` のバッチ内フェーズ数をチケット枚数ではなく `RALPH_TOTAL_LIMIT` 固定で回すようにし、LLM の使用上限などで途中停止した未完了チケットを次フェーズ/次バッチで拾い直せるようにした。各バッチ/フェーズ開始時に `docs/tickets/` 直下の Markdown が存在しなければ全処理を終了する。検証: `bash -n ralph-loop.sh` と dry-run でチケットなし即終了、チケットあり時の上限回数実行を確認。
 
