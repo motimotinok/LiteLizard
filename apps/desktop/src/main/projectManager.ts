@@ -54,5 +54,32 @@ export async function ensureProject(folderPath: string): Promise<void> {
   const result = await detectProject(folderPath);
   if (!result.exists) {
     await initializeProject(folderPath);
+    return;
+  }
+  await assertProjectWritable(folderPath);
+}
+
+/**
+ * `.litelizard/` 配下にプローブファイルを作成・削除し、書き込み権限があるか確認する。
+ * 復元経路は新規初期化を行わないため、ここで明示的に書き込み可否を検出する。
+ */
+export async function assertProjectWritable(folderPath: string): Promise<void> {
+  const litelizardDir = getLitelizardDir(folderPath);
+  const probePath = path.join(
+    litelizardDir,
+    `.write-probe-${process.pid}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+  );
+
+  try {
+    await fs.writeFile(probePath, '', { encoding: 'utf8', flag: 'wx' });
+  } catch (error) {
+    const message = (error as NodeJS.ErrnoException).message ?? 'unknown';
+    throw new Error(`PROJECT_NOT_WRITABLE: ${folderPath} (${message})`);
+  }
+
+  try {
+    await fs.rm(probePath, { force: true });
+  } catch {
+    // プローブ削除に失敗しても次回以降の writeFile で上書きできるため、検出失敗にはしない
   }
 }

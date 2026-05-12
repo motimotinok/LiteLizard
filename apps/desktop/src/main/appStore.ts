@@ -84,10 +84,15 @@ export async function getRecentProjects(): Promise<RecentProjectEntry[]> {
 export async function removeRecentProject(folderPath: string): Promise<void> {
   const store = await readStore();
   const recentProjects = removeRecentProjectFromList(store.recentProjects, folderPath);
-  if (recentProjects.length === store.recentProjects.length) {
+  const clearsLastOpened = store.lastOpenedFolder === folderPath;
+  if (recentProjects.length === store.recentProjects.length && !clearsLastOpened) {
     return;
   }
-  await writeStore({ ...store, recentProjects });
+  await writeStore({
+    ...store,
+    recentProjects,
+    lastOpenedFolder: clearsLastOpened ? null : store.lastOpenedFolder,
+  });
 }
 
 async function pathExists(targetPath: string): Promise<boolean> {

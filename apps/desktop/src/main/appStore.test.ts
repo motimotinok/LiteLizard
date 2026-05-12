@@ -186,4 +186,43 @@ describe('appStore', () => {
 
     expect(appStoreMock.writeFile).not.toHaveBeenCalled();
   });
+
+  it('removeRecentProject は lastOpenedFolder と一致する場合に lastOpenedFolder も null にする', async () => {
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        lastOpenedFolder: '/projects/missing',
+        recentProjects: [
+          { path: '/projects/missing', lastOpenedAt: '2026-05-06T10:00:00.000Z' },
+          { path: '/projects/keep', lastOpenedAt: '2026-05-06T09:00:00.000Z' },
+        ],
+      }),
+    );
+
+    await removeRecentProject('/projects/missing');
+
+    const written = JSON.parse(appStoreMock.writeFile.mock.calls.at(-1)?.[1] ?? '{}');
+    expect(written.lastOpenedFolder).toBeNull();
+    expect(written.recentProjects).toEqual([
+      { path: '/projects/keep', lastOpenedAt: '2026-05-06T09:00:00.000Z' },
+    ]);
+  });
+
+  it('removeRecentProject は recentProjects に無くても lastOpenedFolder 一致時にクリアする', async () => {
+    appStoreMock.writeFile.mockResolvedValue(undefined);
+    appStoreMock.mkdir.mockResolvedValue(undefined);
+    appStoreMock.readFile.mockResolvedValue(
+      JSON.stringify({
+        lastOpenedFolder: '/projects/orphan',
+        recentProjects: [],
+      }),
+    );
+
+    await removeRecentProject('/projects/orphan');
+
+    const written = JSON.parse(appStoreMock.writeFile.mock.calls.at(-1)?.[1] ?? '{}');
+    expect(written.lastOpenedFolder).toBeNull();
+    expect(written.recentProjects).toEqual([]);
+  });
 });

@@ -62,16 +62,24 @@ selected-folder/
 
 ## 5. 前回フォルダの記憶
 
-- 前回開いたフォルダのパスは `electron-store` を使ってアプリ側（ユーザーホーム配下）に保存する
+- 前回開いたフォルダのパスはアプリの `userData/app-store.json` に保存する
 - `.litelizard/` 内ではなくアプリ側に保存する理由: 「どのプロジェクトを開くか」はプロジェクト外の情報であるため
-- 記憶するフォルダは常に1つのみ（複数フォルダの履歴は持たない）
+- `lastOpenedFolder` と Recent files (`recentProjects`) は同じ store に並べて保存し、フォルダを開くたびに同期する
 
 ```typescript
-// electron-store のスキーマイメージ
 interface AppStore {
   lastOpenedFolder: string | null;
+  recentProjects: RecentProjectEntry[];
+  activeReadingAgentId: string | null;
+}
+
+interface RecentProjectEntry {
+  path: string;
+  lastOpenedAt: string; // ISO 8601
 }
 ```
+
+`setLastOpenedFolder(path)` を呼ぶと、`lastOpenedFolder` の更新と同時に `recentProjects` の先頭に `path` を移動して `lastOpenedAt` を更新する。
 
 ---
 
@@ -80,8 +88,9 @@ interface AppStore {
 - メニューバーの「ファイル」→「別のフォルダを開く」から切り替え可能
 - 新しいフォルダを選択すると:
   1. 選択先に `.litelizard/` がなければ自動生成（§3 と同じ処理）
-  2. `electron-store` の `lastOpenedFolder` を更新
-  3. 通常画面を新しいフォルダの内容で再描画
+  2. `.litelizard/` への書き込み可否を確認する（§9）
+  3. `lastOpenedFolder` を更新し、`recentProjects` を更新する
+  4. 通常画面を新しいフォルダの内容で再描画
 
 ---
 
@@ -91,3 +100,34 @@ interface AppStore {
 
 - `.litelizard/config.json` を読み込んでプロジェクト設定を復元する
 - `.litelizard/` の再生成は行わない（既存の分析結果等を保持）
+- 書き込み可否は §9 のプローブで確認する
+
+---
+
+## 8. 復元失敗時の挙動
+
+`lastOpenedFolder` が指すフォルダを開けない場合（削除済み、`.litelizard/config.json` が読めない、書き込み不可、外部メディアが外されている等）には、エラーを握りつぶさずに以下を行う:
+
+1. 失敗パスを `lastOpenedFolder` から外す（`null` にする）
+2. 失敗パスを `recentProjects` からも除外する
+3. ProjectSetupScreen を表示し、状態メッセージで失敗内容を伝える
+4. ユーザーは「フォルダを開く」または Recent files から別のフォルダを選び直せる
+
+これにより、同じ失敗パスを再起動のたびに繰り返し試すことを避ける。
+
+ProjectSetupScreen の Recent files で「フォルダが見つからない」エントリは半透明で表示し、クリックで `recentProjects` から除外する。
+
+---
+
+## 9. 書き込み可否の確認
+
+「保存先として選んだフォルダに書き込めない」状態を、解析実行や保存が走るより前に検出する:
+
+- `assertProjectWritable(folderPath)` を以下のタイミングで呼ぶ
+  - フォルダ選択ダイアログ後の `ensureProject` 内（既存プロジェクトの場合）
+  - `listTree` IPC ハンドラ内（復元経路で `.litelizard/config.json` は読めても書けないケースを検出）
+- 確認方法: `.litelizard/.write-probe-<pid>-<rand>` を書き込み・即削除し、`writeFile` が成功するかで判定する
+- 失敗時は `PROJECT_NOT_WRITABLE: ...` エラーを投げ、上位の `LIST_TREE_FAILED` などとして renderer に届く
+- renderer 側は §8 のフォールバック導線に乗せる
+
+新規プロジェクト初期化（`initializeProject`）は `.litelizard/` を作成する過程で書き込みを伴うため、追加プローブは不要。

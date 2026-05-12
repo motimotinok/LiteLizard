@@ -97,6 +97,7 @@ vi.mock('./analysisStore.js', () => analysisStoreMock);
 
 vi.mock('./projectManager.js', () => ({
   ensureProject: vi.fn(),
+  assertProjectWritable: vi.fn(),
 }));
 
 vi.mock('./appStore.js', () => ({

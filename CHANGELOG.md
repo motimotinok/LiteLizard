@@ -1,3 +1,6 @@
+[2026/05/12]起動と前回ディレクトリ復元の保存先挙動
+公開前タスクとして、起動時の前回フォルダ復元と書き込み可否確認を整理した。`projectManager.assertProjectWritable` を追加し、`.litelizard/.write-probe-<pid>-<rand>` を書き込み・即削除して `.litelizard/` への書き込み可否を実プローブで判定する。`ensureProject` の既存プロジェクト経路と `listTree` IPC ハンドラで呼ぶことで、新規 / 復元の両方でアクセス権限を検出できるようにした。`main/appStore.removeRecentProject` を「対象パスが `lastOpenedFolder` と一致する場合は `lastOpenedFolder` も null にする」よう拡張し、renderer の `restoreLastProject` は復元失敗時に `removeRecentProject(failedPath)` を呼んで Recent と `lastOpenedFolder` を整合させる。これにより削除済み・権限不足のフォルダを再起動のたびに繰り返し試す状態を防ぐ。仕様は `docs/specs/project-management.md` §5–§9 を更新し、決定経緯を `docs/decisions.md` に追記。検証: 追加 / 既存テスト（projectManager / main appStore / renderer useAppStore / ipc）、`pnpm -w lint` / `pnpm -w test`（desktop 260 件、shared 49 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 実機での復元失敗導線の手動確認は未実施、Windows 向け読み取り専用書き込みプローブのテストは別途。
+
 [2026/05/12]作成文章のテキストエクスポート
 現在開いている `.lzl` 文書を、documentId や paragraphId、analysis 情報を含まないプレーンテキストとして保存ダイアログ経由で外部ファイルへ書き出せるようにした。検証: `pnpm -w lint` / `pnpm -w test`（shared 49 件、desktop 253 件、api 4 件、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron 実機での保存ダイアログ手動確認は未実施。
 

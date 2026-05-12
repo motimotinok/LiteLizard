@@ -605,6 +605,11 @@ export const useAppStore = create<AppState>((set, get) => {
 
       await get().hydrateProject(root, 'restore');
       if (get().startupState === 'needs-project') {
+        try {
+          await window.litelizard.removeRecentProject(root);
+        } catch (error) {
+          console.error('[Renderer restoreLastProject] removeRecentProject failed', error);
+        }
         await get().loadRecentProjects();
       }
     } catch (error) {
