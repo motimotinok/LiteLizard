@@ -6,6 +6,20 @@
 
 ---
 
+## [2026-05-12] プロジェクト復元の失敗時挙動と書き込み可否確認を明文化
+
+- **決定**: 公開前仕様として、起動時の前回フォルダ復元・復元失敗時の整合処理・`.litelizard/` への書き込み可否確認を [`docs/specs/project-management.md`](specs/project-management.md) §5–§9 に固定する
+- **挙動**:
+  - 復元失敗時は `lastOpenedFolder` と `recentProjects` から失敗パスを除外し、ProjectSetupScreen で選び直しを促す
+  - `ensureProject` と `listTree` IPC ハンドラで `assertProjectWritable` を呼び、`.litelizard/.write-probe-*` の書き込み・削除で書き込み可否を検出する
+- **理由**: 削除済み / 権限のないフォルダを `lastOpenedFolder` に残したまま再起動を繰り返す状態を防ぎ、外部公開前にユーザーが詰まらない導線を保証するため
+- **却下した案**:
+  - 新規 IPC `clearLastOpenedFolder` を追加: `removeRecentProject` の振る舞い拡張で同等の整合が取れ、preload 契約を変えずに済む
+  - `fs.access(litelizardDir, W_OK)` だけで書き込み可否を判定: macOS の TCC / ACL 下で誤検知が出やすいため、実プローブで確認する
+- **参照**: `apps/desktop/src/main/projectManager.ts`, `apps/desktop/src/main/appStore.ts`, `apps/desktop/src/main/ipc.ts`, `apps/desktop/src/renderer/store/useAppStore.ts`
+
+---
+
 ## [2026-05-05] Reading Agent を解析実行単位として採用 (R-18)
 
 - **決定**: Reading Agent を `userData/agents.json` に保存するアプリ横断の読者プロファイルとし、新しい解析実行では `agentId` を正とする。`personaMode` は既存 `.lzl` / analysis 互換のため温存する

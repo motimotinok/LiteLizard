@@ -37,7 +37,7 @@ import {
   toTitleFromFileName,
   validateEntryName,
 } from './ipcPathUtils.js';
-import { ensureProject } from './projectManager.js';
+import { assertProjectWritable, ensureProject } from './projectManager.js';
 import {
   getActiveReadingAgentId,
   getLastOpenedFolder,
@@ -268,6 +268,7 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.listTree, async (_, root: string) => {
     try {
       const projectRoot = await assertProjectRoot(root);
+      await assertProjectWritable(projectRoot);
       return await fileService.listTree(projectRoot);
     } catch (error) {
       console.error('[IPC fs:listTree] failed', error);

@@ -2,7 +2,12 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { initializeProject, detectProject, ensureProject } from './projectManager.js';
+import {
+  initializeProject,
+  detectProject,
+  ensureProject,
+  assertProjectWritable,
+} from './projectManager.js';
 
 async function withTempDir(run: (dir: string) => Promise<void>) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'litelizard-project-manager-'));
@@ -99,6 +104,56 @@ describe('ensureProject', () => {
       const raw = await fs.readFile(configPath, 'utf8');
       const config = JSON.parse(raw) as { version: number; extra?: string };
       expect(config.extra).toBe('preserved');
+    });
+  });
+
+  it('既存プロジェクトでも .litelizard/ への書き込み可否を確認する', async () => {
+    await withTempDir(async (dir) => {
+      await initializeProject(dir);
+
+      await ensureProject(dir);
+
+      const probeEntries = (await fs.readdir(path.join(dir, '.litelizard'))).filter((entry) =>
+        entry.startsWith('.write-probe-'),
+      );
+      expect(probeEntries).toEqual([]);
+    });
+  });
+});
+
+describe('assertProjectWritable', () => {
+  const platformsWithChmod = process.platform === 'win32' ? [] : ['posix' as const];
+
+  it('書き込み可能な .litelizard/ ではエラーにならず、プローブも残らない', async () => {
+    await withTempDir(async (dir) => {
+      await initializeProject(dir);
+
+      await expect(assertProjectWritable(dir)).resolves.toBeUndefined();
+
+      const probeEntries = (await fs.readdir(path.join(dir, '.litelizard'))).filter((entry) =>
+        entry.startsWith('.write-probe-'),
+      );
+      expect(probeEntries).toEqual([]);
+    });
+  });
+
+  it('.litelizard/ が存在しないフォルダでもエラーを投げる', async () => {
+    await withTempDir(async (dir) => {
+      await expect(assertProjectWritable(dir)).rejects.toThrow(/PROJECT_NOT_WRITABLE/);
+    });
+  });
+
+  it.each(platformsWithChmod)('読み取り専用 .litelizard/ では PROJECT_NOT_WRITABLE を投げる (%s)', async () => {
+    await withTempDir(async (dir) => {
+      await initializeProject(dir);
+      const litelizardDir = path.join(dir, '.litelizard');
+      await fs.chmod(litelizardDir, 0o500);
+
+      try {
+        await expect(assertProjectWritable(dir)).rejects.toThrow(/PROJECT_NOT_WRITABLE/);
+      } finally {
+        await fs.chmod(litelizardDir, 0o700);
+      }
     });
   });
 });
