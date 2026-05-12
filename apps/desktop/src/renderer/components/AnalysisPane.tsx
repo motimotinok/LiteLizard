@@ -95,6 +95,10 @@ function analysisModeRunLabel(mode: AnalysisMode) {
   return '全体解析は準備中です';
 }
 
+function formatChars(value: number): string {
+  return `${value.toLocaleString('ja-JP')} 文字`;
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
@@ -104,7 +108,10 @@ export function AnalysisPane({
   onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
-  const runAnalysis = useAppStore((s) => s.runAnalysis);
+  const requestAnalysisRun = useAppStore((s) => s.requestAnalysisRun);
+  const confirmAnalysisRun = useAppStore((s) => s.confirmAnalysisRun);
+  const cancelAnalysisRun = useAppStore((s) => s.cancelAnalysisRun);
+  const pendingAnalysisRun = useAppStore((s) => s.pendingAnalysisRun);
   const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
@@ -280,13 +287,66 @@ export function AnalysisPane({
         <button
           type="button"
           className="analysis-run-button"
-          onClick={runAnalysis}
-          disabled={generateAllDisabled}
+          onClick={requestAnalysisRun}
+          disabled={generateAllDisabled || pendingAnalysisRun !== null}
           title={runButtonTitle}
         >
           <IconPlay size={10} /> {analysisModeRunLabel(analysisMode)}
         </button>
-        {analysisRunSummary ? (
+        {pendingAnalysisRun ? (
+          <section
+            className="analysis-run-confirm"
+            role="dialog"
+            aria-label="解析実行の確認"
+          >
+            <header className="analysis-run-confirm-header">
+              実行前の概算（送信される前に確認できます）
+            </header>
+            <dl className="analysis-run-confirm-list">
+              <div>
+                <dt>対象段落</dt>
+                <dd>{pendingAnalysisRun.estimate.targetCount} 段落</dd>
+              </div>
+              <div>
+                <dt>対象本文量</dt>
+                <dd>{formatChars(pendingAnalysisRun.estimate.targetTextChars)}</dd>
+              </div>
+              <div>
+                <dt>コンテキスト本文量</dt>
+                <dd>{formatChars(pendingAnalysisRun.estimate.contextTextChars)}</dd>
+              </div>
+              <div>
+                <dt>概算入力量</dt>
+                <dd>{formatChars(pendingAnalysisRun.estimate.totalInputChars)}</dd>
+              </div>
+              <div>
+                <dt>概算 output 量</dt>
+                <dd>{formatChars(pendingAnalysisRun.estimate.estimatedOutputChars)}</dd>
+              </div>
+            </dl>
+            <p className="analysis-run-confirm-note">
+              これは概算であり、実際の課金額・トークン数とは一致しません。
+            </p>
+            <div className="analysis-run-confirm-actions">
+              <button
+                type="button"
+                className="analysis-run-confirm-cancel"
+                onClick={cancelAnalysisRun}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="analysis-run-confirm-execute"
+                onClick={() => {
+                  void confirmAnalysisRun();
+                }}
+              >
+                実行する
+              </button>
+            </div>
+          </section>
+        ) : analysisRunSummary ? (
           <div className="analysis-run-summary" aria-label="解析実行結果">
             <span>対象 {analysisRunSummary.targetCount}</span>
             <span>成功 {analysisRunSummary.successCount}</span>

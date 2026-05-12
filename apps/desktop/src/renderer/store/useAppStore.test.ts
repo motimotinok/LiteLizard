@@ -918,3 +918,356 @@ describe('useAppStore R-15 DnD reorder undo/redo', () => {
     expect(useAppStore.getState().document!.chapters.map((c) => c.id)).toEqual(['c2', 'c1']);
   });
 });
+
+describe('useAppStore 分析実行前の見積もり確認', () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
+    useAppStore.setState(baseState, true);
+  });
+
+  function setupReadyState(documentOverride?: Partial<LiteLizardDocument>) {
+    const document = createLzlDocument(documentOverride);
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      document,
+      activeAgentId: 'reader-quiet',
+      agents: [
+        {
+          id: 'reader-quiet',
+          name: '静かな読者',
+          role: '余韻を読む',
+          systemPrompt: '余韻を中心に読んでください。',
+          model: null,
+          temperature: 0.7,
+          createdAt: '2026-05-02T00:00:00.000Z',
+          updatedAt: '2026-05-02T00:00:00.000Z',
+          builtIn: true,
+        },
+      ],
+      agentsLoaded: true,
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+        contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 10 },
+        editorTweaks: {
+          typeface: 'serif',
+          bodyFontSize: 17,
+          lineHeight: 1.95,
+          paperWarmth: 50,
+          analysisPanelMode: 'side',
+        },
+      },
+    });
+    return document;
+  }
+
+  it('requestAnalysisRun は対象段落数とコンテキスト見積もりを pendingAnalysisRun に格納する', () => {
+    const runAnalysis = vi.fn();
+    const createAnalysisGeneration = vi.fn();
+    window.litelizard = createBridge({ runAnalysis, createAnalysisGeneration });
+    setupReadyState();
+
+    useAppStore.getState().requestAnalysisRun();
+
+    const pending = useAppStore.getState().pendingAnalysisRun;
+    expect(pending).not.toBeNull();
+    expect(pending?.targetParagraphIds).toEqual(['p1', 'p2']);
+    expect(pending?.estimate.targetCount).toBe(2);
+    expect(pending?.estimate.targetTextChars).toBeGreaterThan(0);
+    expect(pending?.estimate.totalInputChars).toBeGreaterThan(pending?.estimate.targetTextChars ?? 0);
+    expect(pending?.estimate.estimatedOutputChars).toBeGreaterThan(0);
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(createAnalysisGeneration).not.toHaveBeenCalled();
+  });
+
+  it('requestAnalysisRun は lastN 設定で contextTextChars を縮める', () => {
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+    setupReadyState({
+      paragraphs: [
+        {
+          id: 'p1',
+          chapterId: 'c1',
+          order: 1,
+          light: { text: '一段落目はやや長めの文章でコンテキストとして利用される。' },
+          lizard: { status: 'complete', deepMeaning: 'done', emotion: [], theme: [], confidence: 0.8, analyzedAt: '2026-04-12T00:00:00.000Z' },
+        },
+        {
+          id: 'p2',
+          chapterId: 'c1',
+          order: 2,
+          light: { text: '二段落目はさらに長いコンテキスト本文として候補に入る。' },
+          lizard: { status: 'complete', deepMeaning: 'done', emotion: [], theme: [], confidence: 0.8, analyzedAt: '2026-04-12T00:00:00.000Z' },
+        },
+        {
+          id: 'p3',
+          chapterId: 'c1',
+          order: 3,
+          light: { text: '対象の段落本文。' },
+          lizard: { status: 'stale' },
+        },
+      ],
+    });
+
+    useAppStore.setState((state) => ({
+      analysisSettings: {
+        ...state.analysisSettings,
+        contextPolicy: { scope: 'document', limitMode: 'none', lastN: 999 },
+      },
+    }));
+    useAppStore.getState().requestAnalysisRun();
+    const noneEstimate = useAppStore.getState().pendingAnalysisRun?.estimate;
+    expect(noneEstimate).toBeDefined();
+
+    useAppStore.setState((state) => ({
+      analysisSettings: {
+        ...state.analysisSettings,
+        contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 1 },
+      },
+      pendingAnalysisRun: null,
+    }));
+    useAppStore.getState().requestAnalysisRun();
+    const lastNEstimate = useAppStore.getState().pendingAnalysisRun?.estimate;
+    expect(lastNEstimate).toBeDefined();
+
+    expect(lastNEstimate!.contextTextChars).toBeLessThan(noneEstimate!.contextTextChars);
+    expect(lastNEstimate!.totalInputChars).toBeLessThan(noneEstimate!.totalInputChars);
+  });
+
+  it('requestAnalysisRun は対象0件でも pendingAnalysisRun を立てずに summary を返す', () => {
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+    setupReadyState({
+      paragraphs: createLzlDocument().paragraphs.map((paragraph) => ({
+        ...paragraph,
+        lizard: {
+          status: 'complete',
+          deepMeaning: 'done',
+          emotion: [],
+          theme: [],
+          confidence: 0.8,
+          analyzedAt: '2026-04-12T00:00:00.000Z',
+        },
+      })),
+    });
+
+    useAppStore.getState().requestAnalysisRun();
+
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(useAppStore.getState().analysisRunSummary).toEqual({
+      targetCount: 0,
+      successCount: 0,
+      failureCount: 0,
+    });
+    expect(runAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('requestAnalysisRun は provider 未設定なら pendingAnalysisRun を立てない', () => {
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+    setupReadyState();
+    useAppStore.setState((state) => ({
+      analysisSettings: {
+        ...state.analysisSettings,
+        providers: {
+          ...state.analysisSettings.providers,
+          openai: { ...state.analysisSettings.providers.openai, apiKeyConfigured: false },
+        },
+      },
+    }));
+
+    useAppStore.getState().requestAnalysisRun();
+
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(runAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('cancelAnalysisRun は pendingAnalysisRun を null に戻し provider / generation を呼ばない', () => {
+    const runAnalysis = vi.fn();
+    const createAnalysisGeneration = vi.fn();
+    window.litelizard = createBridge({ runAnalysis, createAnalysisGeneration });
+    setupReadyState();
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun).not.toBeNull();
+
+    useAppStore.getState().cancelAnalysisRun();
+
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(createAnalysisGeneration).not.toHaveBeenCalled();
+    expect(useAppStore.getState().analysisHistoriesByParagraphId).toEqual({});
+    expect(useAppStore.getState().statusMessage).toBe('解析実行をキャンセルしました');
+  });
+
+  it('confirmAnalysisRun は pendingAnalysisRun を消費して runAnalysis を実行する', async () => {
+    const document = setupReadyState();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_confirm',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          emotion: ['静寂'],
+          theme: ['導入'],
+          deepMeaning: 'confirmed p1',
+          confidence: 0.8,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+        {
+          paragraphId: 'p2',
+          emotion: ['余韻'],
+          theme: ['展開'],
+          deepMeaning: 'confirmed p2',
+          confidence: 0.7,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+    window.litelizard = createBridge({ runAnalysis });
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun).not.toBeNull();
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(runAnalysis).toHaveBeenCalledTimes(1);
+    expect(useAppStore.getState().analysisRunSummary).toEqual({
+      targetCount: 2,
+      successCount: 2,
+      failureCount: 0,
+    });
+  });
+
+  it('confirmAnalysisRun は確認後に文書構造が変わった場合は実行しない', async () => {
+    const document = setupReadyState();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_confirm_target_only',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          emotion: ['静寂'],
+          theme: ['導入'],
+          deepMeaning: 'confirmed p1',
+          confidence: 0.8,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+        {
+          paragraphId: 'p2',
+          emotion: ['余韻'],
+          theme: ['展開'],
+          deepMeaning: 'confirmed p2',
+          confidence: 0.7,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+    window.litelizard = createBridge({ runAnalysis });
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun?.targetParagraphIds).toEqual(['p1', 'p2']);
+
+    useAppStore.setState((state) => ({
+      document: {
+        ...state.document!,
+        paragraphs: [
+          ...state.document!.paragraphs,
+          {
+            id: 'p3',
+            chapterId: 'c1',
+            order: 3,
+            light: { text: '確認後に増えた段落', charCount: 9 },
+            lizard: { status: 'stale' },
+          },
+        ],
+      },
+    }));
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(useAppStore.getState().document?.paragraphs.find((paragraph) => paragraph.id === 'p3')?.lizard.status).toBe(
+      'stale',
+    );
+    expect(useAppStore.getState().analysisRunSummary).toBeNull();
+    expect(useAppStore.getState().statusMessage).toBe(
+      '確認後に文書または本文が変更されたため、解析を開始しませんでした。もう一度確認してください。',
+    );
+  });
+
+  it('confirmAnalysisRun は確認後に別文書へ切り替わった場合は実行しない', async () => {
+    setupReadyState();
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun).not.toBeNull();
+
+    useAppStore.setState({
+      currentFilePath: '/projects/novel/other.lzl',
+      document: createLzlDocument({
+        documentId: 'doc_lzl_other',
+        title: 'other',
+        source: { format: 'lzl-v1', originPath: '/projects/novel/other.lzl' },
+      }),
+    });
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(useAppStore.getState().statusMessage).toBe(
+      '確認後に文書または本文が変更されたため、解析を開始しませんでした。もう一度確認してください。',
+    );
+  });
+
+  it('confirmAnalysisRun は確認後に本文が変わった場合は実行しない', async () => {
+    setupReadyState();
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun).not.toBeNull();
+
+    useAppStore.getState().updateParagraph('p1', '確認後に本文を変更した');
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(useAppStore.getState().statusMessage).toBe(
+      '確認後に文書または本文が変更されたため、解析を開始しませんでした。もう一度確認してください。',
+    );
+  });
+
+  it('pendingAnalysisRun が null のとき confirmAnalysisRun は何もしない', async () => {
+    const runAnalysis = vi.fn();
+    window.litelizard = createBridge({ runAnalysis });
+    setupReadyState();
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(runAnalysis).not.toHaveBeenCalled();
+  });
+});

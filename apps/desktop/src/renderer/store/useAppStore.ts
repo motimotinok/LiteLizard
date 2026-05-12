@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import {
   DEFAULT_ANALYSIS_SETTINGS,
+  estimateAnalysisCost,
+  type AnalysisCostEstimate,
   type AnalysisResult,
   type AnalysisRunInput,
   type AnalysisSettings,
@@ -45,6 +47,21 @@ export interface AnalysisRunSummary {
   targetCount: number;
   successCount: number;
   failureCount: number;
+}
+
+/**
+ * 全体解析の実行直前に確認ダイアログへ表示する pending state。
+ *
+ * 概算（estimate）は対象段落数・入力/出力文字数を含む。confirm されると pending を消費して
+ * 既存の `runAnalysis` フローに入り、cancel ではこの state を null に戻すだけで
+ * provider 呼び出しも analysis generation 更新も発生しない。
+ */
+export interface PendingAnalysisRun {
+  estimate: AnalysisCostEstimate;
+  documentId: string;
+  filePath: string | null;
+  documentSignature: string;
+  targetParagraphIds: string[];
 }
 
 export interface UndoSnapshot {
@@ -103,6 +120,7 @@ interface AppState {
   selectedPatternIndexByParagraphId: SelectedPatternIndexByParagraphId;
   generationSyncPending: boolean;
   analysisRunSummary: AnalysisRunSummary | null;
+  pendingAnalysisRun: PendingAnalysisRun | null;
   analysisSettings: AnalysisSettings;
   agents: ReadingAgent[];
   activeAgentId: string | null;
@@ -144,6 +162,9 @@ interface AppState {
   syncDocumentStructure: (input: DocumentStructureInput) => void;
   saveNow: () => Promise<void>;
   runAnalysis: () => Promise<void>;
+  requestAnalysisRun: () => void;
+  confirmAnalysisRun: () => Promise<void>;
+  cancelAnalysisRun: () => void;
   runAnalysisFor: (paragraphId: string) => Promise<void>;
   selectAnalysisPatternIndex: (paragraphId: string, patternIndex: number) => void;
   setEditorMode: (mode: EditorMode) => void;
@@ -217,6 +238,18 @@ function getAnalysisStructureSignature(document: LiteLizardDocument) {
     .map((paragraph) => `${paragraph.id}:${paragraph.order}:${paragraph.chapterId}`)
     .join('|');
   return `${document.documentId}::${chapterSignature}::${paragraphSignature}`;
+}
+
+function getAnalysisRunInputSignature(document: LiteLizardDocument, targetParagraphIds: string[]) {
+  const targetIdSet = new Set(targetParagraphIds);
+  const targetSignature = document.paragraphs
+    .filter((paragraph) => targetIdSet.has(paragraph.id))
+    .map((paragraph) => `${paragraph.id}:${paragraph.order}:${paragraph.chapterId}:${paragraph.light.text}`)
+    .join('|');
+  const contextSignature = document.paragraphs
+    .map((paragraph) => `${paragraph.id}:${paragraph.order}:${paragraph.chapterId}:${paragraph.light.text}`)
+    .join('|');
+  return `${getAnalysisStructureSignature(document)}::targets=${targetSignature}::context=${contextSignature}`;
 }
 
 function formatAnalysisRunSummary(prefix: string, summary: AnalysisRunSummary) {
@@ -304,6 +337,7 @@ export const useAppStore = create<AppState>((set, get) => {
     selectedPatternIndexByParagraphId: {} as SelectedPatternIndexByParagraphId,
     generationSyncPending: false,
     analysisRunSummary: null,
+    pendingAnalysisRun: null as PendingAnalysisRun | null,
   });
 
   const resetUndoState = () => ({
@@ -450,6 +484,183 @@ export const useAppStore = create<AppState>((set, get) => {
           state.currentAnalysisGeneration ?? (isGenerationManagedDocument(state.document, state.rootPath) ? 1 : null),
       };
     });
+  };
+
+  const runAnalysisForTargetIds = async (targetParagraphIds?: string[]) => {
+    const { document, analysisSettings, activeAgentId } = get();
+    if (!document) {
+      return;
+    }
+    if (!activeAgentId) {
+      set({ statusMessage: '分析エージェントを選択してください' });
+      return;
+    }
+
+    const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
+    if (!selectedProvider.runnable) {
+      set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
+      return;
+    }
+
+    if (!(await ensureGenerationReady(document))) {
+      return;
+    }
+
+    const targetIdSet = targetParagraphIds ? new Set(targetParagraphIds) : null;
+    const staleParagraphs = collectStaleParagraphs(document).filter(
+      (paragraph) => !targetIdSet || targetIdSet.has(paragraph.id),
+    );
+    if (staleParagraphs.length === 0) {
+      const summary = { targetCount: 0, successCount: 0, failureCount: 0 };
+      set({
+        analysisRunSummary: summary,
+        statusMessage: formatAnalysisRunSummary('再解析が必要な段落はありません', summary),
+      });
+      return;
+    }
+
+    const staleParagraphIdSet = new Set(staleParagraphs.map((paragraph) => paragraph.id));
+    const pendingDoc: LiteLizardDocument = {
+      ...document,
+      paragraphs: document.paragraphs.map((paragraph) =>
+        staleParagraphIdSet.has(paragraph.id)
+          ? {
+              ...paragraph,
+              lizard: { ...paragraph.lizard, status: 'pending' },
+            }
+          : paragraph
+      ),
+    };
+    set({ document: pendingDoc, analysisRunSummary: null, statusMessage: '全体解析を実行中...' });
+
+    const payload: AnalysisRunInput = {
+      documentId: document.documentId,
+      agentId: activeAgentId,
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      paragraphs: staleParagraphs.map((paragraph) => ({
+        paragraphId: paragraph.id,
+        order: paragraph.order,
+        text: paragraph.light.text,
+      })),
+      documentParagraphs: toAnalysisParagraphInput(document),
+    };
+
+    const rootPath = get().rootPath;
+    const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
+    const progressedParagraphIds = new Set<string>();
+    const analysisTargetSignature = getAnalysisStructureSignature(document);
+
+    const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
+      const state = get();
+      if (
+        !state.document ||
+        state.document.documentId !== document.documentId ||
+        state.generationSyncPending ||
+        getAnalysisStructureSignature(state.document) !== analysisTargetSignature
+      ) {
+        return;
+      }
+
+      progressedParagraphIds.add(paragraphId);
+
+      if (rootPath && document.source?.format === 'lzl-v1') {
+        const pattern = createStoredPattern(result, staleTextMap.get(paragraphId) ?? '');
+        window.litelizard
+          .saveAnalysisResult(rootPath, document.documentId, paragraphId, pattern)
+          .catch(() => {});
+        appendPatternToStore(paragraphId, pattern);
+        return;
+      }
+
+      appendPatternToStore(paragraphId, createStoredPattern(result, staleTextMap.get(paragraphId) ?? ''));
+    });
+
+    try {
+      const result = await window.litelizard.runAnalysis(payload);
+      result.results.forEach((analyzed) => {
+        if (!progressedParagraphIds.has(analyzed.paragraphId)) {
+          appendPatternToStore(
+            analyzed.paragraphId,
+            createStoredPattern(analyzed, staleTextMap.get(analyzed.paragraphId) ?? ''),
+          );
+        }
+      });
+
+      const succeededParagraphIds = new Set([
+        ...Array.from(progressedParagraphIds),
+        ...result.results.map((analyzed) => analyzed.paragraphId),
+      ]);
+      const summary = {
+        targetCount: staleParagraphs.length,
+        successCount: staleParagraphs.filter((paragraph) => succeededParagraphIds.has(paragraph.id)).length,
+        failureCount: staleParagraphs.filter((paragraph) => !succeededParagraphIds.has(paragraph.id)).length,
+      };
+
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((paragraph) =>
+              succeededParagraphIds.has(paragraph.id)
+                ? {
+                    ...paragraph,
+                    lizard: {
+                      ...paragraph.lizard,
+                      requestId: result.requestId,
+                    },
+                  }
+                : staleTextMap.has(paragraph.id)
+                  ? {
+                      ...paragraph,
+                      lizard: {
+                        status: 'failed',
+                        error: {
+                          code: 'ANALYSIS_PARTIAL_FAILURE',
+                          message: '解析結果が返りませんでした。',
+                        },
+                      },
+                    }
+                  : paragraph,
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+          dirty: true,
+          analysisRunSummary: summary,
+          statusMessage: formatAnalysisRunSummary('全体解析が完了しました', summary),
+        };
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Analysis failed';
+      const successCount = staleParagraphs.filter((paragraph) =>
+        progressedParagraphIds.has(paragraph.id),
+      ).length;
+      const summary = {
+        targetCount: staleParagraphs.length,
+        successCount,
+        failureCount: staleParagraphs.length - successCount,
+      };
+      set((state) => {
+        if (!state.document) return {};
+        return {
+          document: {
+            ...state.document,
+            paragraphs: state.document.paragraphs.map((p) =>
+              staleTextMap.has(p.id) && p.lizard.status === 'pending'
+                ? { ...p, lizard: { status: 'failed', error: { code: 'ANALYSIS_ABORTED', message } } }
+                : p
+            ),
+          },
+          // progress で complete になった段落があれば保存が必要
+          dirty: true,
+          analysisRunSummary: summary,
+          statusMessage: formatAnalysisRunSummary(`解析に失敗しました: ${message}`, summary),
+        };
+      });
+    } finally {
+      unsubscribe();
+    }
   };
 
   return ({
@@ -1068,8 +1279,10 @@ export const useAppStore = create<AppState>((set, get) => {
     }
   },
 
-  runAnalysis: async () => {
-    const { document, analysisSettings, activeAgentId } = get();
+  runAnalysis: () => runAnalysisForTargetIds(),
+
+  requestAnalysisRun: () => {
+    const { document, analysisSettings, activeAgentId, agents, dirty, generationSyncPending } = get();
     if (!document) {
       return;
     }
@@ -1084,7 +1297,11 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
-    if (!(await ensureGenerationReady(document))) {
+    if (generationSyncPending && dirty) {
+      set({
+        statusMessage:
+          '構造変更の保存が完了していないため、解析を開始できません。保存完了後に再実行してください。',
+      });
       return;
     }
 
@@ -1093,152 +1310,75 @@ export const useAppStore = create<AppState>((set, get) => {
       const summary = { targetCount: 0, successCount: 0, failureCount: 0 };
       set({
         analysisRunSummary: summary,
+        pendingAnalysisRun: null,
         statusMessage: formatAnalysisRunSummary('再解析が必要な段落はありません', summary),
       });
       return;
     }
 
-    const pendingDoc: LiteLizardDocument = {
-      ...document,
-      paragraphs: document.paragraphs.map((paragraph) =>
-        paragraph.lizard.status === 'stale'
-          ? {
-              ...paragraph,
-              lizard: { ...paragraph.lizard, status: 'pending' },
-            }
-          : paragraph
-      ),
-    };
-    set({ document: pendingDoc, analysisRunSummary: null, statusMessage: '全体解析を実行中...' });
-
-    const payload: AnalysisRunInput = {
-      documentId: document.documentId,
-      agentId: activeAgentId,
-      personaMode: document.personaMode,
-      promptVersion: 'v1.0.0',
-      paragraphs: staleParagraphs.map((paragraph) => ({
-        paragraphId: paragraph.id,
-        order: paragraph.order,
-        text: paragraph.light.text,
+    const activeAgent = agents.find((agent) => agent.id === activeAgentId) ?? null;
+    const estimate = estimateAnalysisCost({
+      targetParagraphs: staleParagraphs.map((p) => ({
+        paragraphId: p.id,
+        text: p.light.text,
+        chapterId: p.chapterId,
+        order: p.order,
       })),
-      documentParagraphs: toAnalysisParagraphInput(document),
-    };
-
-    const rootPath = get().rootPath;
-    const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
-    const progressedParagraphIds = new Set<string>();
-    const analysisTargetSignature = getAnalysisStructureSignature(document);
-
-    const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
-      const state = get();
-      if (
-        !state.document ||
-        state.document.documentId !== document.documentId ||
-        state.generationSyncPending ||
-        getAnalysisStructureSignature(state.document) !== analysisTargetSignature
-      ) {
-        return;
-      }
-
-      progressedParagraphIds.add(paragraphId);
-
-      if (rootPath && document.source?.format === 'lzl-v1') {
-        const pattern = createStoredPattern(result, staleTextMap.get(paragraphId) ?? '');
-        window.litelizard
-          .saveAnalysisResult(rootPath, document.documentId, paragraphId, pattern)
-          .catch(() => {});
-        appendPatternToStore(paragraphId, pattern);
-        return;
-      }
-
-      appendPatternToStore(paragraphId, createStoredPattern(result, staleTextMap.get(paragraphId) ?? ''));
+      documentParagraphs: document.paragraphs.map((p) => ({
+        paragraphId: p.id,
+        text: p.light.text,
+        chapterId: p.chapterId,
+        order: p.order,
+      })),
+      contextPolicy: analysisSettings.contextPolicy,
+      agent: activeAgent
+        ? {
+            name: activeAgent.name,
+            role: activeAgent.role,
+            systemPrompt: activeAgent.systemPrompt,
+          }
+        : null,
     });
 
-    try {
-      const result = await window.litelizard.runAnalysis(payload);
-      result.results.forEach((analyzed) => {
-        if (!progressedParagraphIds.has(analyzed.paragraphId)) {
-          appendPatternToStore(
-            analyzed.paragraphId,
-            createStoredPattern(analyzed, staleTextMap.get(analyzed.paragraphId) ?? ''),
-          );
-        }
-      });
+    set({
+      pendingAnalysisRun: {
+        estimate,
+        documentId: document.documentId,
+        filePath: get().currentFilePath,
+        documentSignature: getAnalysisRunInputSignature(document, staleParagraphs.map((p) => p.id)),
+        targetParagraphIds: staleParagraphs.map((p) => p.id),
+      },
+      statusMessage: '解析実行の確認をお待ちしています',
+    });
+  },
 
-      const succeededParagraphIds = new Set([
-        ...Array.from(progressedParagraphIds),
-        ...result.results.map((analyzed) => analyzed.paragraphId),
-      ]);
-      const summary = {
-        targetCount: staleParagraphs.length,
-        successCount: staleParagraphs.filter((paragraph) => succeededParagraphIds.has(paragraph.id)).length,
-        failureCount: staleParagraphs.filter((paragraph) => !succeededParagraphIds.has(paragraph.id)).length,
-      };
-
-      set((state) => {
-        if (!state.document) return {};
-        return {
-          document: {
-            ...state.document,
-            paragraphs: state.document.paragraphs.map((paragraph) =>
-              succeededParagraphIds.has(paragraph.id)
-                ? {
-                    ...paragraph,
-                    lizard: {
-                      ...paragraph.lizard,
-                      requestId: result.requestId,
-                    },
-                  }
-                : staleTextMap.has(paragraph.id)
-                  ? {
-                      ...paragraph,
-                      lizard: {
-                        status: 'failed',
-                        error: {
-                          code: 'ANALYSIS_PARTIAL_FAILURE',
-                          message: '解析結果が返りませんでした。',
-                        },
-                      },
-                    }
-                : paragraph,
-            ),
-            updatedAt: new Date().toISOString(),
-          },
-          dirty: true,
-          analysisRunSummary: summary,
-          statusMessage: formatAnalysisRunSummary('全体解析が完了しました', summary),
-        };
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Analysis failed';
-      const successCount = staleParagraphs.filter((paragraph) =>
-        progressedParagraphIds.has(paragraph.id),
-      ).length;
-      const summary = {
-        targetCount: staleParagraphs.length,
-        successCount,
-        failureCount: staleParagraphs.length - successCount,
-      };
-      set((state) => {
-        if (!state.document) return {};
-        return {
-          document: {
-            ...state.document,
-            paragraphs: state.document.paragraphs.map((p) =>
-              p.lizard.status === 'pending'
-                ? { ...p, lizard: { status: 'failed', error: { code: 'ANALYSIS_ABORTED', message } } }
-                : p
-            ),
-          },
-          // progress で complete になった段落があれば保存が必要
-          dirty: true,
-          analysisRunSummary: summary,
-          statusMessage: formatAnalysisRunSummary(`解析に失敗しました: ${message}`, summary),
-        };
-      });
-    } finally {
-      unsubscribe();
+  confirmAnalysisRun: async () => {
+    const pending = get().pendingAnalysisRun;
+    if (!pending) {
+      return;
     }
+    const { document, currentFilePath } = get();
+    if (
+      !document ||
+      document.documentId !== pending.documentId ||
+      currentFilePath !== pending.filePath ||
+      getAnalysisRunInputSignature(document, pending.targetParagraphIds) !== pending.documentSignature
+    ) {
+      set({
+        pendingAnalysisRun: null,
+        statusMessage: '確認後に文書または本文が変更されたため、解析を開始しませんでした。もう一度確認してください。',
+      });
+      return;
+    }
+    set({ pendingAnalysisRun: null });
+    await runAnalysisForTargetIds(pending.targetParagraphIds);
+  },
+
+  cancelAnalysisRun: () => {
+    if (!get().pendingAnalysisRun) {
+      return;
+    }
+    set({ pendingAnalysisRun: null, statusMessage: '解析実行をキャンセルしました' });
   },
 
   runAnalysisFor: async (paragraphId: string) => {
