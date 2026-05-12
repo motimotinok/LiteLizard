@@ -9,6 +9,15 @@ import { buildAppMenu } from './menu.js';
 
 let mainWindow: BrowserWindow | null = null;
 
+type PackagedSmokeResult = {
+  hasRoot: boolean;
+  hasPreloadBridge: boolean;
+  rootText: string;
+  url: string;
+};
+
+const packagedSmokeEnabled = process.env.LITELIZARD_PACKAGED_SMOKE === '1';
+
 function resolvePreloadPath() {
   const currentFile = fileURLToPath(import.meta.url);
   const candidates = [
@@ -64,6 +73,9 @@ function createMainWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[Main] did-finish-load url:', mainWindow?.webContents.getURL());
+    if (packagedSmokeEnabled) {
+      void runPackagedSmoke(mainWindow);
+    }
   });
 
   mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
@@ -81,6 +93,41 @@ function createMainWindow() {
   });
 
   return mainWindow;
+}
+
+async function runPackagedSmoke(window: BrowserWindow | null) {
+  if (!window || window.isDestroyed()) {
+    console.error('[Smoke] failed: main window is not available');
+    app.exit(1);
+    return;
+  }
+
+  try {
+    const result = (await window.webContents.executeJavaScript(
+      `(() => ({
+        hasRoot: Boolean(document.getElementById('root')?.childElementCount),
+        hasPreloadBridge:
+          window.__litelizardPreloadSmoke === 'ipc' &&
+          Boolean(window.litelizard) &&
+          typeof window.litelizard.openFolder === 'function',
+        rootText: document.body.innerText.slice(0, 200),
+        url: window.location.href
+      }))()`,
+      true
+    )) as PackagedSmokeResult;
+
+    if (!result.hasRoot || !result.hasPreloadBridge) {
+      console.error('[Smoke] failed:', JSON.stringify(result));
+      app.exit(1);
+      return;
+    }
+
+    console.log('[Smoke] packaged app ready:', JSON.stringify(result));
+    app.exit(0);
+  } catch (error) {
+    console.error('[Smoke] failed:', error);
+    app.exit(1);
+  }
 }
 
 function getUsableMainWindow() {

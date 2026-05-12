@@ -1,9 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist/preload",
     "rootDir": "src/preload",
     "types": ["node", "electron"],
+    "noEmit": true,
     "declaration": false
   },
   "include": ["src/preload/**/*.ts", "src/preload/**/*.cts"],
