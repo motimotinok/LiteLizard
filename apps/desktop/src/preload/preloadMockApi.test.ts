@@ -1,4 +1,4 @@
-import type { ParagraphAnalysisPattern } from '@litelizard/shared';
+import { DEFAULT_ANALYSIS_SETTINGS, type ParagraphAnalysisPattern } from '@litelizard/shared';
 import { describe, expect, it } from 'vitest';
 import { createMockPreloadApi } from './preloadMockApi.js';
 import { mockRootPath } from './preloadMockData.js';
@@ -74,6 +74,28 @@ describe('createMockPreloadApi', () => {
     expect(settings.localLlm.configured).toBe(true);
   });
 
+  it('旧 Anthropic 既定モデルは mock preload でも Claude Haiku 4.5 の API ID に移行する', async () => {
+    const api = createMockPreloadApi();
+
+    await api.saveAnalysisSettings({
+      defaultProvider: 'anthropic',
+      providers: {
+        openai: { defaultModel: 'gpt-4.1-mini' },
+        anthropic: { defaultModel: 'claude-haiku-4-5' },
+      },
+      localLlm: {
+        endpoint: 'http://127.0.0.1:11434',
+        defaultModel: 'llama3.2',
+      },
+    });
+
+    const settings = await api.loadAnalysisSettings();
+
+    expect(settings.providers.anthropic.defaultModel).toBe(
+      DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel,
+    );
+  });
+
   it('editor tweaks を保存して再読込できる', async () => {
     const api = createMockPreloadApi();
 
@@ -81,7 +103,7 @@ describe('createMockPreloadApi', () => {
       defaultProvider: 'openai',
       providers: {
         openai: { defaultModel: 'gpt-4o-mini' },
-        anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+        anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
       },
       localLlm: {
         endpoint: 'http://127.0.0.1:11434',

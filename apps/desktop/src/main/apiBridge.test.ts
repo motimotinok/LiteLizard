@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AnalysisResult, AnalysisRunInput, ReadingAgent } from '@litelizard/shared';
 import { dryRunReadingAgent, runAnalysis } from './apiBridge.js';
 import {
+  ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
   buildContextTexts,
   createLocalLlmAnalysisProvider,
   normalizeAnalysisPayload,
@@ -190,6 +191,7 @@ describe('createLocalLlmAnalysisProvider', () => {
     const requestBody = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
       model: string;
       prompt: string;
+      format: unknown;
       stream: boolean;
       keep_alive: string;
       options: { temperature: number };
@@ -200,6 +202,7 @@ describe('createLocalLlmAnalysisProvider', () => {
       keep_alive: '30s',
       options: { temperature: 0.2 },
     });
+    expect(requestBody.format).toEqual(ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA);
     expect(requestBody.prompt).toContain('Context paragraphs');
     expect(requestBody.prompt).toContain('余韻を中心に読んでください。');
     expect(requestBody.prompt).toContain('旅立ちの朝');

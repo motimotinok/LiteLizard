@@ -6,6 +6,9 @@ playwright-report
 .vscode
 .DS_Store
 *.log
+.env
+.env.*
+!.env.example
 apps/api/data
 .pnpm-store
 *.tsbuildinfo

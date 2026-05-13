@@ -32,8 +32,21 @@ interface MockState {
   activeReadingAgentId: string | null;
 }
 
+const LEGACY_ANTHROPIC_DEFAULT_MODELS = new Set([
+  'claude-3-5-sonnet-latest',
+  'claude-haiku-4-5',
+]);
+
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function normalizeAnthropicDefaultModel(input: string) {
+  const model = input.trim();
+  if (!model || LEGACY_ANTHROPIC_DEFAULT_MODELS.has(model)) {
+    return DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel;
+  }
+  return model;
 }
 
 function normalizePath(value: string) {
@@ -633,8 +646,7 @@ export function createMockPreloadApi(): BridgeApi {
           },
           anthropic: {
             ...state.analysisSettings.providers.anthropic,
-            defaultModel:
-              input.providers.anthropic.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel,
+            defaultModel: normalizeAnthropicDefaultModel(input.providers.anthropic.defaultModel),
           },
         },
         localLlm: {

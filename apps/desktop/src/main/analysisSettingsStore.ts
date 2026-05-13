@@ -23,6 +23,10 @@ const MIN_LINE_HEIGHT = 1.4;
 const MAX_LINE_HEIGHT = 2.4;
 const MIN_PAPER_WARMTH = 0;
 const MAX_PAPER_WARMTH = 100;
+const LEGACY_ANTHROPIC_DEFAULT_MODELS = new Set([
+  'claude-3-5-sonnet-latest',
+  'claude-haiku-4-5',
+]);
 
 function cloneDefaultSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
@@ -52,6 +56,14 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
     return fallback;
   }
   return Math.min(Math.max(value, min), max);
+}
+
+function normalizeAnthropicDefaultModel(input?: string | null) {
+  const model = input?.trim();
+  if (!model || LEGACY_ANTHROPIC_DEFAULT_MODELS.has(model)) {
+    return DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel;
+  }
+  return model;
 }
 
 function normalizeEditorTweaks(input?: Partial<EditorTweaks> | null): EditorTweaks {
@@ -105,8 +117,7 @@ function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): Analy
         defaultModel: input?.providers?.openai?.defaultModel?.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel,
       },
       anthropic: {
-        defaultModel:
-          input?.providers?.anthropic?.defaultModel?.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel,
+        defaultModel: normalizeAnthropicDefaultModel(input?.providers?.anthropic?.defaultModel),
       },
     },
     localLlm: {
