@@ -34,5 +34,6 @@ PROJECTMEMORY/
 .claude/agent-memory-local
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.playwright-mcp
 開発コマンド.md
 knowledge.md
