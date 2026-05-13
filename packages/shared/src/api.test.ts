@@ -23,7 +23,7 @@ describe('ReadingAgent schemas', () => {
       name: '担当編集',
       role: '売り・引っかかりを評価',
       systemPrompt: 'あなたは担当編集として、読者がつまずく点を指摘します。',
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-4-5-20251001',
       temperature: 0.4,
     };
 

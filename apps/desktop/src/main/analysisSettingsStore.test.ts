@@ -33,7 +33,46 @@ describe('mergeAnalysisSettings', () => {
     const merged = mergeAnalysisSettings(undefined, { openai: false, anthropic: false });
 
     expect(merged.providers.openai.defaultModel).toBe(DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel);
+    expect(merged.providers.anthropic.defaultModel).toBe(DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel);
     expect(merged.localLlm.endpoint).toBe(DEFAULT_ANALYSIS_SETTINGS.localLlm.endpoint);
+  });
+
+  it('旧 Anthropic 既定モデルは Claude Haiku 4.5 の API ID に移行する', () => {
+    const merged = mergeAnalysisSettings(
+      {
+        defaultProvider: 'anthropic',
+        providers: {
+          openai: { defaultModel: 'gpt-4o-mini' },
+          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+        },
+        localLlm: {
+          endpoint: 'http://127.0.0.1:11434',
+          defaultModel: 'llama3.2',
+        },
+      },
+      { openai: false, anthropic: false },
+    );
+
+    expect(merged.providers.anthropic.defaultModel).toBe(DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel);
+  });
+
+  it('短い Anthropic placeholder 値は Claude Haiku 4.5 の API ID に移行する', () => {
+    const merged = mergeAnalysisSettings(
+      {
+        defaultProvider: 'anthropic',
+        providers: {
+          openai: { defaultModel: 'gpt-4o-mini' },
+          anthropic: { defaultModel: 'claude-haiku-4-5' },
+        },
+        localLlm: {
+          endpoint: 'http://127.0.0.1:11434',
+          defaultModel: 'llama3.2',
+        },
+      },
+      { openai: false, anthropic: false },
+    );
+
+    expect(merged.providers.anthropic.defaultModel).toBe(DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel);
   });
 
   it('ローカル LLM 設定は空文字で解除できる', () => {
@@ -42,7 +81,7 @@ describe('mergeAnalysisSettings', () => {
         defaultProvider: 'local-llm',
         providers: {
           openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: {
           endpoint: '',
@@ -69,7 +108,7 @@ describe('mergeAnalysisSettings', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://x', defaultModel: 'm' },
         contextPolicy: { scope: 'chapter', limitMode: 'lastN', lastN: 3 },
@@ -86,7 +125,7 @@ describe('mergeAnalysisSettings', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://x', defaultModel: 'm' },
         contextPolicy: {
@@ -116,7 +155,7 @@ describe('mergeAnalysisSettings', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://x', defaultModel: 'm' },
         editorTweaks: {
@@ -145,7 +184,7 @@ describe('mergeAnalysisSettings', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://x', defaultModel: 'm' },
         editorTweaks: {

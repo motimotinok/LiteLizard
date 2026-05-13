@@ -313,7 +313,7 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
                   type="text"
                   className="settings-input"
                   value={settingsDraft.anthropicModel}
-                  placeholder="claude-haiku-4-5"
+                  placeholder="claude-haiku-4-5-20251001"
                   onChange={(event) =>
                     setSettingsDraft((current) => ({
                       ...current,

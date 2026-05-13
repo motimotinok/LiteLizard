@@ -34,7 +34,7 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
       defaultProvider: 'openai',
       providers: {
         openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-        anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+        anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
       },
       localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
     }),
@@ -134,7 +134,7 @@ describe('useAppStore project startup flow', () => {
       defaultProvider: 'openai',
       providers: {
         openai: { defaultModel: 'gpt-4o-mini' },
-        anthropic: { defaultModel: 'claude-3-5-sonnet-latest' },
+        anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
       },
       localLlm: {
         endpoint: 'http://127.0.0.1:11434',
@@ -526,7 +526,7 @@ describe('useAppStore L-06 analysis state', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
       },
@@ -575,7 +575,7 @@ describe('useAppStore L-06 analysis state', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
       },
@@ -613,7 +613,7 @@ describe('useAppStore L-06 analysis state', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
       },
@@ -685,7 +685,7 @@ describe('useAppStore L-06 analysis state', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
       },
@@ -745,7 +745,7 @@ describe('useAppStore L-06 analysis state', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
       },
@@ -949,7 +949,7 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
         defaultProvider: 'openai',
         providers: {
           openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
-          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-3-5-sonnet-latest' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
         contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 10 },

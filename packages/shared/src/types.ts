@@ -259,7 +259,7 @@ export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
     },
     anthropic: {
       apiKeyConfigured: false,
-      defaultModel: 'claude-3-5-sonnet-latest',
+      defaultModel: 'claude-haiku-4-5-20251001',
     },
   },
   localLlm: {

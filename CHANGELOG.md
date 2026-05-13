@@ -1,3 +1,9 @@
+[2026/05/13]Anthropic 既定分析モデルを Claude Haiku 4.5 に更新
+Settings の API キー登録/分析設定画面で Anthropic の既定モデルが旧値のまま表示される原因が、共有既定設定 `DEFAULT_ANALYSIS_SETTINGS` と保存済み analysis settings の旧値維持にあったため、既定モデルを `claude-haiku-4-5-20251001` に更新し、旧既定値 `claude-3-5-sonnet-latest` と短い placeholder `claude-haiku-4-5` は読み込み/保存時に新 API ID へ移行するようにした。検証: `pnpm --filter @litelizard/desktop test -- analysisSettingsStore preloadMockApi`、`pnpm --filter @litelizard/shared test -- api`、`pnpm -w lint`、`pnpm -w test`、`pnpm -w build` 成功。
+
+[2026/05/13]LLM provider 返却用 JSON schema の共通化
+OpenAI structured output と local-llm / Ollama `format` が同じ `emotion` / `theme` / `deepMeaning` / `confidence` の provider 返却用 schema を使うようにし、Ollama には schema 指定後も既存の JSON parse / normalize 経路を残した。検証: `pnpm --filter @litelizard/desktop test -- apiBridge`、`pnpm -w lint`、`pnpm -w test`、`pnpm -w build` 成功。実 API は OpenAI `gpt-4.1-nano`、Anthropic `claude-haiku-4-5-20251001`、local-llm `gemma4:e2b` で成功。
+
 [2026/05/13]公開前プライバシー・セキュリティ文書の正確性確認
 `README.md` / `PRIVACY.md` / `SECURITY.md` を現行実装と MVP 公開方針に合わせ、テキスト import/export、Reading Agent dry-run、Local LLM の API キー非使用、未署名 `.dmg` 配布と署名・notarization・自動更新の MVP 後対応を正確に記述した。
 

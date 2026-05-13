@@ -33,6 +33,18 @@ export interface ResolvedAnalysisProvider {
 
 type SecretMap = Partial<Record<AnalysisProviderId | string, string>>;
 
+export const ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
+  properties: {
+    emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+    theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+    deepMeaning: { type: 'string', maxLength: 1000 },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+  },
+} as const;
+
 function normalizeArray(input: unknown): string[] {
   if (!Array.isArray(input)) {
     return [];
@@ -138,17 +150,7 @@ export function createOpenAiAnalysisProvider(apiKey: string): AnalysisProvider {
             format: {
               type: 'json_schema',
               name: 'litelizard_analysis',
-              schema: {
-                type: 'object',
-                additionalProperties: false,
-                required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
-                properties: {
-                  emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-                  theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-                  deepMeaning: { type: 'string', maxLength: 1000 },
-                  confidence: { type: 'number', minimum: 0, maximum: 1 },
-                },
-              },
+              schema: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
             },
           },
         });
@@ -256,6 +258,7 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
           body: JSON.stringify({
             model: input.model,
             prompt,
+            format: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
             stream: false,
             keep_alive: '30s',
             options: {
