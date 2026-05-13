@@ -889,6 +889,7 @@ button {
   padding-top: var(--top-pad);
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 .analysis-overlay-mode .analysis-shell {
@@ -1144,23 +1145,54 @@ button {
   background: color-mix(in oklch, var(--paper-soft) 70%, transparent);
 }
 
+.analysis-run-confirm-overlay {
+  position: absolute;
+  inset: var(--top-pad) 0 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.analysis-run-confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--ink-1) 18%, transparent);
+  pointer-events: auto;
+}
+
 .analysis-run-confirm {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  background: color-mix(in oklch, var(--paper-soft) 80%, transparent);
+  border-radius: 6px;
+  background: var(--paper);
   font-family: var(--mono);
+  width: min(100%, 320px);
+  max-height: 100%;
+  overflow-y: auto;
+  box-shadow: 0 12px 28px -16px rgba(40, 30, 20, 0.45);
+  pointer-events: auto;
   font-size: 11px;
   color: var(--ink-2);
 }
 
 .analysis-run-confirm-header {
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-1);
+}
+
+.analysis-run-confirm-lead {
+  margin: 0;
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.5;
 }
 
 .analysis-run-confirm-list {

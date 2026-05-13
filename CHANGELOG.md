@@ -1,3 +1,6 @@
+[2026/05/14]分析実行前確認ダイアログを overlay 化し文言を整理
+公開前手動確認で、分析ボタン押下後に表示される確認 UI で「実行する」ボタンが `.analysis-shell { overflow: hidden }` に押し出されて見えず、内部寄りの「コンテキスト本文量」「概算 output 量」などの文言がユーザーに伝わりにくかった問題を解消した。確認ダイアログを `AnalysisRunConfirm` という props 駆動コンポーネントに切り出し、`AnalysisPane` の header 内ではなく `.analysis-shell` 直下の overlay として描画。半透明 backdrop と最大高制限内スクロールで小さいウィンドウでも操作不能にならないようにし、文言を「解析する段落 / 段落本文 / 前後の文脈 / 送信量(概算) / 応答量(概算)」に置き換え、リード文と注意書きを追加した。SSR テスト 4 件で wording、overlay 構造、ロケール表示を固定。検証: `pnpm -w lint`、`pnpm -w test`（desktop 277 件、shared 57 件、api 4 件、e2e 6 skipped）、`pnpm -w build` 成功。残課題: Electron 実機での GUI 手動確認は未実施（公開前検証チェックリストで吸収）。
+
 [2026/05/13]Anthropic 既定分析モデルを Claude Haiku 4.5 に更新
 Settings の API キー登録/分析設定画面で Anthropic の既定モデルが旧値のまま表示される原因が、共有既定設定 `DEFAULT_ANALYSIS_SETTINGS` と保存済み analysis settings の旧値維持にあったため、既定モデルを `claude-haiku-4-5-20251001` に更新し、旧既定値 `claude-3-5-sonnet-latest` と短い placeholder `claude-haiku-4-5` は読み込み/保存時に新 API ID へ移行するようにした。検証: `pnpm --filter @litelizard/desktop test -- analysisSettingsStore preloadMockApi`、`pnpm --filter @litelizard/shared test -- api`、`pnpm -w lint`、`pnpm -w test`、`pnpm -w build` 成功。
 
