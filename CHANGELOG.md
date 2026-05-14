@@ -1,3 +1,24 @@
+[2026/05/14]プロジェクトフォルダ選択の安全確認
+フォルダ選択ダイアログで新規フォルダ作成を可能にし、macOS のシステム領域や LiteLizard 内部フォルダを作業場所として拒否して、日本語の理由を表示するようにした。検証: projectManager / ipc / ProjectSetupScreen / useAppStore の追加テスト成功。残課題: Electron 実機の folder picker GUI 確認は未実施。
+
+[2026/05/14]MVP公開前チェックリストを docs/release-checklist.md に整理
+LLM が CLI で実行できる自動検証 (`pnpm -w lint` / `test` / `build` / `package:mac` / `smoke:package:mac` / `package:mac:dmg`)、人間が macOS GUI で実行する手動確認 (インストール導線、初回フォルダ選択、段落 DnD、テキストエクスポート、分析実行 overlay、終了/再起動)、公開判断として人間に残る未決事項 (Apple Developer ID 署名 / notarization、自動更新、ランディングページ、Windows / Linux 配布、アプリアイコン #95、Electron E2E 起動 `SIGABRT`、`docs/tickets/2026-05-13-project-folder-selection-safety.md`) を 1 ファイルに分けて整理し、README の Packaging セクション末尾から参照リンクを追加した。検証: `pnpm -w lint` / `pnpm -w test`（desktop 279、shared 57、api 4、e2e 6 skipped）/ `pnpm -w build` / `pnpm --filter @litelizard/desktop package:mac` / `smoke:package:mac` 成功。残課題: 手動 GUI 確認は LLM 側では実施せず、公開判断時に人間が通す前提。
+
+[2026/05/14]本文エディタ段落DnDハンドルの初期表示を修正
+Lexical 初期状態から段落構造を即時 snapshot 化して本文段落の DnD ハンドルを初期表示し、portal 配下でも見える配置に直した。検証: `pnpm --filter @litelizard/desktop test -- EditorPane.logic`、`pnpm --filter @litelizard/desktop test -- useAppStore documentOps`、`pnpm -w lint` / `pnpm -w test`（e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron E2E は既存の Electron `SIGABRT` で起動できず、実 GUI ドラッグ確認は未実施。
+
+[2026/05/14]フォルダ選択直後の起動画面残りを修正
+起動時の前回フォルダ復元が遅れて完了しても、手動で開いたフォルダの ready 状態を古い復元結果で上書きしないようにし、準備中画面には現在の状態メッセージを表示するようにした。検証: `pnpm --filter @litelizard/desktop test -- useAppStore`、`pnpm -w lint`、`pnpm -w test`（e2e 6 skipped）、`pnpm -w build` 成功。残課題: Electron 実機でのフォルダ選択 GUI 確認は未実施。
+
+[2026/05/14]README に未署名 macOS DMG のインストール手順を追加
+MVP 公開版の未署名 `.dmg` について、GitHub Releases からのダウンロード、Applications へのコピー、Gatekeeper 警告への安全な対処、初回起動後の API キー / Local LLM 設定導線を README に追加し、SECURITY.md から該当手順へリンクした。検証: README / SECURITY / PRIVACY / DMG 生成済みチケットとの整合確認、`pnpm -w lint` / `pnpm -w test`（e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
+
+[2026/05/14]MVP公開用の未署名macOS dmg生成を整備
+MVP 公開で GitHub Releases に添付する macOS `.dmg` を生成できるよう、`apps/desktop/package.json` の `build.mac.target` に `dmg` を追加し、新スクリプト `package:mac:dmg`（`electron-builder --mac dmg --publish never`）で `apps/desktop/release/LiteLizard-<version>-<arch>.dmg`（例 `LiteLizard-0.1.0-arm64.dmg`、約 124MB）を出力できるようにした。`dmg.writeUpdateInfo: false` と `dmg.sign: false` を明示して未署名・自動更新なしの MVP 方針と整合させ、既存の smoke 用 `package:mac`（`--mac dir`）と役割を分離。`README.md` の Packaging セクションを両コマンド・出力パス・GitHub Releases 想定ファイル名で書き直し、`smoke-packaged-mac.mjs` の timeout を 30s → 60s（`LITELIZARD_SMOKE_TIMEOUT_MS` で上書き可能）に伸ばした。検証: `pnpm --filter @litelizard/desktop package:mac:dmg` 成功（`.dmg` と `.app` を確認）、`package:mac`（dir のみ）も release クリーン後に成功、`smoke:package:mac` で `[Smoke] packaged app ready: {"hasRoot":true,"hasPreloadBridge":true,...}` を確認、`pnpm -w lint` / `pnpm -w test`（desktop 277、shared 57、api 4、e2e 6 skipped）/ `pnpm -w build` 成功。残課題: ad-hoc 署名 `.app` を別ビルドで上書きすると macOS Keychain ダイアログが出て smoke harness の子プロセス終了が timeout することがあるため、CI 化する際は別途 smoke 安定化が必要。実機 DMG インストール導線整備は `docs/tickets/2026-05-13-readme-macos-install-guide.md` に分離済み。
+
+[2026/05/14]分析実行前確認ダイアログを overlay 化し文言を整理
+公開前手動確認で、分析ボタン押下後に表示される確認 UI で「実行する」ボタンが `.analysis-shell { overflow: hidden }` に押し出されて見えず、内部寄りの「コンテキスト本文量」「概算 output 量」などの文言がユーザーに伝わりにくかった問題を解消した。確認ダイアログを `AnalysisRunConfirm` という props 駆動コンポーネントに切り出し、`AnalysisPane` の header 内ではなく `.analysis-shell` 直下の overlay として描画。半透明 backdrop と最大高制限内スクロールで小さいウィンドウでも操作不能にならないようにし、文言を「解析する段落 / 段落本文 / 前後の文脈 / 送信量(概算) / 応答量(概算)」に置き換え、リード文と注意書きを追加した。SSR テスト 4 件で wording、overlay 構造、ロケール表示を固定。検証: `pnpm -w lint`、`pnpm -w test`（desktop 277 件、shared 57 件、api 4 件、e2e 6 skipped）、`pnpm -w build` 成功。残課題: Electron 実機での GUI 手動確認は未実施（公開前検証チェックリストで吸収）。
+
 [2026/05/13]Anthropic 既定分析モデルを Claude Haiku 4.5 に更新
 Settings の API キー登録/分析設定画面で Anthropic の既定モデルが旧値のまま表示される原因が、共有既定設定 `DEFAULT_ANALYSIS_SETTINGS` と保存済み analysis settings の旧値維持にあったため、既定モデルを `claude-haiku-4-5-20251001` に更新し、旧既定値 `claude-3-5-sonnet-latest` と短い placeholder `claude-haiku-4-5` は読み込み/保存時に新 API ID へ移行するようにした。検証: `pnpm --filter @litelizard/desktop test -- analysisSettingsStore preloadMockApi`、`pnpm --filter @litelizard/shared test -- api`、`pnpm -w lint`、`pnpm -w test`、`pnpm -w build` 成功。
 

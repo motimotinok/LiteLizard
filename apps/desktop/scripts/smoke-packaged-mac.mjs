@@ -5,7 +5,7 @@ import path from 'node:path';
 const appExecutable = path.resolve(
   'release/mac-arm64/LiteLizard.app/Contents/MacOS/LiteLizard'
 );
-const timeoutMs = 30000;
+const timeoutMs = Number(process.env.LITELIZARD_SMOKE_TIMEOUT_MS ?? 60000);
 
 if (process.platform !== 'darwin') {
   console.error('[Smoke] mac packaged app smoke can only run on macOS.');

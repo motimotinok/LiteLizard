@@ -49,7 +49,7 @@ LiteLizard は、ローカルファイル、Electron IPC、API キー、外部 p
 
 - LiteLizard は現時点で脆弱性報奨金制度を提供していません
 - MVP 公開では未署名の macOS `.dmg` を GitHub Releases で配布する方針です。Apple Developer ID 署名、notarization、自動更新は MVP 後の対応として扱います
-- 未署名配布では macOS の警告が表示される可能性があります。公開文言と README で、この前提を利用者に分かる形で明記します
+- 未署名配布では macOS の警告が表示される可能性があります。インストールと Gatekeeper 警告への対処手順は [`README.md` の「macOS へのインストール」](./README.md#macos-へのインストール) を参照してください
 - 依存パッケージ全体のライセンス監査や包括的なサプライチェーン監査は、このドキュメントの範囲外です
 
 ## 変更について

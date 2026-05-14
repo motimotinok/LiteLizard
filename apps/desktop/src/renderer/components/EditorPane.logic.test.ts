@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildChapterInputs,
   buildParagraphInputs,
+  deriveStructureSnapshotFromTopLevelParagraphs,
   shouldSyncStructure,
 } from './editor/utils/structureBuilder.js';
 import {
@@ -137,5 +138,27 @@ describe('EditorPane lexical helpers', () => {
 
     expect(same.shouldSync).toBe(false);
     expect(changed.shouldSync).toBe(true);
+  });
+
+  it('derives initial editor structure from top-level paragraphs before the first edit', () => {
+    const result = deriveStructureSnapshotFromTopLevelParagraphs({
+      topLevelParagraphs: [
+        { nodeKey: 'k_chapter', text: '第一章' },
+        { nodeKey: 'k_p1', text: '一段落目' },
+        { nodeKey: 'k_p2', text: '' },
+      ],
+      existingChapterNodeKeys: new Set(),
+      fallbackChapterNodeIndexes: [0],
+    });
+
+    expect(result.snapshot).toEqual({
+      chapters: [{ nodeKey: 'k_chapter', title: '第一章' }],
+      paragraphs: [
+        { nodeKey: 'k_p1', chapterNodeKey: 'k_chapter', text: '一段落目' },
+        { nodeKey: 'k_p2', chapterNodeKey: 'k_chapter', text: '' },
+      ],
+    });
+    expect(result.chapterNodeKeySet).toEqual(new Set(['k_chapter']));
+    expect(result.emptyParagraphNodeKeys).toEqual(new Set(['k_p2']));
   });
 });
