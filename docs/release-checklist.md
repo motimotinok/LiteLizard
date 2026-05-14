@@ -37,7 +37,9 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 ### 初回体験
 
 - [ ] 初回起動でフォルダ選択ダイアログが開ける。
+- [ ] フォルダ選択ダイアログで新しい作業フォルダを作成できる。
 - [ ] 通常のユーザーフォルダを選ぶと、追加操作なしで workspace 画面に遷移し、`.litelizard/` と既存ファイルがツリーに表示される。
+- [ ] macOS のシステム領域など不適切なフォルダを選んだ場合、日本語の理由が表示され、通常プロジェクトとして進まない。
 - [ ] 設定画面（左の歯車アイコン）から OpenAI / Anthropic API キー、または Local LLM の endpoint / モデル名を保存できる。
 
 ### 執筆まわり
@@ -59,7 +61,6 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 ### 既知の制約として確認しておく
 
 - [ ] dev 環境および Electron 直接起動で `SIGABRT` 等の起動失敗が発生していないか手元で確認する。発生する場合は dev 用 main process の問題として別途追跡する（公開判断にも影響）。
-- [ ] フォルダ選択で macOS のシステム領域などを選んだ場合の挙動（`docs/tickets/2026-05-13-project-folder-selection-safety.md` で別途対応予定）。
 
 ## 公開判断として人間に残っている未決事項
 
@@ -71,7 +72,6 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 - Windows / Linux 向け配布の有無。MVP では Apple Silicon Mac のみが対象。
 - アプリアイコンの最終確定（GitHub Issue #95）。
 - 段落 DnD などの実 GUI 動作確認のための Electron E2E 実行（現状の起動 `SIGABRT` 制約と組み合わせて判断）。
-- フォルダ選択 UI の安全範囲・新規フォルダ作成導線（`docs/tickets/2026-05-13-project-folder-selection-safety.md` の対応有無を MVP に含めるかどうか）。
 
 ## 公開直前の作業フロー（参考）
 

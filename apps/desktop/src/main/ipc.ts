@@ -231,7 +231,9 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.openFolder, async () => {
     try {
       const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
+        properties: ['openDirectory', 'createDirectory'],
+        buttonLabel: 'このフォルダを開く',
+        message: 'LiteLizard の作業フォルダを選ぶか、新しいフォルダを作成してください。',
       });
 
       if (result.canceled || result.filePaths.length === 0) {

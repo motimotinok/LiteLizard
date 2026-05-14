@@ -1,3 +1,6 @@
+[2026/05/14]プロジェクトフォルダ選択の安全確認
+フォルダ選択ダイアログで新規フォルダ作成を可能にし、macOS のシステム領域や LiteLizard 内部フォルダを作業場所として拒否して、日本語の理由を表示するようにした。検証: projectManager / ipc / ProjectSetupScreen / useAppStore の追加テスト成功。残課題: Electron 実機の folder picker GUI 確認は未実施。
+
 [2026/05/14]MVP公開前チェックリストを docs/release-checklist.md に整理
 LLM が CLI で実行できる自動検証 (`pnpm -w lint` / `test` / `build` / `package:mac` / `smoke:package:mac` / `package:mac:dmg`)、人間が macOS GUI で実行する手動確認 (インストール導線、初回フォルダ選択、段落 DnD、テキストエクスポート、分析実行 overlay、終了/再起動)、公開判断として人間に残る未決事項 (Apple Developer ID 署名 / notarization、自動更新、ランディングページ、Windows / Linux 配布、アプリアイコン #95、Electron E2E 起動 `SIGABRT`、`docs/tickets/2026-05-13-project-folder-selection-safety.md`) を 1 ファイルに分けて整理し、README の Packaging セクション末尾から参照リンクを追加した。検証: `pnpm -w lint` / `pnpm -w test`（desktop 279、shared 57、api 4、e2e 6 skipped）/ `pnpm -w build` / `pnpm --filter @litelizard/desktop package:mac` / `smoke:package:mac` 成功。残課題: 手動 GUI 確認は LLM 側では実施せず、公開判断時に人間が通す前提。
 

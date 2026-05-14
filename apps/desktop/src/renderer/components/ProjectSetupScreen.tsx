@@ -71,6 +71,9 @@ export function ProjectSetupScreen({
                 フォルダを開く
               </button>
             </div>
+            <p className="welcome-empty-message">
+              既存の作業フォルダを選ぶか、フォルダ選択画面で新しい作業フォルダを作成できます。
+            </p>
             {recentProjects.length > 0 ? (
               <div className="welcome-recent">
                 <div className="welcome-recent-label">最近のフォルダ</div>

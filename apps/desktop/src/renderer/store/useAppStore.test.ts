@@ -338,6 +338,24 @@ describe('useAppStore project startup flow', () => {
     expect(state.tree).toHaveLength(1);
   });
 
+  it('openFolder は不適切なフォルダ選択の理由を日本語で表示する', async () => {
+    window.litelizard = createBridge({
+      openFolder: vi.fn().mockRejectedValue(
+        new Error(
+          'OPEN_FOLDER_FAILED: PROJECT_LOCATION_UNSAFE: /System は LiteLizard の作業フォルダとして安全ではありません。macOS のシステム領域やアプリ実行に必要な領域は選べません。',
+        ),
+      ),
+    });
+
+    await useAppStore.getState().openFolder();
+
+    const state = useAppStore.getState();
+    expect(state.startupState).toBe('needs-project');
+    expect(state.statusMessage).toContain('LiteLizard の作業フォルダとして安全ではありません');
+    expect(state.statusMessage).toContain('macOS のシステム領域やアプリ実行に必要な領域は選べません');
+    expect(state.statusMessage).not.toContain('ダイアログの起動に失敗');
+  });
+
   it('moveEntry は開いているファイルの保存先パスとツリーを更新する', async () => {
     const movedPath = '/projects/novel/archive/draft.lzl';
     const moveEntry = vi.fn().mockResolvedValue({ ok: true, path: movedPath });

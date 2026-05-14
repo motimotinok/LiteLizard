@@ -6,6 +6,7 @@ import {
   initializeProject,
   detectProject,
   ensureProject,
+  assertProjectLocationSafe,
   assertProjectWritable,
 } from './projectManager.js';
 
@@ -92,6 +93,12 @@ describe('ensureProject', () => {
     });
   });
 
+  it('macOS のシステム領域はプロジェクトとして初期化しない', async () => {
+    await expect(ensureProject('/System')).rejects.toThrow(
+      'LiteLizard の作業フォルダとして安全ではありません',
+    );
+  });
+
   it('既存プロジェクトでは何もしない（config.json を上書きしない）', async () => {
     await withTempDir(async (dir) => {
       await initializeProject(dir);
@@ -119,6 +126,23 @@ describe('ensureProject', () => {
       expect(probeEntries).toEqual([]);
     });
   });
+});
+
+describe('assertProjectLocationSafe', () => {
+  it('通常のユーザー作業フォルダは許可する', async () => {
+    await withTempDir(async (dir) => {
+      await expect(assertProjectLocationSafe(dir)).resolves.toBeUndefined();
+    });
+  });
+
+  it.each(['/System', '/Library', '/usr', '/bin'])(
+    'システム領域を分かる理由付きで拒否する (%s)',
+    async (folderPath) => {
+      await expect(assertProjectLocationSafe(folderPath)).rejects.toThrow(
+        'macOS のシステム領域やアプリ実行に必要な領域は選べません',
+      );
+    },
+  );
 });
 
 describe('assertProjectWritable', () => {
