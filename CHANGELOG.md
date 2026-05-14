@@ -1,3 +1,6 @@
+[2026/05/14]MVP公開前チェックリストを docs/release-checklist.md に整理
+LLM が CLI で実行できる自動検証 (`pnpm -w lint` / `test` / `build` / `package:mac` / `smoke:package:mac` / `package:mac:dmg`)、人間が macOS GUI で実行する手動確認 (インストール導線、初回フォルダ選択、段落 DnD、テキストエクスポート、分析実行 overlay、終了/再起動)、公開判断として人間に残る未決事項 (Apple Developer ID 署名 / notarization、自動更新、ランディングページ、Windows / Linux 配布、アプリアイコン #95、Electron E2E 起動 `SIGABRT`、`docs/tickets/2026-05-13-project-folder-selection-safety.md`) を 1 ファイルに分けて整理し、README の Packaging セクション末尾から参照リンクを追加した。検証: `pnpm -w lint` / `pnpm -w test`（desktop 279、shared 57、api 4、e2e 6 skipped）/ `pnpm -w build` / `pnpm --filter @litelizard/desktop package:mac` / `smoke:package:mac` 成功。残課題: 手動 GUI 確認は LLM 側では実施せず、公開判断時に人間が通す前提。
+
 [2026/05/14]本文エディタ段落DnDハンドルの初期表示を修正
 Lexical 初期状態から段落構造を即時 snapshot 化して本文段落の DnD ハンドルを初期表示し、portal 配下でも見える配置に直した。検証: `pnpm --filter @litelizard/desktop test -- EditorPane.logic`、`pnpm --filter @litelizard/desktop test -- useAppStore documentOps`、`pnpm -w lint` / `pnpm -w test`（e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron E2E は既存の Electron `SIGABRT` で起動できず、実 GUI ドラッグ確認は未実施。
 

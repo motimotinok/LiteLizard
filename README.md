@@ -72,6 +72,8 @@ xattr -dr com.apple.quarantine /Applications/LiteLizard.app
 
 MVP 公開では未署名の `.dmg` を GitHub Releases に置く方針です。Developer ID 署名、notarization、自動更新は MVP 後の対応です。未署名配布のため初回起動時に macOS Gatekeeper の警告が出る前提です。
 
+公開前に確認する自動検証コマンド・手動 GUI 手順・公開判断の未決事項は [`docs/release-checklist.md`](./docs/release-checklist.md) にまとめています。
+
 ## プライバシー
 
 LiteLizard がどのデータをローカルに保存し、どの操作で外部 provider にデータを送信するかは [`PRIVACY.md`](./PRIVACY.md) にまとめています。
