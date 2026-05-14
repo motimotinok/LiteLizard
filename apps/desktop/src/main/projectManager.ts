@@ -48,22 +48,42 @@ async function isLiteLizardSourceCheckout(folderPath: string): Promise<boolean> 
   }
 }
 
+async function realpathIfExists(folderPath: string): Promise<string | null> {
+  try {
+    return await fs.realpath(folderPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function assertProjectLocationPathSafe(folderPath: string): Promise<void> {
+  if (folderPath === path.parse(folderPath).root) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (UNSAFE_INTERNAL_FOLDER_NAMES.has(path.basename(folderPath))) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (UNSAFE_SYSTEM_ROOTS.some((root) => isPathAtOrInside(folderPath, root))) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (await isLiteLizardSourceCheckout(folderPath)) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は LiteLizard の開発用フォルダに見えます。${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+}
+
 export async function assertProjectLocationSafe(folderPath: string): Promise<void> {
   const resolvedPath = path.resolve(folderPath);
-  if (resolvedPath === path.parse(resolvedPath).root) {
-    throw new Error(`PROJECT_LOCATION_UNSAFE: ${resolvedPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
-  }
+  await assertProjectLocationPathSafe(resolvedPath);
 
-  if (UNSAFE_INTERNAL_FOLDER_NAMES.has(path.basename(resolvedPath))) {
-    throw new Error(`PROJECT_LOCATION_UNSAFE: ${resolvedPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
-  }
-
-  if (UNSAFE_SYSTEM_ROOTS.some((root) => isPathAtOrInside(resolvedPath, root))) {
-    throw new Error(`PROJECT_LOCATION_UNSAFE: ${resolvedPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
-  }
-
-  if (await isLiteLizardSourceCheckout(resolvedPath)) {
-    throw new Error(`PROJECT_LOCATION_UNSAFE: ${resolvedPath} は LiteLizard の開発用フォルダに見えます。${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  const realPath = await realpathIfExists(resolvedPath);
+  if (realPath && realPath !== resolvedPath) {
+    await assertProjectLocationPathSafe(realPath);
   }
 }
 

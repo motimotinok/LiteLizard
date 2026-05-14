@@ -135,6 +135,17 @@ describe('assertProjectLocationSafe', () => {
     });
   });
 
+  it('通常フォルダへの symlink は許可する', async () => {
+    await withTempDir(async (dir) => {
+      const target = path.join(dir, 'workspace');
+      const link = path.join(dir, 'workspace-link');
+      await fs.mkdir(target);
+      await fs.symlink(target, link, 'dir');
+
+      await expect(assertProjectLocationSafe(link)).resolves.toBeUndefined();
+    });
+  });
+
   it.each(['/System', '/Library', '/usr', '/bin'])(
     'システム領域を分かる理由付きで拒否する (%s)',
     async (folderPath) => {
@@ -143,6 +154,15 @@ describe('assertProjectLocationSafe', () => {
       );
     },
   );
+
+  it.runIf(process.platform === 'darwin')('システム領域への symlink も拒否する', async () => {
+    await withTempDir(async (dir) => {
+      const link = path.join(dir, 'unsafe-link');
+      await fs.symlink('/Applications', link, 'dir');
+
+      await expect(assertProjectLocationSafe(link)).rejects.toThrow(/PROJECT_LOCATION_UNSAFE/);
+    });
+  });
 });
 
 describe('assertProjectWritable', () => {
