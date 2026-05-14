@@ -108,6 +108,7 @@ vi.mock('./appStore.js', () => ({
 }));
 
 import { registerIpcHandlers } from './ipc.js';
+import { ensureProject } from './projectManager.js';
 
 function getRegisteredHandlers() {
   return new Map<string, (...args: never[]) => unknown>(electronMock.handle.mock.calls);
@@ -175,6 +176,23 @@ describe('registerIpcHandlers', () => {
 
     expect(registeredChannels).toEqual(expect.arrayContaining(expectedInvokeChannels));
     expect(registeredChannels).toHaveLength(expectedInvokeChannels.length);
+  });
+
+  it('openFolder は新規フォルダ作成を許可する folder picker を開く', async () => {
+    electronMock.showOpenDialog.mockResolvedValue({
+      canceled: true,
+      filePaths: [],
+    });
+    registerIpcHandlers();
+
+    await getRequiredHandler(IPC_CHANNELS.openFolder)();
+
+    expect(electronMock.showOpenDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.arrayContaining(['openDirectory', 'createDirectory']),
+      }),
+    );
+    expect(ensureProject).not.toHaveBeenCalled();
   });
 
   it('wires reading agent IPC handlers to the main store', async () => {

@@ -106,6 +106,12 @@ function cloneAnalysisSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
 }
 
+function formatProjectOpenErrorMessage(message: string): string {
+  return message
+    .replace(/^OPEN_FOLDER_FAILED:\s*/, '')
+    .replace(/^PROJECT_LOCATION_UNSAFE:\s*/, '');
+}
+
 interface AppState {
   startupState: StartupState;
   rootPath: string | null;
@@ -946,7 +952,7 @@ export const useAppStore = create<AppState>((set, get) => {
       console.error('[Renderer openFolder] failed', error);
       set({
         startupState: get().rootPath ? 'ready' : 'needs-project',
-        statusMessage: `フォルダ選択ダイアログの起動に失敗しました: ${message}`,
+        statusMessage: `フォルダを開けませんでした: ${formatProjectOpenErrorMessage(message)}`,
       });
       return;
     }
