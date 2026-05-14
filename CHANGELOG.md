@@ -1,3 +1,6 @@
+[2026/05/14]フォルダ選択直後の起動画面残りを修正
+起動時の前回フォルダ復元が遅れて完了しても、手動で開いたフォルダの ready 状態を古い復元結果で上書きしないようにし、準備中画面には現在の状態メッセージを表示するようにした。検証: `pnpm --filter @litelizard/desktop test -- useAppStore`、`pnpm -w lint`、`pnpm -w test`（e2e 6 skipped）、`pnpm -w build` 成功。残課題: Electron 実機でのフォルダ選択 GUI 確認は未実施。
+
 [2026/05/14]README に未署名 macOS DMG のインストール手順を追加
 MVP 公開版の未署名 `.dmg` について、GitHub Releases からのダウンロード、Applications へのコピー、Gatekeeper 警告への安全な対処、初回起動後の API キー / Local LLM 設定導線を README に追加し、SECURITY.md から該当手順へリンクした。検証: README / SECURITY / PRIVACY / DMG 生成済みチケットとの整合確認、`pnpm -w lint` / `pnpm -w test`（e2e 6 skipped）/ `pnpm -w build` 成功。残課題なし。
 

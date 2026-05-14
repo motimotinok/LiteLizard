@@ -98,6 +98,16 @@ function createLzlDocument(overrides: Partial<LiteLizardDocument> = {}): LiteLiz
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('useAppStore project startup flow', () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
@@ -307,6 +317,25 @@ describe('useAppStore project startup flow', () => {
     expect(state.revision).toBe(0);
     expect(state.dirty).toBe(false);
     expect(setLastOpenedFolder).toHaveBeenCalledWith('/projects/next');
+  });
+
+  it('openFolder は遅れて完了した前回フォルダ復元に ready 状態を上書きされない', async () => {
+    const lastOpened = createDeferred<string | null>();
+    window.litelizard = createBridge({
+      getLastOpenedFolder: vi.fn().mockReturnValue(lastOpened.promise),
+      openFolder: vi.fn().mockResolvedValue('/projects/novel'),
+      listTree: vi.fn().mockResolvedValue([{ path: '/projects/novel/draft.lzl', name: 'draft.lzl', type: 'file' }]),
+    });
+
+    const restore = useAppStore.getState().restoreLastProject();
+    await useAppStore.getState().openFolder();
+    lastOpened.resolve(null);
+    await restore;
+
+    const state = useAppStore.getState();
+    expect(state.startupState).toBe('ready');
+    expect(state.rootPath).toBe('/projects/novel');
+    expect(state.tree).toHaveLength(1);
   });
 
   it('moveEntry は開いているファイルの保存先パスとツリーを更新する', async () => {
