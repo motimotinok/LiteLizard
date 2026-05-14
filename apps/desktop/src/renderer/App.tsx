@@ -291,6 +291,7 @@ export function App() {
     recentProjects,
     openRecentProject,
     removeRecentProject,
+    statusMessage,
   } = useAppStore();
 
   useEffect(() => {
@@ -319,7 +320,7 @@ export function App() {
           <h1 className="project-launch-title">準備中</h1>
           <div className="project-launch-rule" />
           <p className="project-launch-description">
-            前回の作業フォルダを確認しています。
+            {statusMessage || '前回の作業フォルダを確認しています。'}
           </p>
         </div>
       </div>

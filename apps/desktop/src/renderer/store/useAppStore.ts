@@ -109,6 +109,7 @@ function cloneAnalysisSettings(): AnalysisSettings {
 interface AppState {
   startupState: StartupState;
   rootPath: string | null;
+  projectOpenRequestId: number;
   recentProjects: RecentProjectEntry[];
   tree: FileNode[];
   currentFilePath: string | null;
@@ -140,7 +141,7 @@ interface AppState {
   restoreSnapshot: (snapshot: UndoSnapshot) => void;
   clearUndoStacks: () => void;
   clearRedoStack: () => void;
-  hydrateProject: (rootPath: string, source: 'restore' | 'dialog') => Promise<void>;
+  hydrateProject: (rootPath: string, source: 'restore' | 'dialog', requestId?: number) => Promise<void>;
   restoreLastProject: () => Promise<void>;
   openFolder: () => Promise<void>;
   loadRecentProjects: () => Promise<void>;
@@ -666,6 +667,7 @@ export const useAppStore = create<AppState>((set, get) => {
   return ({
     startupState: 'loading',
     rootPath: null,
+    projectOpenRequestId: 0,
     recentProjects: [],
     tree: [],
     currentFilePath: null,
@@ -746,10 +748,17 @@ export const useAppStore = create<AppState>((set, get) => {
     set({ redoStack: [] });
   },
 
-  hydrateProject: async (rootPath, source) => {
+  hydrateProject: async (rootPath, source, requestId = get().projectOpenRequestId) => {
+    const isCurrentProjectOpenRequest = () => get().projectOpenRequestId === requestId;
     try {
       const tree = await window.litelizard.listTree(rootPath);
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       await window.litelizard.setLastOpenedFolder(rootPath);
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       set({
         startupState: 'ready',
         rootPath,
@@ -767,6 +776,9 @@ export const useAppStore = create<AppState>((set, get) => {
       });
       void get().loadRecentProjects();
     } catch (error) {
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       const previousState = get();
       console.error('[Renderer hydrateProject] failed', error);
@@ -804,17 +816,29 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
-    set({ startupState: 'loading', statusMessage: '前回のフォルダを確認しています...' });
+    const requestId = get().projectOpenRequestId + 1;
+    const isCurrentProjectOpenRequest = () => get().projectOpenRequestId === requestId;
+    set({
+      projectOpenRequestId: requestId,
+      startupState: 'loading',
+      statusMessage: '前回のフォルダを確認しています...',
+    });
 
     try {
       const root = await window.litelizard.getLastOpenedFolder();
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       if (!root) {
         set({ startupState: 'needs-project', statusMessage: 'フォルダを選択して始めてください' });
         await get().loadRecentProjects();
         return;
       }
 
-      await get().hydrateProject(root, 'restore');
+      await get().hydrateProject(root, 'restore', requestId);
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       if (get().startupState === 'needs-project') {
         try {
           await window.litelizard.removeRecentProject(root);
@@ -824,6 +848,9 @@ export const useAppStore = create<AppState>((set, get) => {
         await get().loadRecentProjects();
       }
     } catch (error) {
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Renderer restoreLastProject] failed', error);
       set({
@@ -850,8 +877,17 @@ export const useAppStore = create<AppState>((set, get) => {
     if (!window.litelizard) {
       return;
     }
-    set({ startupState: 'loading', statusMessage: `フォルダを開いています: ${folderPath}` });
-    await get().hydrateProject(folderPath, 'restore');
+    const requestId = get().projectOpenRequestId + 1;
+    const isCurrentProjectOpenRequest = () => get().projectOpenRequestId === requestId;
+    set({
+      projectOpenRequestId: requestId,
+      startupState: 'loading',
+      statusMessage: `フォルダを開いています: ${folderPath}`,
+    });
+    await get().hydrateProject(folderPath, 'restore', requestId);
+    if (!isCurrentProjectOpenRequest()) {
+      return;
+    }
     if (get().rootPath !== folderPath) {
       try {
         await window.litelizard.removeRecentProject(folderPath);
@@ -887,14 +923,25 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
+    const requestId = get().projectOpenRequestId + 1;
+    const isCurrentProjectOpenRequest = () => get().projectOpenRequestId === requestId;
     if (!get().rootPath) {
-      set({ startupState: 'loading', statusMessage: 'フォルダ選択ダイアログを開いています...' });
+      set({
+        projectOpenRequestId: requestId,
+        startupState: 'loading',
+        statusMessage: 'フォルダ選択ダイアログを開いています...',
+      });
+    } else {
+      set({ projectOpenRequestId: requestId });
     }
 
     let root: string | null = null;
     try {
       root = await window.litelizard.openFolder();
     } catch (error) {
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('[Renderer openFolder] failed', error);
       set({
@@ -905,6 +952,9 @@ export const useAppStore = create<AppState>((set, get) => {
     }
 
     if (!root) {
+      if (!isCurrentProjectOpenRequest()) {
+        return;
+      }
       set({
         startupState: get().rootPath ? 'ready' : 'needs-project',
         statusMessage: 'フォルダ選択をキャンセルしました',
@@ -912,7 +962,10 @@ export const useAppStore = create<AppState>((set, get) => {
       return;
     }
 
-    await get().hydrateProject(root, 'dialog');
+    if (!isCurrentProjectOpenRequest()) {
+      return;
+    }
+    await get().hydrateProject(root, 'dialog', requestId);
   },
 
   createDocument: async (title: string, parentPath?: string) => {
