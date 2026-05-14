@@ -7,6 +7,7 @@ CLAUDE_LIMIT="${RALPH_CLAUDE_LIMIT:-2}"
 TOTAL_LIMIT="${RALPH_TOTAL_LIMIT:-5}"
 BATCHES="${RALPH_BATCHES:-2}"
 SLEEP_BETWEEN_BATCHES_SECONDS="${RALPH_SLEEP_BETWEEN_BATCHES_SECONDS:-18000}"
+PHASE_TIMEOUT_SECONDS="${RALPH_PHASE_TIMEOUT_SECONDS:-3600}"
 CODEX_SANDBOX="${RALPH_CODEX_SANDBOX:-workspace-write}"
 CODEX_APPROVAL="${RALPH_CODEX_APPROVAL:-never}"
 CODEX_REASONING_EFFORT="${RALPH_CODEX_REASONING_EFFORT:-high}"
@@ -47,15 +48,55 @@ if ! is_non_negative_int "$SLEEP_BETWEEN_BATCHES_SECONDS"; then
   exit 1
 fi
 
+if ! is_non_negative_int "$PHASE_TIMEOUT_SECONDS"; then
+  echo "RALPH_PHASE_TIMEOUT_SECONDS must be a non-negative integer: $PHASE_TIMEOUT_SECONDS" >&2
+  exit 1
+fi
+
 active_ticket_count() {
   find "$TICKET_DIR" -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' '
+}
+
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  if [ "$timeout_seconds" -eq 0 ]; then
+    "$@"
+    return $?
+  fi
+
+  "$@" &
+  local command_pid="$!"
+  local elapsed_seconds=0
+  local poll_seconds=5
+
+  while kill -0 "$command_pid" 2>/dev/null; do
+    if [ "$elapsed_seconds" -ge "$timeout_seconds" ]; then
+      echo "command timed out after ${timeout_seconds}s; terminating pid ${command_pid}" >&2
+      pkill -TERM -P "$command_pid" 2>/dev/null || true
+      kill "$command_pid" 2>/dev/null || true
+      sleep 5
+      pkill -KILL -P "$command_pid" 2>/dev/null || true
+      if kill -0 "$command_pid" 2>/dev/null; then
+        kill -KILL "$command_pid" 2>/dev/null || true
+      fi
+      wait "$command_pid" 2>/dev/null || true
+      return 124
+    fi
+
+    sleep "$poll_seconds"
+    elapsed_seconds=$((elapsed_seconds + poll_seconds))
+  done
+
+  wait "$command_pid"
 }
 
 echo "pwd: $(pwd)"
 echo "active tickets:"
 find "$TICKET_DIR" -maxdepth 1 -type f -name "*.md" -print | sort
 echo ""
-echo "limits: batches=$BATCHES phase_limit_per_batch=$TOTAL_LIMIT claude_phases_per_batch=$CLAUDE_LIMIT sleep_between_batches_seconds=$SLEEP_BETWEEN_BATCHES_SECONDS"
+echo "limits: batches=$BATCHES phase_limit_per_batch=$TOTAL_LIMIT claude_phases_per_batch=$CLAUDE_LIMIT sleep_between_batches_seconds=$SLEEP_BETWEEN_BATCHES_SECONDS phase_timeout_seconds=$PHASE_TIMEOUT_SECONDS"
 echo "codex: sandbox=$CODEX_SANDBOX approval=$CODEX_APPROVAL reasoning_effort=$CODEX_REASONING_EFFORT"
 echo ""
 
@@ -100,13 +141,13 @@ run_phase() {
   fi
 
   if [ "$provider" = "claude" ]; then
-    claude -p "$prompt" --dangerously-skip-permissions
+    run_with_timeout "$PHASE_TIMEOUT_SECONDS" claude -p "$prompt" --dangerously-skip-permissions
   else
     mkdir -p "$LOG_DIR"
     local log_file
     log_file="${LOG_DIR}/$(date +%Y%m%d-%H%M%S)-phase${phase}-codex.log"
     echo "codex output: $log_file"
-    codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"" "$prompt" >"$log_file" 2>&1
+    run_with_timeout "$PHASE_TIMEOUT_SECONDS" codex -a "$CODEX_APPROVAL" exec -C "$(pwd)" -s "$CODEX_SANDBOX" -c "model_reasoning_effort=\"${CODEX_REASONING_EFFORT}\"" "$prompt" >"$log_file" 2>&1
   fi
   echo "=== Phase${phase} (${provider}) 終了 ==="
   echo ""
@@ -153,9 +194,15 @@ run_batch() {
 
     phase=$((count + 1))
     if [ "$count" -lt "$batch_claude_limit" ]; then
-      run_phase "$phase" "claude"
+      if ! run_phase "$phase" "claude"; then
+        echo "Phase${phase} (claude) failed or timed out. Stopping Batch${batch}."
+        return 1
+      fi
     else
-      run_phase "$phase" "codex"
+      if ! run_phase "$phase" "codex"; then
+        echo "Phase${phase} (codex) failed or timed out. Stopping Batch${batch}."
+        return 1
+      fi
     fi
     count=$((count + 1))
   done
