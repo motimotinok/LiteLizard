@@ -1,7 +1,7 @@
 ---
-status: todo
-started_at:
-completed_at:
+status: done
+started_at: 2026-05-14T08:20:18+09:00
+completed_at: 2026-05-14T08:37:44+09:00
 ---
 
 # README に未署名 DMG のインストール手順を追加する
@@ -40,22 +40,22 @@ MVP は未署名の macOS `.dmg` を GitHub Releases で配布する方針で、
 
 ## 受け入れ条件
 
-- [ ] `README.md` に macOS インストール手順セクションが追加されている
-- [ ] DMG マウント → Applications コピー → Gatekeeper 警告対処 → 初回起動 → API キー設定までの流れが順に書かれている
-- [ ] Gatekeeper 警告対処方法が、誤った操作で他アプリの quarantine 属性まで外さないよう、`LiteLizard.app` 単体に対象を限定した安全な書き方になっている
-- [ ] 未署名配布・自動更新なし・MVP 扱いであることが利用者に分かる形で書かれている
-- [ ] `SECURITY.md` と README のインストール手順が矛盾していない
-- [ ] 既存 README のコンセプト・開発セクションを崩していない
+- [x] `README.md` に macOS インストール手順セクションが追加されている
+- [x] DMG マウント → Applications コピー → Gatekeeper 警告対処 → 初回起動 → API キー設定までの流れが順に書かれている
+- [x] Gatekeeper 警告対処方法が、誤った操作で他アプリの quarantine 属性まで外さないよう、`LiteLizard.app` 単体に対象を限定した安全な書き方になっている
+- [x] 未署名配布・自動更新なし・MVP 扱いであることが利用者に分かる形で書かれている
+- [x] `SECURITY.md` と README のインストール手順が矛盾していない
+- [x] 既存 README のコンセプト・開発セクションを崩していない
 
 ## 検証方法
 
-- [ ] README を実際の手順通りに読んで、初見ユーザーでもインストールできる粒度か確認する
-- [ ] `SECURITY.md` / `PRIVACY.md` / `docs/tickets/2026-05-13-macos-dmg-release-package.md` と矛盾がないか確認する
-- [ ] 関連する既存テストを確認する
-- [ ] 必要なテストを追加または更新する
-- [ ] `pnpm -w lint`
-- [ ] `pnpm -w test`
-- [ ] `pnpm -w build`
+- [x] README を実際の手順通りに読んで、初見ユーザーでもインストールできる粒度か確認する
+- [x] `SECURITY.md` / `PRIVACY.md` / `docs/tickets/2026-05-13-macos-dmg-release-package.md` と矛盾がないか確認する
+- [x] 関連する既存テストを確認する
+- [x] 必要なテストを追加または更新する
+- [x] `pnpm -w lint`
+- [x] `pnpm -w test`
+- [x] `pnpm -w build`
 
 ## 関連
 
@@ -67,4 +67,16 @@ MVP は未署名の macOS `.dmg` を GitHub Releases で配布する方針で、
 
 ## 完了メモ
 
-未着手。
+完了。`README.md` に利用者向けの「macOS へのインストール」セクションを追加し、GitHub Releases からの `.dmg` ダウンロード、DMG マウント、`Applications` へのコピー、右クリック / Control クリックからの初回起動、Gatekeeper 警告への対処、初回起動後の作業フォルダ選択と API キー / Local LLM 設定導線を順番に記載した。
+
+Gatekeeper の補助手順は `xattr -dr com.apple.quarantine /Applications/LiteLizard.app` に限定し、`/Applications` 全体や他アプリを対象にしない注意を明記した。`SECURITY.md` の未署名配布に関する説明から README のインストール手順へリンクし、`CHANGELOG.md` に完了履歴を追記した。
+
+検証:
+- README を実際の手順順に読み、DMG マウント → Applications コピー → Gatekeeper 警告対処 → 初回起動 → API キー / Local LLM 設定までの流れを確認。
+- `SECURITY.md` / `PRIVACY.md` / `docs/tickets/done/2026-05-13-macos-dmg-release-package.md` / `apps/desktop/package.json` と矛盾がないことを確認。
+- 関連する既存テストを確認。docs 変更のため新規テスト追加は不要と判断。
+- `pnpm -w lint` 成功。
+- `pnpm -w test` 成功（e2e 6 skipped）。
+- `pnpm -w build` 成功。
+
+残課題なし。
