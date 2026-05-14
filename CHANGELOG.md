@@ -1,3 +1,6 @@
+[2026/05/14]本文エディタ段落DnDハンドルの初期表示を修正
+Lexical 初期状態から段落構造を即時 snapshot 化して本文段落の DnD ハンドルを初期表示し、portal 配下でも見える配置に直した。検証: `pnpm --filter @litelizard/desktop test -- EditorPane.logic`、`pnpm --filter @litelizard/desktop test -- useAppStore documentOps`、`pnpm -w lint` / `pnpm -w test`（e2e 6 skipped）/ `pnpm -w build` 成功。残課題: Electron E2E は既存の Electron `SIGABRT` で起動できず、実 GUI ドラッグ確認は未実施。
+
 [2026/05/14]フォルダ選択直後の起動画面残りを修正
 起動時の前回フォルダ復元が遅れて完了しても、手動で開いたフォルダの ready 状態を古い復元結果で上書きしないようにし、準備中画面には現在の状態メッセージを表示するようにした。検証: `pnpm --filter @litelizard/desktop test -- useAppStore`、`pnpm -w lint`、`pnpm -w test`（e2e 6 skipped）、`pnpm -w build` 成功。残課題: Electron 実機でのフォルダ選択 GUI 確認は未実施。
 

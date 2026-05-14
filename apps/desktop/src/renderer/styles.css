@@ -710,10 +710,12 @@ button {
 }
 
 /* ドラッグハンドル */
+.paragraph-drag-wrapper {
+  z-index: 2;
+}
+
 .paragraph-drag-handle {
-  position: absolute;
-  left: -36px;
-  top: 8px;
+  position: static;
   width: 18px;
   height: 22px;
   display: grid;
@@ -726,11 +728,10 @@ button {
   line-height: 1;
   letter-spacing: -1px;
   border-radius: 3px;
-  opacity: 0;
+  opacity: 0.28;
   transition: opacity 0.2s ease, color 0.2s ease;
 }
 
-.editor-paragraph-row:hover .paragraph-drag-handle,
 .paragraph-drag-handle:hover,
 .paragraph-drag-handle:focus-visible {
   opacity: 1;
