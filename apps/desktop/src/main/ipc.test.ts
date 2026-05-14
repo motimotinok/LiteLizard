@@ -97,6 +97,7 @@ vi.mock('./analysisStore.js', () => analysisStoreMock);
 
 vi.mock('./projectManager.js', () => ({
   ensureProject: vi.fn(),
+  assertProjectLocationSafe: vi.fn(),
   assertProjectWritable: vi.fn(),
 }));
 
@@ -108,6 +109,7 @@ vi.mock('./appStore.js', () => ({
 }));
 
 import { registerIpcHandlers } from './ipc.js';
+import { assertProjectLocationSafe, ensureProject } from './projectManager.js';
 
 function getRegisteredHandlers() {
   return new Map<string, (...args: never[]) => unknown>(electronMock.handle.mock.calls);
@@ -175,6 +177,23 @@ describe('registerIpcHandlers', () => {
 
     expect(registeredChannels).toEqual(expect.arrayContaining(expectedInvokeChannels));
     expect(registeredChannels).toHaveLength(expectedInvokeChannels.length);
+  });
+
+  it('openFolder は新規フォルダ作成を許可する folder picker を開く', async () => {
+    electronMock.showOpenDialog.mockResolvedValue({
+      canceled: true,
+      filePaths: [],
+    });
+    registerIpcHandlers();
+
+    await getRequiredHandler(IPC_CHANNELS.openFolder)();
+
+    expect(electronMock.showOpenDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.arrayContaining(['openDirectory', 'createDirectory']),
+      }),
+    );
+    expect(ensureProject).not.toHaveBeenCalled();
   });
 
   it('wires reading agent IPC handlers to the main store', async () => {
@@ -369,6 +388,36 @@ describe('registerIpcHandlers', () => {
       expect(fileServiceMock.listTree).toHaveBeenCalledWith(projectRoot);
       expect(fileServiceMock.load).toHaveBeenCalledWith(documentPath);
       expect(fileServiceMock.save).toHaveBeenCalledWith(documentPath, { documentId: 'd_abcdefghij' }, 1);
+    });
+  });
+
+  it('listTree は既存プロジェクト root でも安全でない場所を拒否する', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      vi.mocked(assertProjectLocationSafe).mockRejectedValueOnce(
+        new Error(
+          'PROJECT_LOCATION_UNSAFE: /Applications/LiteLizard は LiteLizard の作業フォルダとして安全ではありません。',
+        ),
+      );
+
+      registerIpcHandlers();
+
+      await expect(getRequiredHandler(IPC_CHANNELS.listTree)(undefined as never, projectRoot as never))
+        .rejects.toThrow(/LIST_TREE_FAILED: PROJECT_LOCATION_UNSAFE/);
+      expect(fileServiceMock.listTree).not.toHaveBeenCalled();
+    });
+  });
+
+  it('listTree は通常の既存プロジェクト root ではファイル一覧へ進む', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      fileServiceMock.listTree.mockResolvedValue([{ path: path.join(projectRoot, 'draft.lzl'), name: 'draft.lzl', type: 'file' }]);
+
+      registerIpcHandlers();
+
+      await expect(getRequiredHandler(IPC_CHANNELS.listTree)(undefined as never, projectRoot as never)).resolves.toEqual([
+        { path: path.join(projectRoot, 'draft.lzl'), name: 'draft.lzl', type: 'file' },
+      ]);
+      expect(assertProjectLocationSafe).toHaveBeenCalledWith(projectRoot);
+      expect(fileServiceMock.listTree).toHaveBeenCalledWith(projectRoot);
     });
   });
 

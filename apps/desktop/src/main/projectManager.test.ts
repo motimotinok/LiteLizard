@@ -6,6 +6,7 @@ import {
   initializeProject,
   detectProject,
   ensureProject,
+  assertProjectLocationSafe,
   assertProjectWritable,
 } from './projectManager.js';
 
@@ -92,6 +93,12 @@ describe('ensureProject', () => {
     });
   });
 
+  it('macOS のシステム領域はプロジェクトとして初期化しない', async () => {
+    await expect(ensureProject('/System')).rejects.toThrow(
+      'LiteLizard の作業フォルダとして安全ではありません',
+    );
+  });
+
   it('既存プロジェクトでは何もしない（config.json を上書きしない）', async () => {
     await withTempDir(async (dir) => {
       await initializeProject(dir);
@@ -117,6 +124,43 @@ describe('ensureProject', () => {
         entry.startsWith('.write-probe-'),
       );
       expect(probeEntries).toEqual([]);
+    });
+  });
+});
+
+describe('assertProjectLocationSafe', () => {
+  it('通常のユーザー作業フォルダは許可する', async () => {
+    await withTempDir(async (dir) => {
+      await expect(assertProjectLocationSafe(dir)).resolves.toBeUndefined();
+    });
+  });
+
+  it('通常フォルダへの symlink は許可する', async () => {
+    await withTempDir(async (dir) => {
+      const target = path.join(dir, 'workspace');
+      const link = path.join(dir, 'workspace-link');
+      await fs.mkdir(target);
+      await fs.symlink(target, link, 'dir');
+
+      await expect(assertProjectLocationSafe(link)).resolves.toBeUndefined();
+    });
+  });
+
+  it.each(['/System', '/Library', '/usr', '/bin'])(
+    'システム領域を分かる理由付きで拒否する (%s)',
+    async (folderPath) => {
+      await expect(assertProjectLocationSafe(folderPath)).rejects.toThrow(
+        'macOS のシステム領域やアプリ実行に必要な領域は選べません',
+      );
+    },
+  );
+
+  it.runIf(process.platform === 'darwin')('システム領域への symlink も拒否する', async () => {
+    await withTempDir(async (dir) => {
+      const link = path.join(dir, 'unsafe-link');
+      await fs.symlink('/Applications', link, 'dir');
+
+      await expect(assertProjectLocationSafe(link)).rejects.toThrow(/PROJECT_LOCATION_UNSAFE/);
     });
   });
 });

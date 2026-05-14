@@ -85,7 +85,7 @@ function ParagraphSortableHandle({ nodeKey, position, editor }: HandleProps) {
   };
 
   return (
-    <div style={wrapperStyle}>
+    <div className="paragraph-drag-wrapper" style={wrapperStyle}>
       <button
         ref={setActivatorNodeRef}
         style={handleStyle}

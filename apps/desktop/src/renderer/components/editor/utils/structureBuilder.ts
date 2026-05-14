@@ -7,6 +7,83 @@ export interface StructureSnapshot {
   paragraphs: Array<{ nodeKey: string; chapterNodeKey: string | null; text: string }>;
 }
 
+export interface TopLevelParagraphSnapshot {
+  nodeKey: string;
+  text: string;
+}
+
+export function deriveStructureSnapshotFromTopLevelParagraphs({
+  topLevelParagraphs,
+  existingChapterNodeKeys,
+  fallbackChapterNodeIndexes,
+}: {
+  topLevelParagraphs: TopLevelParagraphSnapshot[];
+  existingChapterNodeKeys: ReadonlySet<string>;
+  fallbackChapterNodeIndexes: number[];
+}): {
+  snapshot: StructureSnapshot;
+  emptyParagraphNodeKeys: Set<string>;
+  chapterNodeKeySet: Set<string>;
+} {
+  const chapterNodeKeySet = new Set<string>();
+
+  topLevelParagraphs.forEach((node) => {
+    if (existingChapterNodeKeys.has(node.nodeKey)) {
+      chapterNodeKeySet.add(node.nodeKey);
+    }
+  });
+
+  // On editor remount (e.g. macro -> micro), node keys are regenerated.
+  // Recover chapter nodes by deterministic top-level positions from the current document snapshot.
+  if (chapterNodeKeySet.size === 0 && topLevelParagraphs.length > 0) {
+    fallbackChapterNodeIndexes.forEach((index) => {
+      const node = topLevelParagraphs[index];
+      if (node) {
+        chapterNodeKeySet.add(node.nodeKey);
+      }
+    });
+
+    if (chapterNodeKeySet.size === 0) {
+      chapterNodeKeySet.add(topLevelParagraphs[0].nodeKey);
+    }
+  }
+
+  const chapters: StructureSnapshot['chapters'] = [];
+  const paragraphs: StructureSnapshot['paragraphs'] = [];
+  const emptyParagraphNodeKeys = new Set<string>();
+
+  let currentChapterNodeKey: string | null = null;
+
+  topLevelParagraphs.forEach((node) => {
+    const isChapter = chapterNodeKeySet.has(node.nodeKey) || currentChapterNodeKey === null;
+    if (isChapter) {
+      chapterNodeKeySet.add(node.nodeKey);
+      currentChapterNodeKey = node.nodeKey;
+      chapters.push({
+        nodeKey: node.nodeKey,
+        title: node.text.trim() || `章${chapters.length + 1}`,
+      });
+      return;
+    }
+
+    if (node.text.trim().length === 0) {
+      emptyParagraphNodeKeys.add(node.nodeKey);
+    }
+
+    paragraphs.push({
+      nodeKey: node.nodeKey,
+      chapterNodeKey: currentChapterNodeKey,
+      text: node.text,
+    });
+  });
+
+  return {
+    snapshot: { chapters, paragraphs },
+    emptyParagraphNodeKeys,
+    chapterNodeKeySet,
+  };
+}
+
 export function toStructureSignature(snapshot: StructureSnapshot): string {
   return JSON.stringify({
     chapters: snapshot.chapters.map((chapter) => chapter.title),

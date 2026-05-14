@@ -37,7 +37,7 @@ import {
   toTitleFromFileName,
   validateEntryName,
 } from './ipcPathUtils.js';
-import { assertProjectWritable, ensureProject } from './projectManager.js';
+import { assertProjectLocationSafe, assertProjectWritable, ensureProject } from './projectManager.js';
 import {
   getActiveReadingAgentId,
   getLastOpenedFolder,
@@ -163,6 +163,7 @@ async function assertProjectRoot(projectRoot: string): Promise<string> {
   if (!detectedRoot || path.resolve(detectedRoot) !== resolvedRoot) {
     throw new Error(`Project root is invalid: ${projectRoot}`);
   }
+  await assertProjectLocationSafe(resolvedRoot);
   await fs.realpath(resolvedRoot);
   return resolvedRoot;
 }
@@ -231,7 +232,9 @@ export function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.openFolder, async () => {
     try {
       const result = await dialog.showOpenDialog({
-        properties: ['openDirectory'],
+        properties: ['openDirectory', 'createDirectory'],
+        buttonLabel: 'このフォルダを開く',
+        message: 'LiteLizard の作業フォルダを選ぶか、新しいフォルダを作成してください。',
       });
 
       if (result.canceled || result.filePaths.length === 0) {

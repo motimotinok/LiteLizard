@@ -4,6 +4,10 @@ import path from 'node:path';
 const LITELIZARD_DIR = '.litelizard';
 const CONFIG_FILE = 'config.json';
 const ANALYSIS_DIR = 'analysis';
+const UNSAFE_PROJECT_ROOT_MESSAGE =
+  'LiteLizard の作業フォルダとして安全ではありません。macOS のシステム領域やアプリ実行に必要な領域は選べません。ホームフォルダや Documents 配下に新しい作業フォルダを作って選んでください。';
+const UNSAFE_SYSTEM_ROOTS = ['/System', '/Library', '/Applications', '/usr', '/bin', '/sbin', '/etc', '/dev'];
+const UNSAFE_INTERNAL_FOLDER_NAMES = new Set(['.git', '.litelizard', 'node_modules']);
 
 interface ProjectConfig {
   version: number;
@@ -20,6 +24,67 @@ function getLitelizardDir(folderPath: string): string {
 
 function getConfigPath(folderPath: string): string {
   return path.join(getLitelizardDir(folderPath), CONFIG_FILE);
+}
+
+function isPathAtOrInside(candidatePath: string, parentPath: string): boolean {
+  const normalizedCandidate = path.resolve(candidatePath).toLowerCase();
+  const normalizedParent = path.resolve(parentPath).toLowerCase();
+  const relative = path.relative(normalizedParent, normalizedCandidate);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+async function isLiteLizardSourceCheckout(folderPath: string): Promise<boolean> {
+  const requiredEntries = [
+    'pnpm-workspace.yaml',
+    path.join('apps', 'desktop'),
+    path.join('packages', 'shared'),
+  ];
+
+  try {
+    await Promise.all(requiredEntries.map((entry) => fs.stat(path.join(folderPath, entry))));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function realpathIfExists(folderPath: string): Promise<string | null> {
+  try {
+    return await fs.realpath(folderPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function assertProjectLocationPathSafe(folderPath: string): Promise<void> {
+  if (folderPath === path.parse(folderPath).root) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (UNSAFE_INTERNAL_FOLDER_NAMES.has(path.basename(folderPath))) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (UNSAFE_SYSTEM_ROOTS.some((root) => isPathAtOrInside(folderPath, root))) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は ${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+
+  if (await isLiteLizardSourceCheckout(folderPath)) {
+    throw new Error(`PROJECT_LOCATION_UNSAFE: ${folderPath} は LiteLizard の開発用フォルダに見えます。${UNSAFE_PROJECT_ROOT_MESSAGE}`);
+  }
+}
+
+export async function assertProjectLocationSafe(folderPath: string): Promise<void> {
+  const resolvedPath = path.resolve(folderPath);
+  await assertProjectLocationPathSafe(resolvedPath);
+
+  const realPath = await realpathIfExists(resolvedPath);
+  if (realPath && realPath !== resolvedPath) {
+    await assertProjectLocationPathSafe(realPath);
+  }
 }
 
 export async function initializeProject(folderPath: string): Promise<void> {
@@ -51,6 +116,7 @@ export async function detectProject(folderPath: string): Promise<DetectResult> {
 }
 
 export async function ensureProject(folderPath: string): Promise<void> {
+  await assertProjectLocationSafe(folderPath);
   const result = await detectProject(folderPath);
   if (!result.exists) {
     await initializeProject(folderPath);
