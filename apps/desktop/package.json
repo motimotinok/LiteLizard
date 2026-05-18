@@ -24,7 +24,8 @@
     "asar": true,
     "npmRebuild": false,
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -44,6 +45,7 @@
       ],
       "identity": "-",
       "hardenedRuntime": false,
+      "icon": "build/icon.icns",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "dmg": {

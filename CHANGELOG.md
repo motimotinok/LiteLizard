@@ -1,3 +1,6 @@
+[2026/05/18]macOS アプリアイコンを追加
+トカゲのしっぽが鉛筆になっている試作アイコンを `apps/desktop/build/` に追加し、`electron-builder` の macOS icon 設定で packaged app に反映されるようにした。検証: `pnpm --filter @litelizard/desktop package:mac` 成功、生成 `.app` の `Info.plist` と `Contents/Resources/icon.icns` を確認。
+
 [2026/05/14]プロジェクトフォルダ選択の安全確認
 フォルダ選択ダイアログで新規フォルダ作成を可能にし、macOS のシステム領域や LiteLizard 内部フォルダを作業場所として拒否して、日本語の理由を表示するようにした。検証: projectManager / ipc / ProjectSetupScreen / useAppStore の追加テスト成功。残課題: Electron 実機の folder picker GUI 確認は未実施。
 
