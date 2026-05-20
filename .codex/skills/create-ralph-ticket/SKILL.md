@@ -1,6 +1,6 @@
 ---
 name: create-ralph-ticket
-description: "LiteLizard の Ralph Loop 用ローカルチケットを docs/tickets/ 配下に Markdown として作成するスキル。ユーザーが「Ralph Loop のチケットを作って」「ralph チケットにして」「docs/tickets にチケットを作成して」「ローカルチケット化して」などと明示した時、または Ralph Loop 中にプロンプトが許可する具体的な残課題・バグ・追加改善をチケット化する時に使う。GitHub Issue は作らず、退役済み WBS も更新しない。"
+description: "LiteLizard の Ralph Loop 用ローカルチケットを docs/tickets/ 配下に Markdown として作成するスキル。ユーザーが「Ralph Loop のチケットを作って」「ralph チケットにして」「docs/tickets にチケットを作成して」「ローカルチケット化して」などと明示した時、GitHub Issue から今すぐ実装する作業へ切り出す時、または Ralph Loop 中にプロンプトが許可する具体的な残課題・バグ・追加改善をチケット化する時に使う。Issue はクローズせず、退役済み WBS も更新しない。"
 ---
 
 # Create Ralph Ticket
@@ -11,8 +11,9 @@ LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 直下に Markdown 
 
 ## 方針
 
-- GitHub Issue とは完全に分離する。
-- `gh issue create` は使わない。
+- GitHub Issue backlog から今すぐ実装する作業を切り出す場合は、Source Issue 番号/URLをチケットに残す。
+- `gh issue create` / `gh issue close` は使わない。
+- チケット作成時にも完了時にも、元 Issue を自動 close しない。
 - WBS は退役済みのため、`docs/old/wbs.md` は更新しない。
 - Ralph Loop 実行中に作成するのは、今回の作業で実際に確認した具体的な残課題、バグ、追加改善だけにする。
 - 作成するチケットは、同じ Ralph Loop 内では次タスクとして扱わない。次回以降の候補にする。
@@ -61,6 +62,8 @@ completed_at:
 
 なぜこのチケットが必要かを書く。
 
+Source Issue: ある場合は `#番号 URL` を書く。ない場合は `なし` と書く。
+
 ## ゴール
 
 完了時に実現されている状態を書く。
@@ -93,4 +96,4 @@ completed_at:
 
 ## 作成後の報告
 
-作成したファイルパスと、チケットのゴールを 1 行で報告する。
+作成したファイルパス、チケットのゴール、Source Issue の有無を 1 行で報告する。元 Issue がある場合でも、このスキルでは close しない。

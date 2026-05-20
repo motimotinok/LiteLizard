@@ -1,4 +1,0 @@
-interface:
-  display_name: "Update Product Map"
-  short_description: "全体像と将来テーマをproduct-mapに整理する"
-  default_prompt: "Update docs/product-map.md with product direction, future themes, or pre-ticket ideas. Do not turn it into a task ledger."

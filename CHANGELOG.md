@@ -1,3 +1,9 @@
+[2026/05/20]Codex Stop hook を追加
+ターン終了時に `CHANGELOG.md`、`NOW.md`、`docs/tickets/` の状態確認を1回だけ促す repo-local Stop hook を追加し、`stop_hook_active` で継続ループを避けるようにした。
+
+[2026/05/20]Issue backlog 中心の運用へ整理
+Product Map を退役済み資料へ移し、LLM の入口として `NOW.md` を追加した。GitHub Issues を backlog、`docs/tickets/` を Ralph Loop 実行キューとする方針に合わせて `AGENTS.md`、Ralph Loop prompt、workflow skills を更新した。検証: skill validation、旧 product-map/update-product-map 参照検索、diff whitespace check を実施。
+
 [2026/05/18]macOS アプリアイコンを追加
 トカゲのしっぽが鉛筆になっている試作アイコンを `apps/desktop/build/` に追加し、`electron-builder` の macOS icon 設定で packaged app に反映されるようにした。検証: `pnpm --filter @litelizard/desktop package:mac` 成功、生成 `.app` の `Info.plist` と `Contents/Resources/icon.icns` を確認。
 

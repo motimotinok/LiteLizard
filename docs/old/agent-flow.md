@@ -11,7 +11,7 @@
 ```
 [Issue 作成]
    │
-   │ create-github-issue スキル / 手動
+   │ 旧 Issue 作成スキル / 手動
    │ - Depends on: 必要なら明記
    ▼
 [Issue が pending 状態]
@@ -70,7 +70,7 @@
 
 ## Issue 本文の規約
 
-`agent-ready` ラベルを付ける Issue は、`create-github-issue` スキルの標準テンプレ（背景・意図・ゴール・スコープ・非ゴール・受け入れ条件・検証方法）を満たすこと。
+`agent-ready` ラベルを付ける Issue は、旧 Issue 作成テンプレ（背景・意図・ゴール・スコープ・非ゴール・受け入れ条件・検証方法）を満たすこと。
 
 ### `## Depends on`（必要なら）
 
