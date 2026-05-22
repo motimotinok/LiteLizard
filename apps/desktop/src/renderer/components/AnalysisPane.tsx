@@ -254,7 +254,7 @@ export function AnalysisPane({
                 className="agent-select-create"
                 onClick={() => {
                   setAgentMenuOpen(false);
-                  openAgentsPanel();
+                  openAgentsPanel({ intent: 'new' });
                 }}
               >
                 <IconPlus size={12} /> 新しいエージェントを作成

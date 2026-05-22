@@ -13,6 +13,7 @@ import {
   type ReadingAgent,
   type ReadingAgentInput,
   type RecentProjectEntry,
+  type UpdateCheckResult,
 } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
@@ -37,6 +38,7 @@ export type ViewScale = 'micro' | 'macro';
 export type AnalysisMode = 'paragraph' | 'chapter' | 'document';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
 export type WorkspacePanel = 'editor' | 'settings' | 'agents' | 'search';
+export type AgentsScreenIntent = 'new';
 
 export interface PendingParagraphNavigation {
   paragraphId: string;
@@ -139,6 +141,10 @@ interface AppState {
   analysisLayerOpen: boolean;
   statusMessage: string;
   pendingParagraphNavigation: PendingParagraphNavigation | null;
+  pendingAgentsScreenIntent: AgentsScreenIntent | null;
+  appVersion: string | null;
+  updateCheck: UpdateCheckResult | null;
+  updateNoticeDismissed: boolean;
   undoStack: UndoSnapshot[];
   redoStack: UndoSnapshot[];
   pushUndo: (snapshot: UndoSnapshot) => void;
@@ -181,7 +187,8 @@ interface AppState {
   cycleEditorMode: () => void;
   openSettingsPanel: () => void;
   openEditorPanel: () => void;
-  openAgentsPanel: () => void;
+  openAgentsPanel: (options?: { intent?: AgentsScreenIntent }) => void;
+  consumeAgentsScreenIntent: () => AgentsScreenIntent | null;
   openSearchPanel: () => void;
   requestNavigateToParagraph: (paragraphId: string) => void;
   consumePendingParagraphNavigation: () => void;
@@ -203,6 +210,10 @@ interface AppState {
   clearProviderApiKey: (providerId: 'openai' | 'anthropic') => Promise<void>;
   saveAnalysisSettings: (input: AnalysisSettingsInput) => Promise<void>;
   testLocalLlmConnection: (input: { endpoint: string; model: string }) => Promise<{ ok: boolean; message: string }>;
+  loadAppVersion: () => Promise<void>;
+  checkForUpdates: () => Promise<void>;
+  openReleasesPage: () => Promise<void>;
+  dismissUpdateNotice: () => void;
 }
 
 function isSameOrNestedPath(value: string, base: string) {
@@ -693,6 +704,10 @@ export const useAppStore = create<AppState>((set, get) => {
     analysisLayerOpen: false,
     statusMessage: '準備完了',
     pendingParagraphNavigation: null,
+    pendingAgentsScreenIntent: null,
+    appVersion: null,
+    updateCheck: null,
+    updateNoticeDismissed: false,
 
   pushUndo: (snapshot) => {
     set((state) => {
@@ -1622,8 +1637,23 @@ export const useAppStore = create<AppState>((set, get) => {
   openSettingsPanel: () => {
     set({ activeWorkspacePanel: 'settings', statusMessage: '設定を開きました' });
   },
-  openAgentsPanel: () => {
-    set({ activeWorkspacePanel: 'agents', statusMessage: '分析エージェントを開きました' });
+  openAgentsPanel: (options) => {
+    const intent = options?.intent ?? null;
+    const statusMessage =
+      intent === 'new' ? '新しい分析エージェントの作成を開きました' : '分析エージェントを開きました';
+    set({
+      activeWorkspacePanel: 'agents',
+      pendingAgentsScreenIntent: intent,
+      statusMessage,
+    });
+  },
+
+  consumeAgentsScreenIntent: () => {
+    const intent = get().pendingAgentsScreenIntent;
+    if (intent) {
+      set({ pendingAgentsScreenIntent: null });
+    }
+    return intent;
   },
 
   openEditorPanel: () => {
@@ -1895,6 +1925,37 @@ export const useAppStore = create<AppState>((set, get) => {
       set({ statusMessage: nextMessage });
       return { ok: false, message: nextMessage };
     }
+  },
+
+  loadAppVersion: async () => {
+    try {
+      const version = await window.litelizard.getAppVersion();
+      set({ appVersion: version });
+    } catch {
+      // バージョン取得失敗は黙って無視する（起動・執筆を妨げない）
+    }
+  },
+
+  checkForUpdates: async () => {
+    try {
+      const result = await window.litelizard.checkForUpdates();
+      set({ updateCheck: result, updateNoticeDismissed: false });
+    } catch {
+      // 通信失敗時はバナーを出さない
+    }
+  },
+
+  openReleasesPage: async () => {
+    try {
+      await window.litelizard.openReleasesPage();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `リリースページを開けませんでした: ${message}` });
+    }
+  },
+
+  dismissUpdateNotice: () => {
+    set({ updateNoticeDismissed: true });
   },
   });
 });

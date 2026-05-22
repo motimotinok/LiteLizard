@@ -32,6 +32,10 @@ MVP 公開版は、未署名の macOS `.dmg` として GitHub Releases から配
 
 未署名アプリのため、通常のダブルクリックでは Gatekeeper の警告で起動できない場合があります。まずは上記の右クリックまたは Control クリックからの `開く` を使ってください。
 
+### 更新の確認
+
+LiteLizard は本格的なアプリ内自動更新を持ちません。起動時に GitHub Releases の `mvp-latest` を参照し、新しいバージョンがある場合だけ右下に控えめな通知を表示します。通知から `GitHub Releases を開く` を押すと、外部ブラウザで [`Releases`](https://github.com/motimotinok/LiteLizard/releases/tag/mvp-latest) ページが開きます。最新版を取り込むには `.dmg` を再ダウンロードして、上記のインストール手順をやり直してください。手動で確認したい場合は、設定画面の `LiteLizard について` から `更新を確認` / `GitHub Releases を開く` を使えます。
+
 それでも起動できない場合だけ、Terminal で次のコマンドを実行します。この操作は `LiteLizard.app` だけを対象にしてください。`/Applications` 全体や他のアプリを対象にしないでください。
 
 ```sh

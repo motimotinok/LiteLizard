@@ -24,7 +24,7 @@ const TABS: SettingsTab[] = [
   { id: 'editor', label: 'エディタ' },
   { id: 'appearance', label: '外観', comingSoon: true },
   { id: 'keyboard', label: 'キーボード', comingSoon: true },
-  { id: 'about', label: 'LiteLizard について', comingSoon: true },
+  { id: 'about', label: 'LiteLizard について' },
 ];
 
 const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string }> = [
@@ -47,6 +47,10 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
   const clearProviderApiKey = useAppStore((s) => s.clearProviderApiKey);
   const saveAnalysisSettings = useAppStore((s) => s.saveAnalysisSettings);
   const testLocalLlmConnection = useAppStore((s) => s.testLocalLlmConnection);
+  const appVersion = useAppStore((s) => s.appVersion);
+  const updateCheck = useAppStore((s) => s.updateCheck);
+  const checkForUpdates = useAppStore((s) => s.checkForUpdates);
+  const openReleasesPage = useAppStore((s) => s.openReleasesPage);
 
   const [activeTab, setActiveTab] = useState<SettingsTab['id']>(initialTab);
   const [draftKeys, setDraftKeys] = useState<Record<'openai' | 'anthropic', string>>({
@@ -662,6 +666,55 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
                     onClick={() => void saveDraftSettings()}
                   >
                     エディタ設定を保存
+                  </button>
+                </div>
+              </div>
+            </Section>
+          </>
+        ) : activeTab === 'about' ? (
+          <>
+            <CenteredHeader
+              overline="settings"
+              title="LiteLizard について"
+              subtitle={
+                <>
+                  バージョン情報と、GitHub Releases からの手動更新導線です。
+                  <br />
+                  自動更新には未対応です。
+                </>
+              }
+            />
+            <Section label={toKanjiIndex(1)} title="バージョン">
+              <Row label="現在のバージョン">
+                <div className="settings-row-value">
+                  {appVersion ? `v${appVersion}` : '取得中…'}
+                </div>
+              </Row>
+              <Row label="最新版">
+                <div className="settings-row-value">
+                  {updateCheck
+                    ? updateCheck.latestVersion
+                      ? updateCheck.updateAvailable
+                        ? `v${updateCheck.latestVersion} が公開されています`
+                        : `v${updateCheck.latestVersion}（最新）`
+                      : updateCheck.error
+                        ? `確認できませんでした: ${updateCheck.error}`
+                        : '取得できませんでした'
+                    : '確認中…'}
+                </div>
+              </Row>
+              <div className="settings-actions-row">
+                <span>更新ページを開いて手動で .dmg を入れ替えます。</span>
+                <div className="settings-actions-buttons">
+                  <button type="button" className="button-small" onClick={() => void checkForUpdates()}>
+                    更新を確認
+                  </button>
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void openReleasesPage()}
+                  >
+                    GitHub Releases を開く
                   </button>
                 </div>
               </div>

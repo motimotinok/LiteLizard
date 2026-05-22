@@ -751,6 +751,18 @@ export function createMockPreloadApi(): BridgeApi {
       return Array.from(state.readingAgents.values()).map(clone);
     },
 
+    getAppVersion: async () => '0.1.0-mock',
+
+    checkForUpdates: async () => ({
+      currentVersion: '0.1.0-mock',
+      latestVersion: null,
+      releaseUrl: 'https://github.com/motimotinok/LiteLizard/releases/tag/mvp-latest',
+      updateAvailable: false,
+      checkedAt: new Date().toISOString(),
+    }),
+
+    openReleasesPage: async () => ({ ok: true }),
+
     dryRunReadingAgent: async (input) => {
       const analyzedAt = new Date().toISOString();
       const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);
