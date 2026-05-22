@@ -16,6 +16,19 @@ export interface AnalysisProgressEvent {
   result: AnalysisResult;
 }
 
+/**
+ * 軽量更新通知（#101 MVP 用）。
+ * アプリ内自動更新は持たず、GitHub Releases の `mvp-latest` を参照して新版有無を判定するのみ。
+ */
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string | null;
+  releaseUrl: string;
+  updateAvailable: boolean;
+  checkedAt: string;
+  error?: string;
+}
+
 export interface ReadingAgentDryRunInput {
   agent: ReadingAgentInput & { id?: string };
   paragraph: AnalysisParagraph;
@@ -85,6 +98,9 @@ export interface BridgeApi {
   deleteReadingAgent(id: string): Promise<{ ok: true }>;
   resetReadingAgents(): Promise<ReadingAgent[]>;
   dryRunReadingAgent(input: ReadingAgentDryRunInput): Promise<AnalysisResult>;
+  getAppVersion(): Promise<string>;
+  checkForUpdates(): Promise<UpdateCheckResult>;
+  openReleasesPage(): Promise<{ ok: true }>;
 }
 
 /**
@@ -126,6 +142,9 @@ export const IPC_CHANNELS = {
   deleteReadingAgent: 'agents:delete',
   resetReadingAgents: 'agents:reset',
   dryRunReadingAgent: 'agents:dryRun',
+  getAppVersion: 'app:getAppVersion',
+  checkForUpdates: 'app:checkForUpdates',
+  openReleasesPage: 'app:openReleasesPage',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

@@ -12,8 +12,9 @@ MVP を外部公開できる状態にする。まず macOS 向けの未署名 `.
 
 - #95 MVP 公開コントロールを親 Issue として見る。
 - #100 の判断により、MVP は Apple Silicon 向け `arm64.dmg` 配布で進める。
-- #93 provider contract の残確認を公開前必須として扱う。OpenAI / Anthropic は再確認済み、local-llm endpoint と UI 登録経由確認が残る。
-- #101 更新通知と手動 `.dmg` 更新導線を、#89 本格自動更新とは別の軽量な MVP 対応候補として扱う。
+- #93 provider contract の残確認: OpenAI / Anthropic は再確認済み、local-llm endpoint への接続は `http://localhost:11434` 到達不能のため未完了。schema 経路ではなく環境問題として公開判断に回す。
+- #101 軽量更新通知（GitHub Releases `mvp-latest` 参照、起動時バナー、設定画面の `LiteLizard について` タブ）は実装済み。本格自動更新 #89 とは別物として扱う。
+- MVP 配布導線として、`main` 更新時に `.github/workflows/release.yml` が macos-latest 上で DMG をビルドし `mvp-latest` Release を上書き。
 - 公開直前は `docs/release-checklist.md` の自動検証と手動 GUI 確認を通す。
 - #89 自動更新、#90 ランディングページ、#94 Gemini provider は原則 MVP 後候補。
 

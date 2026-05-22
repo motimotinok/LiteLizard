@@ -106,8 +106,10 @@ export function AgentsScreen() {
   const deleteAgent = useAppStore((s) => s.deleteAgent);
   const resetAgents = useAppStore((s) => s.resetAgents);
   const dryRunAgent = useAppStore((s) => s.dryRunAgent);
+  const consumeAgentsScreenIntent = useAppStore((s) => s.consumeAgentsScreenIntent);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(activeAgentId);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [draft, setDraft] = useState<AgentDraft>(createNewDraft);
   const [baseDraft, setBaseDraft] = useState<AgentDraft>(createNewDraft);
   const [formError, setFormError] = useState<string | null>(null);
@@ -122,10 +124,25 @@ export function AgentsScreen() {
   const dirty = !sameDraft(draft, baseDraft);
 
   useEffect(() => {
+    const intent = consumeAgentsScreenIntent();
+    if (intent === 'new') {
+      const nextDraft = createNewDraft();
+      setSelectedAgentId(null);
+      setIsCreatingNew(true);
+      setDraft(nextDraft);
+      setBaseDraft({ ...nextDraft, name: '' });
+      setFormError(null);
+      setPreview(null);
+      setPreviewError(null);
+    }
+  }, [consumeAgentsScreenIntent]);
+
+  useEffect(() => {
+    if (isCreatingNew) return;
     if (!agentsLoaded || agents.length === 0) return;
     if (selectedAgentId && agents.some((agent) => agent.id === selectedAgentId)) return;
     setSelectedAgentId(activeAgentId && agents.some((agent) => agent.id === activeAgentId) ? activeAgentId : agents[0].id);
-  }, [activeAgentId, agents, agentsLoaded, selectedAgentId]);
+  }, [activeAgentId, agents, agentsLoaded, isCreatingNew, selectedAgentId]);
 
   useEffect(() => {
     if (!selectedAgent) return;
@@ -147,6 +164,7 @@ export function AgentsScreen() {
   const handleNew = () => {
     const nextDraft = createNewDraft();
     setSelectedAgentId(null);
+    setIsCreatingNew(true);
     setDraft(nextDraft);
     setBaseDraft({ ...nextDraft, name: '' });
     setFormError(null);
@@ -163,6 +181,7 @@ export function AgentsScreen() {
     try {
       const saved = await saveAgent(toInput(draft));
       const nextDraft = toDraft(saved);
+      setIsCreatingNew(false);
       setSelectedAgentId(saved.id);
       setDraft(nextDraft);
       setBaseDraft(nextDraft);
@@ -177,6 +196,7 @@ export function AgentsScreen() {
     if (!window.confirm(`${draft.name || 'このエージェント'}を削除しますか？`)) return;
     try {
       await deleteAgent(draft.id);
+      setIsCreatingNew(false);
       setSelectedAgentId(null);
       setPreview(null);
       setPreviewError(null);
@@ -187,6 +207,7 @@ export function AgentsScreen() {
 
   const handleDuplicate = () => {
     setSelectedAgentId(null);
+    setIsCreatingNew(true);
     setDraft({
       ...draft,
       id: undefined,
@@ -201,10 +222,16 @@ export function AgentsScreen() {
     if (!window.confirm('分析エージェントを初期状態に戻しますか？')) return;
     try {
       const reset = await resetAgents();
+      setIsCreatingNew(false);
       setSelectedAgentId(reset[0]?.id ?? null);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'リセットに失敗しました。');
     }
+  };
+
+  const handleSelectAgent = (id: string) => {
+    setIsCreatingNew(false);
+    setSelectedAgentId(id);
   };
 
   const handleDryRun = async () => {
@@ -259,7 +286,7 @@ export function AgentsScreen() {
             className={
               selectedAgentId === entry.id ? 'agents-sidebar-item is-active' : 'agents-sidebar-item'
             }
-            onClick={() => setSelectedAgentId(entry.id)}
+            onClick={() => handleSelectAgent(entry.id)}
           >
             <div className="agents-sidebar-row">
               <span className="agents-sidebar-kanji">{toKanjiIndex(index + 1)}</span>

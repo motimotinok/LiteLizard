@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
-import { app, dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain, shell } from 'electron';
+import { fetchLatestRelease, RELEASES_PAGE_URL } from './updateChecker.js';
 import {
   buildImportedDocument,
   createChapterId,
@@ -728,6 +729,18 @@ export function registerIpcHandlers() {
       console.error('[IPC agents:reset] failed', error);
       throw new Error(`RESET_READING_AGENTS_FAILED: ${getErrorMessage(error)}`);
     }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.getAppVersion, async () => app.getVersion());
+
+  ipcMain.handle(IPC_CHANNELS.checkForUpdates, async () => {
+    const currentVersion = app.getVersion();
+    return fetchLatestRelease(currentVersion, { signal: AbortSignal.timeout(5_000) });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.openReleasesPage, async () => {
+    await shell.openExternal(RELEASES_PAGE_URL);
+    return { ok: true as const };
   });
 
   ipcMain.handle(IPC_CHANNELS.dryRunReadingAgent, async (_, input: ReadingAgentDryRunInput) => {

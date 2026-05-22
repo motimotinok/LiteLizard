@@ -79,5 +79,8 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.resetReadingAgents),
     dryRunReadingAgent: (input) =>
       ipcRenderer.invoke(IPC_CHANNELS.dryRunReadingAgent, input),
+    getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getAppVersion),
+    checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
+    openReleasesPage: () => ipcRenderer.invoke(IPC_CHANNELS.openReleasesPage),
   };
 }
