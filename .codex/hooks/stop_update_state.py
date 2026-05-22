@@ -4,8 +4,7 @@ import sys
 
 
 CONTINUATION_PROMPT = (
-    "CHANGELOG.md、NOW.md、docs/tickets/ のチケット状態を確認し、"
-    "必要なら更新してください。"
+    "CHANGELOG.md と NOW.md を確認し、必要なら更新してください。"
 )
 
 

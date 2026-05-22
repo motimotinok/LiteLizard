@@ -1,6 +1,6 @@
 # LiteLizard NOW
 
-最終更新: 2026-05-21
+最終更新: 2026-05-22
 
 このファイルは LLM が最初に読む現在地。タスク台帳ではなく、詳細な backlog は GitHub Issues を見る。
 
@@ -13,6 +13,7 @@ MVP を外部公開できる状態にする。まず macOS 向けの未署名 `.
 - #95 MVP 公開コントロールを親 Issue として見る。
 - #100 の判断により、MVP は Apple Silicon 向け `arm64.dmg` 配布で進める。
 - #93 provider contract の残確認を公開前必須として扱う。OpenAI / Anthropic は再確認済み、local-llm endpoint と UI 登録経由確認が残る。
+- #101 更新通知と手動 `.dmg` 更新導線を、#89 本格自動更新とは別の軽量な MVP 対応候補として扱う。
 - 公開直前は `docs/release-checklist.md` の自動検証と手動 GUI 確認を通す。
 - #89 自動更新、#90 ランディングページ、#94 Gemini provider は原則 MVP 後候補。
 
