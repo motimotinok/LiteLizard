@@ -1,7 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
 import { app, dialog, ipcMain, shell } from 'electron';
-import { fetchLatestRelease, RELEASES_PAGE_URL } from './updateChecker.js';
+import { fetchLatestRelease, RELEASE_DOWNLOAD_URL, RELEASES_PAGE_URL } from './updateChecker.js';
 import {
   buildImportedDocument,
   createChapterId,
@@ -740,6 +740,11 @@ export function registerIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.openReleasesPage, async () => {
     await shell.openExternal(RELEASES_PAGE_URL);
+    return { ok: true as const };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.downloadLatestRelease, async () => {
+    await shell.openExternal(RELEASE_DOWNLOAD_URL);
     return { ok: true as const };
   });
 

@@ -34,7 +34,7 @@ MVP 公開版は、未署名の macOS `.dmg` として GitHub Releases から配
 
 ### 更新の確認
 
-LiteLizard は本格的なアプリ内自動更新を持ちません。起動時に GitHub Releases の `mvp-latest` を参照し、新しいバージョンがある場合だけ右下に控えめな通知を表示します。通知から `GitHub Releases を開く` を押すと、外部ブラウザで [`Releases`](https://github.com/motimotinok/LiteLizard/releases/tag/mvp-latest) ページが開きます。最新版を取り込むには `.dmg` を再ダウンロードして、上記のインストール手順をやり直してください。手動で確認したい場合は、設定画面の `LiteLizard について` から `更新を確認` / `GitHub Releases を開く` を使えます。
+LiteLizard は本格的なアプリ内自動更新を持ちません。起動時に GitHub Releases の `mvp-latest` を参照し、新しいバージョンがある場合だけ左下サイドバーの歯車アイコンに**青い丸（バッジ）**だけが付きます。バッジが付いた状態で歯車を押すと、設定画面の `LiteLizard について` タブが開きます。そこから `最新版 .dmg をダウンロード` を押すとブラウザが [`LiteLizard-latest-arm64.dmg`](https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg) のダウンロードを開始します。`GitHub Releases を開く` で [`Releases`](https://github.com/motimotinok/LiteLizard/releases/tag/mvp-latest) ページに移動することもできます。最新版を取り込むには `.dmg` を再ダウンロードして、上記のインストール手順をやり直してください。バッジは次回起動時に最新版を取り込んでいれば自動で消えます。
 
 それでも起動できない場合だけ、Terminal で次のコマンドを実行します。この操作は `LiteLizard.app` だけを対象にしてください。`/Applications` 全体や他のアプリを対象にしないでください。
 

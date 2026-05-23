@@ -2,7 +2,9 @@ import type { UpdateCheckResult } from '@litelizard/shared';
 
 export const RELEASE_TAG = 'mvp-latest';
 export const RELEASE_REPO = 'motimotinok/LiteLizard';
+export const RELEASE_ASSET_FILENAME = 'LiteLizard-latest-arm64.dmg';
 export const RELEASES_PAGE_URL = `https://github.com/${RELEASE_REPO}/releases/tag/${RELEASE_TAG}`;
+export const RELEASE_DOWNLOAD_URL = `https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${RELEASE_ASSET_FILENAME}`;
 const RELEASE_API_URL = `https://api.github.com/repos/${RELEASE_REPO}/releases/tags/${RELEASE_TAG}`;
 
 const VERSION_PATTERN = /v?(\d+)\.(\d+)\.(\d+)(?:[-+][\w.-]+)?/;

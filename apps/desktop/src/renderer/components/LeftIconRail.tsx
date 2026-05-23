@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppStore } from '../store/useAppStore.js';
 import { IconAgent, IconFolder, IconSearch, IconSettings } from './ui/icons.js';
 
 export type LeftIconRailPanel = 'editor' | 'agents' | 'settings' | 'search';
@@ -21,6 +22,9 @@ const PRIMARY_NAV: NavItem[] = [
 ];
 
 export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) {
+  const updateAvailable = useAppStore((state) => state.updateCheck?.updateAvailable ?? false);
+  const settingsLabel = updateAvailable ? '設定（新しいバージョンあり）' : '設定';
+
   return (
     <nav className="left-icon-rail" aria-label="primary-navigation">
       {PRIMARY_NAV.map(({ id, label, Icon }) => {
@@ -46,11 +50,12 @@ export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) 
             ? 'rail-icon-button rail-icon-button-footer is-active'
             : 'rail-icon-button rail-icon-button-footer'
         }
-        aria-label="設定"
-        title="設定"
+        aria-label={settingsLabel}
+        title={settingsLabel}
         onClick={() => onSelectPanel('settings')}
       >
         <IconSettings size={17} />
+        {updateAvailable ? <span className="rail-icon-badge" aria-hidden="true" /> : null}
       </button>
     </nav>
   );
