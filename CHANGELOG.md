@@ -1,3 +1,6 @@
+[2026/05/23]GitHub Actions の pnpm セットアップを公式 action に切替
+直前の `@v5` 化に伴い CI で `Unable to locate executable file: pnpm` が発生していた問題（`actions/setup-node@v5` + `corepack enable && corepack prepare pnpm@9.12.3 --activate` の経路が新環境で安定して shim を作れていない）を解消するため、`.github/workflows/{ci,release,deploy-pages}.yml` の pnpm セットアップを `pnpm/action-setup@v4` に切り替えた。バージョン指定はルート `package.json` の `packageManager: pnpm@9.12.3` を参照するため不要、`actions/setup-node` には `cache: 'pnpm'` を追加し、`pnpm install` の `--store-dir .pnpm-store` 指定は action 側で管理されるため削除した。検証: workflow YAML 差分の手動確認のみ。残課題: `dev` push 後の CI 実走と Release workflow の `workflow_dispatch` 実走で pnpm 解決成功・DMG 生成成功を確認する。
+
 [2026/05/23]GitHub Actions の Node.js 20 廃止対応
 GitHub Actions runner の Node.js 20 廃止予告（2025-09-19 アナウンス）に伴う警告 `Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24` を解消するため、`.github/workflows/{release,ci,deploy-pages,claude}.yml` の `actions/checkout` と `actions/setup-node` を `@v4` → `@v5`（Node.js 24 ネイティブ）に更新し、暫定回避策として置いていた `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` 環境変数を `release.yml` / `ci.yml` / `deploy-pages.yml` から削除した。Node 24 ランタイム指定（`actions/setup-node` の `node-version: 24`）と pnpm 9.12.3 corepack 経路は変更なし。検証: workflow YAML 差分の手動確認のみ（CI/Release 実行は次回 push 時に確認）。残課題: `main` への push もしくは `workflow_dispatch` で Release workflow を実走させて、警告が消えること・DMG 添付が成功することを確認する。
 
