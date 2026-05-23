@@ -2556,60 +2556,18 @@ button {
 }
 
 /* =========================================================
- * 軽量更新通知バナー (#101)
+ * 更新通知バッジ（歯車アイコン用、#89）
  * ========================================================= */
-.update-notice {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--paper);
-  border: 1px solid var(--ink-4-soft);
-  box-shadow: 0 8px 24px -16px rgba(40, 30, 20, 0.4);
-  font-family: var(--sans);
-  font-size: 12.5px;
-  color: var(--ink-2);
-  max-width: 360px;
-}
-
-.update-notice-text {
-  flex: 1;
-  line-height: 1.6;
-}
-
-.update-notice-text strong {
-  color: var(--ink-1, var(--ink-2));
-}
-
-.update-notice-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.update-notice-button {
-  padding: 4px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  border: 1px solid var(--ink-4-soft);
-  background: var(--paper-soft);
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.update-notice-button.is-primary {
-  background: var(--ink-2);
-  color: var(--paper);
-  border-color: var(--ink-2);
-}
-
-.update-notice-button:hover {
-  filter: brightness(0.97);
+.rail-icon-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: oklch(62% 0.16 245);
+  box-shadow: 0 0 0 1.5px var(--paper);
+  pointer-events: none;
 }
 
 /* =========================================================

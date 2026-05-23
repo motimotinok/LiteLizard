@@ -1,5 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { fetchLatestRelease, isNewerVersion, pickLatestVersion } from './updateChecker.js';
+import {
+  fetchLatestRelease,
+  isNewerVersion,
+  pickLatestVersion,
+  RELEASE_ASSET_FILENAME,
+  RELEASE_DOWNLOAD_URL,
+  RELEASE_TAG,
+} from './updateChecker.js';
+
+describe('release constants', () => {
+  it('RELEASE_DOWNLOAD_URL points to the mvp-latest tagged asset', () => {
+    expect(RELEASE_TAG).toBe('mvp-latest');
+    expect(RELEASE_ASSET_FILENAME).toBe('LiteLizard-latest-arm64.dmg');
+    expect(RELEASE_DOWNLOAD_URL).toBe(
+      'https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg',
+    );
+  });
+});
 
 describe('isNewerVersion', () => {
   it('returns true when patch advances', () => {

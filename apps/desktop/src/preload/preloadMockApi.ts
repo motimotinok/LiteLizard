@@ -763,6 +763,8 @@ export function createMockPreloadApi(): BridgeApi {
 
     openReleasesPage: async () => ({ ok: true }),
 
+    downloadLatestRelease: async () => ({ ok: true }),
+
     dryRunReadingAgent: async (input) => {
       const analyzedAt = new Date().toISOString();
       const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);

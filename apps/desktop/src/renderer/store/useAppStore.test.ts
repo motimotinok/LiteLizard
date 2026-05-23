@@ -64,6 +64,16 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
     deleteReadingAgent: vi.fn(),
     resetReadingAgents: vi.fn(),
     dryRunReadingAgent: vi.fn(),
+    getAppVersion: vi.fn().mockResolvedValue('0.0.0-test'),
+    checkForUpdates: vi.fn().mockResolvedValue({
+      currentVersion: '0.0.0-test',
+      latestVersion: null,
+      releaseUrl: 'https://example.test/release',
+      updateAvailable: false,
+      checkedAt: '2026-05-23T00:00:00.000Z',
+    }),
+    openReleasesPage: vi.fn().mockResolvedValue({ ok: true }),
+    downloadLatestRelease: vi.fn().mockResolvedValue({ ok: true }),
     ...overrides,
   };
 }
@@ -1316,5 +1326,70 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
     await useAppStore.getState().confirmAnalysisRun();
 
     expect(runAnalysis).not.toHaveBeenCalled();
+  });
+});
+
+describe('useAppStore #89 軽量更新通知の歯車バッジ導線', () => {
+  beforeEach(() => {
+    (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
+    useAppStore.setState(baseState, true);
+    window.litelizard = createBridge();
+  });
+
+  it('updateAvailable=true の状態で openSettingsPanel を呼ぶと pendingSettingsScreenIntent が "update" になる', () => {
+    useAppStore.setState({
+      updateCheck: {
+        currentVersion: '0.1.0',
+        latestVersion: '0.2.0',
+        releaseUrl: 'https://example.test/release',
+        updateAvailable: true,
+        checkedAt: '2026-05-23T00:00:00.000Z',
+      },
+    });
+
+    useAppStore.getState().openSettingsPanel();
+
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('settings');
+    expect(useAppStore.getState().pendingSettingsScreenIntent).toBe('update');
+  });
+
+  it('updateAvailable=false の状態で openSettingsPanel を呼ぶと pendingSettingsScreenIntent は null のまま', () => {
+    useAppStore.setState({
+      updateCheck: {
+        currentVersion: '0.1.0',
+        latestVersion: '0.1.0',
+        releaseUrl: 'https://example.test/release',
+        updateAvailable: false,
+        checkedAt: '2026-05-23T00:00:00.000Z',
+      },
+    });
+
+    useAppStore.getState().openSettingsPanel();
+
+    expect(useAppStore.getState().activeWorkspacePanel).toBe('settings');
+    expect(useAppStore.getState().pendingSettingsScreenIntent).toBe(null);
+  });
+
+  it('明示的に intent="update" を渡すと updateAvailable に関係なく pendingSettingsScreenIntent が "update" になる', () => {
+    useAppStore.getState().openSettingsPanel({ intent: 'update' });
+    expect(useAppStore.getState().pendingSettingsScreenIntent).toBe('update');
+  });
+
+  it('consumeSettingsScreenIntent は intent を返した後 null に戻す', () => {
+    useAppStore.setState({ pendingSettingsScreenIntent: 'update' });
+    const first = useAppStore.getState().consumeSettingsScreenIntent();
+    const second = useAppStore.getState().consumeSettingsScreenIntent();
+    expect(first).toBe('update');
+    expect(second).toBe(null);
+    expect(useAppStore.getState().pendingSettingsScreenIntent).toBe(null);
+  });
+
+  it('downloadLatestRelease は bridge.downloadLatestRelease を呼ぶ', async () => {
+    const downloadLatestRelease = vi.fn().mockResolvedValue({ ok: true });
+    window.litelizard = createBridge({ downloadLatestRelease });
+
+    await useAppStore.getState().downloadLatestRelease();
+
+    expect(downloadLatestRelease).toHaveBeenCalledTimes(1);
   });
 });

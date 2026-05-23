@@ -290,11 +290,6 @@ export function App() {
     loadAgents,
     loadAppVersion,
     checkForUpdates,
-    openReleasesPage,
-    dismissUpdateNotice,
-    updateCheck,
-    updateNoticeDismissed,
-    appVersion,
     recentProjects,
     openRecentProject,
     removeRecentProject,
@@ -336,59 +331,16 @@ export function App() {
     );
   }
 
-  const showUpdateNotice = Boolean(
-    updateCheck?.updateAvailable && !updateNoticeDismissed,
-  );
-
-  const updateNotice = showUpdateNotice && updateCheck ? (
-    <div className="update-notice" role="status" aria-live="polite">
-      <div className="update-notice-text">
-        <strong>新しい LiteLizard が公開されています</strong>
-        <br />
-        現在 v{appVersion ?? updateCheck.currentVersion}、最新 v{updateCheck.latestVersion}。
-        GitHub Releases から `.dmg` を再ダウンロードしてください（自動更新は未対応）。
-      </div>
-      <div className="update-notice-actions">
-        <button
-          type="button"
-          className="update-notice-button is-primary"
-          onClick={() => {
-            void openReleasesPage();
-            dismissUpdateNotice();
-          }}
-        >
-          開く
-        </button>
-        <button
-          type="button"
-          className="update-notice-button"
-          onClick={dismissUpdateNotice}
-          aria-label="閉じる"
-        >
-          閉じる
-        </button>
-      </div>
-    </div>
-  ) : null;
-
   if (startupState === 'needs-project' && !rootPath) {
     return (
-      <>
-        <ProjectSetupScreen
-          onSelectFolder={() => void openFolder()}
-          recentProjects={recentProjects}
-          onOpenRecent={(folderPath) => void openRecentProject(folderPath)}
-          onRemoveRecent={(folderPath) => void removeRecentProject(folderPath)}
-        />
-        {updateNotice}
-      </>
+      <ProjectSetupScreen
+        onSelectFolder={() => void openFolder()}
+        recentProjects={recentProjects}
+        onOpenRecent={(folderPath) => void openRecentProject(folderPath)}
+        onRemoveRecent={(folderPath) => void removeRecentProject(folderPath)}
+      />
     );
   }
 
-  return (
-    <>
-      <WorkspaceShell />
-      {updateNotice}
-    </>
-  );
+  return <WorkspaceShell />;
 }

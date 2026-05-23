@@ -39,6 +39,7 @@ export type AnalysisMode = 'paragraph' | 'chapter' | 'document';
 export type StartupState = 'loading' | 'needs-project' | 'ready';
 export type WorkspacePanel = 'editor' | 'settings' | 'agents' | 'search';
 export type AgentsScreenIntent = 'new';
+export type SettingsScreenIntent = 'update';
 
 export interface PendingParagraphNavigation {
   paragraphId: string;
@@ -142,9 +143,9 @@ interface AppState {
   statusMessage: string;
   pendingParagraphNavigation: PendingParagraphNavigation | null;
   pendingAgentsScreenIntent: AgentsScreenIntent | null;
+  pendingSettingsScreenIntent: SettingsScreenIntent | null;
   appVersion: string | null;
   updateCheck: UpdateCheckResult | null;
-  updateNoticeDismissed: boolean;
   undoStack: UndoSnapshot[];
   redoStack: UndoSnapshot[];
   pushUndo: (snapshot: UndoSnapshot) => void;
@@ -185,7 +186,8 @@ interface AppState {
   setAnalysisMode: (mode: AnalysisMode) => void;
   toggleViewScale: () => void;
   cycleEditorMode: () => void;
-  openSettingsPanel: () => void;
+  openSettingsPanel: (options?: { intent?: SettingsScreenIntent }) => void;
+  consumeSettingsScreenIntent: () => SettingsScreenIntent | null;
   openEditorPanel: () => void;
   openAgentsPanel: (options?: { intent?: AgentsScreenIntent }) => void;
   consumeAgentsScreenIntent: () => AgentsScreenIntent | null;
@@ -213,7 +215,7 @@ interface AppState {
   loadAppVersion: () => Promise<void>;
   checkForUpdates: () => Promise<void>;
   openReleasesPage: () => Promise<void>;
-  dismissUpdateNotice: () => void;
+  downloadLatestRelease: () => Promise<void>;
 }
 
 function isSameOrNestedPath(value: string, base: string) {
@@ -705,9 +707,9 @@ export const useAppStore = create<AppState>((set, get) => {
     statusMessage: '準備完了',
     pendingParagraphNavigation: null,
     pendingAgentsScreenIntent: null,
+    pendingSettingsScreenIntent: null,
     appVersion: null,
     updateCheck: null,
-    updateNoticeDismissed: false,
 
   pushUndo: (snapshot) => {
     set((state) => {
@@ -1634,8 +1636,22 @@ export const useAppStore = create<AppState>((set, get) => {
     set({ editorMode: 'writing', analysisLayerOpen: false });
   },
 
-  openSettingsPanel: () => {
-    set({ activeWorkspacePanel: 'settings', statusMessage: '設定を開きました' });
+  openSettingsPanel: (options) => {
+    const explicitIntent = options?.intent ?? null;
+    const autoIntent = !explicitIntent && get().updateCheck?.updateAvailable ? 'update' : null;
+    const intent = explicitIntent ?? autoIntent;
+    set({
+      activeWorkspacePanel: 'settings',
+      pendingSettingsScreenIntent: intent,
+      statusMessage: '設定を開きました',
+    });
+  },
+  consumeSettingsScreenIntent: () => {
+    const intent = get().pendingSettingsScreenIntent;
+    if (intent) {
+      set({ pendingSettingsScreenIntent: null });
+    }
+    return intent;
   },
   openAgentsPanel: (options) => {
     const intent = options?.intent ?? null;
@@ -1939,9 +1955,9 @@ export const useAppStore = create<AppState>((set, get) => {
   checkForUpdates: async () => {
     try {
       const result = await window.litelizard.checkForUpdates();
-      set({ updateCheck: result, updateNoticeDismissed: false });
+      set({ updateCheck: result });
     } catch {
-      // 通信失敗時はバナーを出さない
+      // 通信失敗時はバッジを出さない（起動・執筆を妨げない）
     }
   },
 
@@ -1954,8 +1970,13 @@ export const useAppStore = create<AppState>((set, get) => {
     }
   },
 
-  dismissUpdateNotice: () => {
-    set({ updateNoticeDismissed: true });
+  downloadLatestRelease: async () => {
+    try {
+      await window.litelizard.downloadLatestRelease();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      set({ statusMessage: `ダウンロードリンクを開けませんでした: ${message}` });
+    }
   },
   });
 });

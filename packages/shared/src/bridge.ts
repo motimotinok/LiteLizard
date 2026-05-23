@@ -101,6 +101,7 @@ export interface BridgeApi {
   getAppVersion(): Promise<string>;
   checkForUpdates(): Promise<UpdateCheckResult>;
   openReleasesPage(): Promise<{ ok: true }>;
+  downloadLatestRelease(): Promise<{ ok: true }>;
 }
 
 /**
@@ -145,6 +146,7 @@ export const IPC_CHANNELS = {
   getAppVersion: 'app:getAppVersion',
   checkForUpdates: 'app:checkForUpdates',
   openReleasesPage: 'app:openReleasesPage',
+  downloadLatestRelease: 'app:downloadLatestRelease',
 } as const satisfies Record<Exclude<keyof BridgeApi, 'onRequestOpenFolder' | 'onAnalysisProgress'> | 'requestOpenFolder' | 'analysisProgress', string>;
 
 export type IpcChannelName = (typeof IPC_CHANNELS)[keyof typeof IPC_CHANNELS];

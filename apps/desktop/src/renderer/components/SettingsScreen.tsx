@@ -51,8 +51,17 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
   const updateCheck = useAppStore((s) => s.updateCheck);
   const checkForUpdates = useAppStore((s) => s.checkForUpdates);
   const openReleasesPage = useAppStore((s) => s.openReleasesPage);
+  const downloadLatestRelease = useAppStore((s) => s.downloadLatestRelease);
+  const consumeSettingsScreenIntent = useAppStore((s) => s.consumeSettingsScreenIntent);
 
   const [activeTab, setActiveTab] = useState<SettingsTab['id']>(initialTab);
+
+  useEffect(() => {
+    const intent = consumeSettingsScreenIntent();
+    if (intent === 'update') {
+      setActiveTab('about');
+    }
+  }, [consumeSettingsScreenIntent]);
   const [draftKeys, setDraftKeys] = useState<Record<'openai' | 'anthropic', string>>({
     openai: '',
     anthropic: '',
@@ -704,17 +713,24 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
                 </div>
               </Row>
               <div className="settings-actions-row">
-                <span>更新ページを開いて手動で .dmg を入れ替えます。</span>
+                <span>最新の .dmg をブラウザでダウンロードして、Applications に置き直してください。</span>
                 <div className="settings-actions-buttons">
                   <button type="button" className="button-small" onClick={() => void checkForUpdates()}>
                     更新を確認
                   </button>
+                  <button type="button" className="button-small" onClick={() => void openReleasesPage()}>
+                    GitHub Releases を開く
+                  </button>
                   <button
                     type="button"
-                    className="button-small button-small-primary"
-                    onClick={() => void openReleasesPage()}
+                    className={
+                      updateCheck?.updateAvailable
+                        ? 'button-small button-small-primary'
+                        : 'button-small'
+                    }
+                    onClick={() => void downloadLatestRelease()}
                   >
-                    GitHub Releases を開く
+                    最新版 .dmg をダウンロード
                   </button>
                 </div>
               </div>

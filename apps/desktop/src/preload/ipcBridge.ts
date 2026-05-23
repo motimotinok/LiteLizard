@@ -82,5 +82,6 @@ export function createIpcBridge(): BridgeApi {
     getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.getAppVersion),
     checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.checkForUpdates),
     openReleasesPage: () => ipcRenderer.invoke(IPC_CHANNELS.openReleasesPage),
+    downloadLatestRelease: () => ipcRenderer.invoke(IPC_CHANNELS.downloadLatestRelease),
   };
 }
