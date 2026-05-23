@@ -56,7 +56,7 @@ jobs:
       - name: Locate DMG artifact
         id: artifact
         run: |
-          DMG="apps/desktop/release/LiteLizard-${{ steps.app-version.outputs.version }}-arm64.dmg"
+          DMG="apps/desktop/release/LiteLizard-latest-arm64.dmg"
           if [ ! -f "$DMG" ]; then
             echo "DMG not found at $DMG" >&2
             ls -la apps/desktop/release || true
