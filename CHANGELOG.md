@@ -1,3 +1,6 @@
+[2026/05/23]ローカル絶対パスを参照していた `.npmrc` を削除し CI/Release を復旧
+リポジトリ直下の `.npmrc` に開発機の絶対パス `store-dir=/Users/jane/Library/pnpm/store/v3` がコミットされており、CI の `pnpm/action-setup@v4` ステップが Ubuntu runner 上で `EACCES: permission denied, mkdir '/Users'` で失敗、MVP Release の macos-latest 上でも `jane` ユーザーが存在しないため同様に失敗していた。指定されていた値が macOS の pnpm 既定 store パス（`~/Library/pnpm/store/v3`）と同一だったため、ファイル自体を削除しても開発機の挙動は変わらない判断で `.npmrc` を `git rm` した。検証: 削除前の失敗ログ確認のみ。残課題: 次回 push 後の CI / `workflow_dispatch` での MVP Release 実走で pnpm install 成功と DMG 生成を確認する。ローカルで再度 store-dir を明示したい場合は `~/.npmrc`（ホーム配下）に置く運用にする。
+
 [2026/05/23]GitHub Actions の pnpm セットアップを公式 action に切替
 直前の `@v5` 化に伴い CI で `Unable to locate executable file: pnpm` が発生していた問題（`actions/setup-node@v5` + `corepack enable && corepack prepare pnpm@9.12.3 --activate` の経路が新環境で安定して shim を作れていない）を解消するため、`.github/workflows/{ci,release,deploy-pages}.yml` の pnpm セットアップを `pnpm/action-setup@v4` に切り替えた。バージョン指定はルート `package.json` の `packageManager: pnpm@9.12.3` を参照するため不要、`actions/setup-node` には `cache: 'pnpm'` を追加し、`pnpm install` の `--store-dir .pnpm-store` 指定は action 側で管理されるため削除した。検証: workflow YAML 差分の手動確認のみ。残課題: `dev` push 後の CI 実走と Release workflow の `workflow_dispatch` 実走で pnpm 解決成功・DMG 生成成功を確認する。
 
