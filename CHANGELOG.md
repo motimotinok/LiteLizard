@@ -1,3 +1,6 @@
+[2026/05/23]MVP Release workflow に `@litelizard/shared` ビルドステップを追加
+`release.yml` で `pnpm -w build` より前に `pnpm -w test` を走らせていたため、`apps/api` / `apps/desktop` の vitest が dist 未生成の `@litelizard/shared` を解決できず `Failed to resolve entry for package "@litelizard/shared"` で連続失敗していた。`ci.yml` 同様に `Install dependencies` 直後に `Build shared package`（`pnpm --filter @litelizard/shared build`）ステップを追加して、Lint / Run tests / Build workspace の前に shared の dist を用意するようにした。検証: workflow_dispatch 経由の MVP Release 実走で Run tests・package:mac:dmg・Publish GitHub Release が全て成功することを確認する（push 後に gh から実走させる）。
+
 [2026/05/23]ローカル絶対パスを参照していた `.npmrc` を削除し CI/Release を復旧
 リポジトリ直下の `.npmrc` に開発機の絶対パス `store-dir=/Users/jane/Library/pnpm/store/v3` がコミットされており、CI の `pnpm/action-setup@v4` ステップが Ubuntu runner 上で `EACCES: permission denied, mkdir '/Users'` で失敗、MVP Release の macos-latest 上でも `jane` ユーザーが存在しないため同様に失敗していた。指定されていた値が macOS の pnpm 既定 store パス（`~/Library/pnpm/store/v3`）と同一だったため、ファイル自体を削除しても開発機の挙動は変わらない判断で `.npmrc` を `git rm` した。検証: 削除前の失敗ログ確認のみ。残課題: 次回 push 後の CI / `workflow_dispatch` での MVP Release 実走で pnpm install 成功と DMG 生成を確認する。ローカルで再度 store-dir を明示したい場合は `~/.npmrc`（ホーム配下）に置く運用にする。
 
