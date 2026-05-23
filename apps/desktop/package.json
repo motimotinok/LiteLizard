@@ -46,7 +46,7 @@
       "identity": "-",
       "hardenedRuntime": false,
       "icon": "build/icon.icns",
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "artifactName": "${productName}-latest-${arch}.${ext}"
     },
     "dmg": {
       "writeUpdateInfo": false,

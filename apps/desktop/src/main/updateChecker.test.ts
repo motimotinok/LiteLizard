@@ -20,7 +20,16 @@ describe('isNewerVersion', () => {
 });
 
 describe('pickLatestVersion', () => {
-  it('prefers asset filename when present', () => {
+  it('extracts version from release body when asset/tag use "latest" naming', () => {
+    expect(
+      pickLatestVersion({
+        tag_name: 'mvp-latest',
+        assets: [{ name: 'LiteLizard-latest-arm64.dmg' }],
+        body: 'LiteLizard MVP の最新ビルドです (v0.1.0, commit abc1234)。',
+      }),
+    ).toBe('0.1.0');
+  });
+  it('prefers asset filename version when present', () => {
     expect(
       pickLatestVersion({
         tag_name: 'mvp-latest',
@@ -50,7 +59,8 @@ describe('fetchLatestRelease', () => {
       new Response(
         JSON.stringify({
           tag_name: 'mvp-latest',
-          assets: [{ name: 'LiteLizard-0.2.0-arm64.dmg' }],
+          assets: [{ name: 'LiteLizard-latest-arm64.dmg' }],
+          body: 'LiteLizard MVP の最新ビルドです (v0.2.0, commit abc1234)。',
           html_url: 'https://example.test/release',
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -66,7 +76,11 @@ describe('fetchLatestRelease', () => {
   it('returns updateAvailable=false when versions match', async () => {
     const fakeFetch = (async () =>
       new Response(
-        JSON.stringify({ tag_name: 'mvp-latest', assets: [{ name: 'LiteLizard-0.1.0-arm64.dmg' }] }),
+        JSON.stringify({
+          tag_name: 'mvp-latest',
+          assets: [{ name: 'LiteLizard-latest-arm64.dmg' }],
+          body: 'LiteLizard MVP の最新ビルドです (v0.1.0, commit abc1234)。',
+        }),
         { status: 200 },
       )) as unknown as typeof fetch;
 
