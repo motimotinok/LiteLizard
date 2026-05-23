@@ -41,7 +41,7 @@
   3. **Lexical unit test** — Plugin 単体テスト
 
 ### リポジトリ衛生
-- `.npmrc` などの設定ファイルに `/Users/...` や `C:\Users\...` の絶対パスを書かない。CI (Ubuntu / macos-latest runner) で pnpm が `EACCES: mkdir '/Users'` 等で失敗する。store-dir などの開発機固有設定はホーム配下の `~/.npmrc` に置く。
+- リポジトリにコミットするファイル（コード・設定・ドキュメント・テスト・スクリプト・チケット・CHANGELOG など何であれ）にユーザー固有の絶対パスを書かない。`/Users/<name>/...`、`/home/<name>/...`、`C:\Users\<name>\...` などは別環境（CI、他開発者、別 OS）で必ず壊れる。開発機固有設定は `~/.npmrc` などホーム配下に逃がし、コード内では `os.homedir()` / `path.join(...)` / 環境変数 / プロジェクト相対パスで表現する。例: `.npmrc` に `store-dir=/Users/jane/...` を書いて CI が `EACCES: mkdir '/Users'` で連続失敗した事例あり。
 
 ### renderer の SSR テスト時の zustand 注意
 - 既存の renderer テストは `renderToStaticMarkup` を使う node 環境のテストが多い。zustand v5 の `useStore` は SSR 時に `useSyncExternalStore` の `getServerSnapshot` を経由し、**ストアの初期状態**を返す。`useAppStore.setState(...)` で値を変えても `renderToStaticMarkup` 内の `useAppStore(selector)` には反映されない。
