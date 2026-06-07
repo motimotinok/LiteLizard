@@ -1,16 +1,3 @@
 {
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/stop_update_state.py\"",
-            "timeout": 30,
-            "statusMessage": "Checking project state"
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }
