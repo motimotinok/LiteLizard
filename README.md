@@ -61,8 +61,13 @@ xattr -dr com.apple.quarantine /Applications/LiteLizard.app
 
 ### Quick start
 
-1. 依存関係をインストール: `pnpm install`
-2. デスクトップアプリを起動: `pnpm --filter @litelizard/desktop dev`
+Node.js 24（`.nvmrc` は `24.13.0`）と pnpm 9.12.3 を使用します。Electron 42のツールチェーンはNode.js 22.12.0未満では動作しません。
+
+1. Node.js を切り替え: `nvm use`
+2. 依存関係をインストール: `pnpm install`
+3. デスクトップアプリを起動: `pnpm --filter @litelizard/desktop dev`
+
+デスクトップの起動・パッケージコマンドは、Node.js 22.12.0未満で実行された場合、nvmまたはnodebrewにインストール済みの対応Nodeを自動検出します。対応Nodeが見つからない場合はNode.js 24をインストールしてから再実行してください。
 
 ### Test
 
