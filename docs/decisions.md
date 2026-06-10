@@ -6,6 +6,23 @@
 
 ---
 
+## [2026-06-10] Electron は公式サポート中の安定系列へ更新する
+
+- **決定**: サポート終了済みの Electron 34.5.8 から、着手時点で公式サポート対象の Electron 42.4.0 へ更新する。今後も公開版が公式のサポート対象3メジャーから外れる前に更新を検討する
+- **理由**: 公開中のデスクトップアプリが、セキュリティ修正を受けられない Chromium / Node.js を同梱し続ける状態を避けるため
+- **互換対応**:
+  - Electron 35以降の `webContents` の `console-message` イベントを、旧来の位置引数ではなくイベントオブジェクトから読む
+  - Electron 42のパッケージインストール時にバイナリを取得しない仕様へ対応し、開発起動とmacOSパッケージ作成前に `install-electron` を明示実行する
+  - Electron 42のツールチェーン要件に合わせてNode.js 22.12.0以上を必須とし、開発・パッケージコマンドではnvm/nodebrewにインストール済みの対応Nodeを自動選択する。標準の開発環境はCIと同じNode.js 24とする
+  - packaged smoke はrendererとpreload IPCの準備完了を検出した後、検証側からアプリを終了する
+- **サポート範囲**: Electron 42のmacOS最小要件は12.0だが、LiteLizardの公開上の動作確認済み環境は引き続きmacOS Tahoe 26.5.1のApple Silicon Macのみとする
+- **却下した案**:
+  - Electron 34を維持する: 公式サポート終了済みであり、公開アプリの依存として許容できない
+  - Electron以外の依存も一括更新する: 互換性確認の範囲が広がり、今回のセキュリティ更新と無関係な回帰を混ぜるため
+- **参照**: `apps/desktop/package.json`, `apps/desktop/src/main/main.ts`, `apps/desktop/scripts/smoke-packaged-mac.mjs`, GitHub Issue #107
+
+---
+
 ## [2026-06-10] macOS の公開サポート範囲を実機確認済み環境に限定する
 
 - **決定**: MVP の配布対象は Apple Silicon Mac（arm64）のみとし、公開上の動作確認済み環境は macOS Tahoe 26.5.1 とする。その他の macOS バージョンは未検証のため動作を保証せず、対応下限は宣言しない

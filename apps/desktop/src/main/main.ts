@@ -78,8 +78,8 @@ function createMainWindow() {
     }
   });
 
-  mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
-    console.log('[Renderer console]', message, sourceId ? `(${sourceId}:${line})` : '');
+  mainWindow.webContents.on('console-message', ({ message, lineNumber, sourceId }) => {
+    console.log('[Renderer console]', message, sourceId ? `(${sourceId}:${lineNumber})` : '');
   });
 
   mainWindow.webContents.on('preload-error', (_event, preloadPathWithError, error) => {

@@ -29,6 +29,7 @@ const child = spawn(appExecutable, ['--no-sandbox'], {
 
 let output = '';
 let settled = false;
+let ready = false;
 
 const finish = (code, signal = null) => {
   if (settled) {
@@ -37,7 +38,7 @@ const finish = (code, signal = null) => {
   settled = true;
   clearTimeout(timer);
 
-  const passed = code === 0 && output.includes('[Smoke] packaged app ready:');
+  const passed = ready && (code === 0 || signal === 'SIGTERM');
   if (!passed) {
     console.error(output.trim());
     console.error(
@@ -60,10 +61,18 @@ const timer = setTimeout(() => {
 
 child.stdout.on('data', (chunk) => {
   output += chunk.toString();
+  if (!ready && output.includes('[Smoke] packaged app ready:')) {
+    ready = true;
+    child.kill('SIGTERM');
+  }
 });
 
 child.stderr.on('data', (chunk) => {
   output += chunk.toString();
+  if (!ready && output.includes('[Smoke] packaged app ready:')) {
+    ready = true;
+    child.kill('SIGTERM');
+  }
 });
 
 child.on('error', (error) => {

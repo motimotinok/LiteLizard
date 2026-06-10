@@ -1,3 +1,6 @@
+[2026/06/10]#107 サポート中の Electron へ更新
+Electron を34.5.8から42.4.0へ更新し、console-message APIとバイナリ取得方法の変更へ追従した。Node 21でElectronインストーラーがESMエラーになる問題に対してNode 22.12以上を明示し、nvm/nodebrewの対応Nodeを自動選択する起動ラッパーを追加したうえで、全体テスト、macOS arm64のapp・DMG生成、開発起動、packaged smokeを確認した。
+
 [2026/06/10]Ralph Loop 運用を廃止
 Issue着手時にRalphチケットを自動作成する指示をAGENTS.md、NOW.md、関連スキルから削除し、Ralph専用プロンプト・スキル・実行スクリプトをold配下へ移して、GitHub Issueをそのまま実装単位として扱う運用へ変更した。
 
