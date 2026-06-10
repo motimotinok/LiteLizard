@@ -6,6 +6,18 @@
 
 ---
 
+## [2026-06-10] macOS の公開サポート範囲を実機確認済み環境に限定する
+
+- **決定**: MVP の配布対象は Apple Silicon Mac（arm64）のみとし、公開上の動作確認済み環境は macOS Tahoe 26.5.1 とする。その他の macOS バージョンは未検証のため動作を保証せず、対応下限は宣言しない
+- **理由**: 現時点で利用可能な実機が macOS Tahoe 26.5.1 の Apple Silicon Mac のみであり、Electron の理論上の要件だけを根拠に未検証環境まで保証すると、利用者に誤った期待を与えるため
+- **確認事項**: lockfile で解決されている Electron は 34.5.8。同梱バイナリの `Info.plist` は `LSMinimumSystemVersion: 11.0` を宣言しているが、これは LiteLizard の動作保証ではない。Electron 公式では 34 系はサポート終了と明記されているため、Electron 更新は OS 表記とは分離した後続課題として扱う
+- **却下した案**:
+  - Electron の技術的な最小バージョンをそのまま LiteLizard のサポート下限にする: LiteLizard 自体の実機検証がなく、アプリ固有機能の動作を保証できない
+  - 「macOS 対応」とだけ記載する: 対象アーキテクチャと確認済み環境が利用者に伝わらない
+- **参照**: `README.md`, `.github/workflows/release.yml`, `docs/release-checklist.md`, GitHub Issue #106
+
+---
+
 ## [2026-05-12] プロジェクト復元の失敗時挙動と書き込み可否確認を明文化
 
 - **決定**: 公開前仕様として、起動時の前回フォルダ復元・復元失敗時の整合処理・`.litelizard/` への書き込み可否確認を [`docs/specs/project-management.md`](specs/project-management.md) §5–§9 に固定する
