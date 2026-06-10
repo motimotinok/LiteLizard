@@ -18,18 +18,19 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
    - `[Smoke] packaged app ready: {"hasRoot":true,"hasPreloadBridge":true,...}` の出力で成功とみなす。
    - timeout を伸ばしたい場合は `LITELIZARD_SMOKE_TIMEOUT_MS` で上書きできる（既定 60000ms）。
 6. 公開用 `.dmg` 生成: `pnpm --filter @litelizard/desktop package:mac:dmg`
-   - 出力: `apps/desktop/release/LiteLizard-<version>-<arch>.dmg`（例: `LiteLizard-0.1.0-arm64.dmg`）
+   - 出力: `apps/desktop/release/LiteLizard-latest-<arch>.dmg`（Apple Silicon 向けは `LiteLizard-latest-arm64.dmg`）
    - GitHub Releases に添付するのはこのファイル。
 
 `package:mac` と `package:mac:dmg` は同じ `release/` ディレクトリに出力するため、両方を続けて回す場合はその間に `release/` を整理するか、必要な成果物だけを残す。`smoke:package:mac` は `package:mac` で出した `.app` を見にいくため、`package:mac:dmg` だけを回した直後では確認できない。
 
 ## 手動 GUI 確認（人間が macOS 上で実行）
 
-`package:mac:dmg` で出力した `.dmg` を実際に展開し、初見ユーザーが触るのに近い状態で確認する。LLM はこの工程を実行できないので、Ralph Loop ではここを「未実施」のまま完了扱いにしない。
+`package:mac:dmg` で出力した `.dmg` を実際に展開し、初見ユーザーが触るのに近い状態で確認する。LLM はこの工程を実行できないため、人間の確認が済むまでは「未実施」として扱う。
 
 ### インストール導線
 
-- [ ] `apps/desktop/release/LiteLizard-<version>-arm64.dmg` を Finder で開く。
+- [ ] Apple Silicon Mac（arm64）かつ macOS Tahoe 26.5.1 の環境で確認していることを記録する。
+- [ ] `apps/desktop/release/LiteLizard-latest-arm64.dmg` を Finder で開く。
 - [ ] `LiteLizard.app` を `Applications` フォルダへドラッグしてコピーできる。
 - [ ] `Applications` の `LiteLizard.app` を右クリック / Control + クリック → `開く` で Gatekeeper 警告を経て起動できる。
 - [ ] それでも起動できない場合の `xattr -dr com.apple.quarantine /Applications/LiteLizard.app` 手順が README 通りに通る。
@@ -64,12 +65,13 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 
 ## 公開判断として人間に残っている未決事項
 
-これらは MVP 公開の可否そのものを左右する判断項目で、Ralph Loop が自動で確定させるものではない。MVP リリース前に「現状のままで公開する」「公開しない」「次のサイクルに送る」のいずれかを決める。
+これらは MVP 公開の可否そのものを左右する判断項目であり、人間が決定する。MVP リリース前に「現状のままで公開する」「公開しない」「次のサイクルに送る」のいずれかを決める。
 
 - Apple Developer ID 署名 / notarization の有無。現状は ad-hoc 署名のみで、Gatekeeper の警告対処は README に記載済み。
 - 自動更新機能の有無。MVP では実装しない方針。
 - ランディングページ公開の有無。MVP では README が事実上唯一のユーザー向け導線。
 - Windows / Linux 向け配布の有無。MVP では Apple Silicon Mac のみが対象。
+- macOS の動作確認済み環境は Tahoe 26.5.1 のみ。その他のバージョンは未検証で、公開上は動作保証しない。
 - アプリアイコンの最終確定（GitHub Issue #95）。
 - 段落 DnD などの実 GUI 動作確認のための Electron E2E 実行（現状の起動 `SIGABRT` 制約と組み合わせて判断）。
 
@@ -78,4 +80,4 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 1. 自動検証セクションを最初から最後まで成功させる。
 2. 生成された `.dmg` を手動 GUI 確認の手順で触る。
 3. 公開判断の未決事項を確認し、現状で公開可能か判断する。
-4. 公開可能と判断したら、`apps/desktop/release/LiteLizard-<version>-<arch>.dmg` を GitHub Releases に添付し、`CHANGELOG.md` の最新エントリと README を必要に応じて更新する。
+4. 公開可能と判断したら、`apps/desktop/release/LiteLizard-latest-<arch>.dmg` を GitHub Releases に添付し、`CHANGELOG.md` の最新エントリと README を必要に応じて更新する。

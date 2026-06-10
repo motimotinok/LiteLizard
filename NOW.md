@@ -19,16 +19,14 @@ MVP を外部公開できる状態にする。まず macOS 向けの未署名 `.
 - 公開直前は `docs/release-checklist.md` の自動検証と手動 GUI 確認を通す。
 - #90 ランディングページ、#94 Gemini provider は原則 MVP 後候補。
 
-## 実行キュー
+## Backlog
 
 - 思いつき、未着手、公開準備、将来構想、判断待ちは GitHub Issues に置く。
-- 今すぐ実装すると決めた作業だけ `docs/tickets/` に Ralph Loop チケットとして切り出す。
-- 完了済みチケットは `docs/tickets/done/`、完了した事実は `CHANGELOG.md` を見る。
+- 完了した事実は `CHANGELOG.md` を見る。
 
 ## 参照先
 
 - backlog: GitHub Issues
 - 親 Issue: #95
-- 実行キュー: `docs/tickets/`
 - 完了履歴: `CHANGELOG.md`
 - 確定仕様: `docs/specs/` と `docs/decisions.md`

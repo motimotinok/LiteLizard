@@ -1,9 +1,11 @@
 ---
 name: create-ralph-ticket
-description: "LiteLizard の Ralph Loop 用ローカルチケットを docs/tickets/ 配下に Markdown として作成するスキル。ユーザーが「Ralph Loop のチケットを作って」「ralph チケットにして」「docs/tickets にチケットを作成して」「ローカルチケット化して」などと明示した時、GitHub Issue から今すぐ実装する作業へ切り出す時、または Ralph Loop 中にプロンプトが許可する具体的な残課題・バグ・追加改善をチケット化する時に使う。Issue はクローズせず、退役済み WBS も更新しない。"
+description: "退役済み。LiteLizard の旧 Ralph Loop 用ローカルチケット作成スキル。履歴参照専用であり、現役の開発フローでは使用しない。"
 ---
 
 # Create Ralph Ticket
+
+> **退役済み**: 履歴参照用。現役の開発フローでは使用しない。
 
 LiteLizard の Ralph Loop 用チケットを `docs/tickets/` 直下に Markdown ファイルとして作成する。
 

@@ -1,6 +1,6 @@
 # Autonomous Issue Pickup Agent
 
-> **退役済み**: LiteLizard の現役自律開発フローは `prompts/ralph-loop.md` と `docs/tickets/` に移行した。このプロンプトは履歴参照用であり、新規実行には使わない。
+> **退役済み**: この Issue pickup フローと後継の Ralph Loop はどちらも退役済み。このプロンプトは履歴参照用であり、新規実行には使わない。
 
 > このプロンプトは、リモート VM 上で自律実行されるエージェントが LiteLizard リポジトリの GitHub Issue を 1 件拾って PR を作るために使う。コピー & ペーストで動く self-contained 仕様。
 >

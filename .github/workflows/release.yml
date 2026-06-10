@@ -79,6 +79,8 @@ jobs:
           LiteLizard MVP の最新ビルドです (v${APP_VERSION}, commit ${GITHUB_SHA::7})。
 
           - 対象: Apple Silicon Mac (arm64) のみ
+          - 動作確認済み: macOS Tahoe 26.5.1
+          - その他の macOS バージョン: 未検証のため動作保証外です
           - 形式: 未署名の \`.dmg\` です。初回起動時は Finder で右クリック → 「開く」で承認してください
           - 更新: アプリ内自動更新には未対応です。最新版は本ページから \`.dmg\` を再ダウンロード・再インストールしてください
           - インストール手順: リポジトリ README の "macOS インストール" 節を参照

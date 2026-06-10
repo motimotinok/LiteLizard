@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# Retired: kept only for historical reference.
 set -euo pipefail
 
-PROMPT_FILE="${RALPH_PROMPT_FILE:-prompts/ralph-loop.md}"
+PROMPT_FILE="${RALPH_PROMPT_FILE:-prompts/old/ralph-loop.md}"
 TICKET_DIR="${RALPH_TICKET_DIR:-docs/tickets}"
 CLAUDE_LIMIT="${RALPH_CLAUDE_LIMIT:-2}"
 TOTAL_LIMIT="${RALPH_TOTAL_LIMIT:-5}"
