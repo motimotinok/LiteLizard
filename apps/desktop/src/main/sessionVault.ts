@@ -1,85 +1,146 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
+import { safeStorage } from 'electron';
+import type { AnalysisProviderId } from '@litelizard/shared';
 
-interface EncryptedPayload {
-  version: 1;
-  salt: string;
-  iv: string;
-  tag: string;
-  ciphertext: string;
+const ENCRYPTED_FILE_NAME = 'api-keys.bin';
+const PLAINTEXT_FILE_NAME = 'api-keys.plaintext';
+
+type SecretMap = Partial<Record<AnalysisProviderId | string, string>>;
+
+function isMissingFileError(error: unknown) {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
 }
 
-const PEPPER = 'litelizard-v1-pepper';
-
-function deriveKey(salt: Buffer) {
-  const userMaterial = `${os.userInfo().username}:${os.homedir()}:${PEPPER}`;
-  return crypto.pbkdf2Sync(userMaterial, salt, 210_000, 32, 'sha256');
-}
-
-function encryptValue(value: string): EncryptedPayload {
-  const salt = crypto.randomBytes(16);
-  const iv = crypto.randomBytes(12);
-  const key = deriveKey(salt);
-
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = JSON.stringify({ value });
-  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const tag = cipher.getAuthTag();
-
-  return {
-    version: 1,
-    salt: salt.toString('base64'),
-    iv: iv.toString('base64'),
-    tag: tag.toString('base64'),
-    ciphertext: ciphertext.toString('base64'),
-  };
-}
-
-function decryptValue(payload: EncryptedPayload): string {
-  const salt = Buffer.from(payload.salt, 'base64');
-  const iv = Buffer.from(payload.iv, 'base64');
-  const tag = Buffer.from(payload.tag, 'base64');
-  const ciphertext = Buffer.from(payload.ciphertext, 'base64');
-  const key = deriveKey(salt);
-
-  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
-  const parsed = JSON.parse(plaintext) as { value?: unknown };
-  if (typeof parsed.value !== 'string') {
-    throw new Error('Invalid vault payload');
+async function readBufferIfExists(filePath: string): Promise<Buffer | null> {
+  try {
+    return await fs.readFile(filePath);
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return null;
+    }
+    throw error;
   }
-  return parsed.value;
+}
+
+async function readTextIfExists(filePath: string): Promise<string | null> {
+  try {
+    return await fs.readFile(filePath, 'utf8');
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function removeIfExists(filePath: string) {
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+  }
 }
 
 export function createApiKeyVault(userDataPath: string) {
-  const apiKeyPath = path.join(userDataPath, 'api-key.enc.json');
+  const encryptedPath = path.join(userDataPath, ENCRYPTED_FILE_NAME);
+  const plaintextPath = path.join(userDataPath, PLAINTEXT_FILE_NAME);
+
+  async function loadSecrets(): Promise<SecretMap> {
+    const encrypted = await readBufferIfExists(encryptedPath);
+    if (encrypted) {
+      try {
+        const raw = safeStorage.decryptString(encrypted);
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {};
+          }
+          return Object.fromEntries(
+            Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+          );
+        } catch {
+          if (raw.trim()) {
+            return { openai: raw };
+          }
+          return {};
+        }
+      } catch {
+        return {};
+      }
+    }
+
+    const plaintext = await readTextIfExists(plaintextPath);
+    if (!plaintext) {
+      return {};
+    }
+
+    try {
+      const parsed = JSON.parse(plaintext) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { openai: plaintext };
+      }
+      return Object.fromEntries(
+        Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      );
+    } catch {
+      return { openai: plaintext };
+    }
+  }
+
+  async function saveSecrets(secrets: SecretMap) {
+    await fs.mkdir(userDataPath, { recursive: true });
+    const normalized = Object.fromEntries(
+      Object.entries(secrets).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1].trim())
+      )
+    );
+    const serialized = JSON.stringify(normalized);
+
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(serialized);
+      await fs.writeFile(encryptedPath, encrypted);
+      await removeIfExists(plaintextPath);
+      return;
+    }
+
+    await fs.writeFile(plaintextPath, serialized, 'utf8');
+    await removeIfExists(encryptedPath);
+  }
 
   return {
-    async load(): Promise<string | null> {
-      try {
-        const raw = await fs.readFile(apiKeyPath, 'utf8');
-        const parsed = JSON.parse(raw) as EncryptedPayload;
-        return decryptValue(parsed);
-      } catch {
-        return null;
-      }
+    async load(providerId = 'openai'): Promise<string | null> {
+      const secrets = await loadSecrets();
+      return secrets[providerId]?.trim() ? secrets[providerId] ?? null : null;
     },
 
-    async save(apiKey: string) {
-      const encrypted = encryptValue(apiKey);
-      await fs.mkdir(path.dirname(apiKeyPath), { recursive: true });
-      await fs.writeFile(apiKeyPath, JSON.stringify(encrypted, null, 2), 'utf8');
+    async loadAll(): Promise<SecretMap> {
+      return loadSecrets();
     },
 
-    async clear() {
-      try {
-        await fs.unlink(apiKeyPath);
-      } catch {
-        // ignore missing key
+    async save(providerId: string, apiKey: string) {
+      const secrets = await loadSecrets();
+      secrets[providerId] = apiKey;
+      await saveSecrets(secrets);
+    },
+
+    async clear(providerId?: string) {
+      if (!providerId) {
+        await Promise.all([removeIfExists(encryptedPath), removeIfExists(plaintextPath)]);
+        return;
       }
+
+      const secrets = await loadSecrets();
+      delete secrets[providerId];
+
+      if (Object.keys(secrets).length === 0) {
+        await Promise.all([removeIfExists(encryptedPath), removeIfExists(plaintextPath)]);
+        return;
+      }
+
+      await saveSecrets(secrets);
     },
   };
 }

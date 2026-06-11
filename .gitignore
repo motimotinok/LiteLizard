@@ -1,13 +1,29 @@
 node_modules
 dist
+apps/desktop/release
 coverage
 playwright-report
 .vscode
 .DS_Store
 *.log
+.env
+.env.*
+!.env.example
 apps/api/data
 .pnpm-store
 *.tsbuildinfo
+
+# Generated desktop JS/types (Vite/tsc handle compilation; source lives in TS/TSX)
+apps/desktop/src/renderer/**/*.js
+apps/desktop/src/renderer/**/*.js.map
+apps/desktop/src/renderer/**/*.d.ts
+!apps/desktop/src/renderer/global.d.ts
+apps/desktop/src/preload/**/*.js
+apps/desktop/src/preload/**/*.js.map
+apps/desktop/src/preload/**/*.d.ts
+
+# Temporary files (codex logs, etc.)
+tmp/
 
 # Project memory (Claude task management - local only)
 PROJECTMEMORY/
@@ -15,3 +31,10 @@ PROJECTMEMORY/
 # Claude user settings (machine-specific)
 .claude/settings.json
 .claude/settings.local.json
+.claude/agent-memory-local
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+.playwright-mcp
+開発コマンド.md
+knowledge.md
+docs/note-release-article-draft.md

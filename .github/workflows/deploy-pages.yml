@@ -1,9 +1,15 @@
 name: Deploy to GitHub Pages
+run-name: Deploy GitHub Pages (${{ github.ref_name }})
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'apps/landing/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,27 +19,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.12.3
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
-          cache: pnpm
+          node-version: 24
+          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build for GitHub Pages
-        run: pnpm --filter @litelizard/desktop build
-        env:
-          GITHUB_PAGES: 'true'
+      - name: Build landing page
+        run: pnpm --filter @litelizard/landing build
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/desktop/dist/renderer
+          publish_dir: ./apps/landing/dist

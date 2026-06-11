@@ -1,20 +1,29 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { toKanjiIndex } from '../../ui/kanji.js';
 
 export function StructureChromePlugin({
   chapterNodeKeys,
   paragraphNodeKeys,
+  paragraphIds,
   active,
+  linkedHighlightParagraphId,
   emptyParagraphNodeKeys,
+  onPreviewParagraphLink,
 }: {
   chapterNodeKeys: string[];
   paragraphNodeKeys: string[];
+  paragraphIds: string[];
   active: { nodeKey: string | null; type: 'chapter' | 'paragraph' | null };
+  linkedHighlightParagraphId: string | null;
   emptyParagraphNodeKeys: Set<string>;
+  onPreviewParagraphLink?: (id: string | null) => void;
 }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
+    const cleanups: Array<() => void> = [];
+
     chapterNodeKeys.forEach((nodeKey, index) => {
       const element = editor.getElementByKey(nodeKey);
       if (!element) {
@@ -23,20 +32,40 @@ export function StructureChromePlugin({
 
       element.classList.add('editor-chapter-row');
       element.classList.toggle('editor-chapter-row-active', active.type === 'chapter' && active.nodeKey === nodeKey);
-      element.setAttribute('data-chapter-index', `Chapter ${index + 1}`);
+      element.setAttribute('data-chapter-index', `第${toKanjiIndex(index + 1)}章`);
       element.setAttribute('data-testid', `editor-chapter-row-${index + 1}`);
     });
 
     paragraphNodeKeys.forEach((nodeKey, index) => {
       const element = editor.getElementByKey(nodeKey);
+      const paragraphId = paragraphIds[index] ?? null;
       if (!element) {
         return;
       }
 
       element.classList.add('editor-paragraph-row');
       element.classList.toggle('editor-paragraph-row-active', active.type === 'paragraph' && active.nodeKey === nodeKey);
-      element.setAttribute('data-paragraph-index', String(index + 1));
+      element.classList.toggle(
+        'editor-paragraph-row-linked-highlight',
+        Boolean(paragraphId && paragraphId === linkedHighlightParagraphId),
+      );
+      element.setAttribute('data-paragraph-index', toKanjiIndex(index + 1));
       element.setAttribute('data-testid', `editor-paragraph-row-${index + 1}`);
+
+      if (paragraphId && onPreviewParagraphLink) {
+        const onEnter = () => onPreviewParagraphLink(paragraphId);
+        const onLeave = () => onPreviewParagraphLink(null);
+        element.addEventListener('mouseenter', onEnter);
+        element.addEventListener('mouseleave', onLeave);
+        element.addEventListener('focusin', onEnter);
+        element.addEventListener('focusout', onLeave);
+        cleanups.push(() => {
+          element.removeEventListener('mouseenter', onEnter);
+          element.removeEventListener('mouseleave', onLeave);
+          element.removeEventListener('focusin', onEnter);
+          element.removeEventListener('focusout', onLeave);
+        });
+      }
 
       const showHint = active.type === 'paragraph' && active.nodeKey === nodeKey && emptyParagraphNodeKeys.has(nodeKey);
       element.classList.toggle('editor-paragraph-row-show-hint', showHint);
@@ -46,7 +75,21 @@ export function StructureChromePlugin({
         element.removeAttribute('data-command-hint');
       }
     });
-  }, [active.nodeKey, active.type, chapterNodeKeys, editor, emptyParagraphNodeKeys, paragraphNodeKeys]);
+
+    return () => {
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  }, [
+    active.nodeKey,
+    active.type,
+    chapterNodeKeys,
+    editor,
+    emptyParagraphNodeKeys,
+    linkedHighlightParagraphId,
+    onPreviewParagraphLink,
+    paragraphIds,
+    paragraphNodeKeys,
+  ]);
 
   return null;
 }

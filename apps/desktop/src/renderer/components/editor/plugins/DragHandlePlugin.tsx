@@ -5,6 +5,7 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useAppStore } from '../../../store/useAppStore.js';
 
 interface Position {
   top: number;
@@ -84,7 +85,7 @@ function ParagraphSortableHandle({ nodeKey, position, editor }: HandleProps) {
   };
 
   return (
-    <div style={wrapperStyle}>
+    <div className="paragraph-drag-wrapper" style={wrapperStyle}>
       <button
         ref={setActivatorNodeRef}
         style={handleStyle}
@@ -150,22 +151,34 @@ export function DragHandlePlugin({ paragraphNodeKeys, containerRef }: Props) {
       const activeKey = String(active.id);
       const overKey = String(over.id);
 
-      editor.update(() => {
-        const root = $getRoot();
-        const children = root.getChildren().filter($isParagraphNode);
-        const dragged = children.find((n) => n.getKey() === activeKey);
-        const target = children.find((n) => n.getKey() === overKey);
-        if (!dragged || !target) return;
+      const store = useAppStore.getState();
+      const doc = store.document;
+      if (doc) {
+        store.pushUndo({
+          lexicalStateJson: JSON.stringify(editor.getEditorState().toJSON()),
+          documentSnapshot: doc,
+        });
+      }
 
-        const activeIndex = children.indexOf(dragged);
-        const overIndex = children.indexOf(target);
-        dragged.remove();
-        if (activeIndex < overIndex) {
-          target.insertAfter(dragged);
-        } else {
-          target.insertBefore(dragged);
-        }
-      });
+      editor.update(
+        () => {
+          const root = $getRoot();
+          const children = root.getChildren().filter($isParagraphNode);
+          const dragged = children.find((n) => n.getKey() === activeKey);
+          const target = children.find((n) => n.getKey() === overKey);
+          if (!dragged || !target) return;
+
+          const activeIndex = children.indexOf(dragged);
+          const overIndex = children.indexOf(target);
+          dragged.remove();
+          if (activeIndex < overIndex) {
+            target.insertAfter(dragged);
+          } else {
+            target.insertBefore(dragged);
+          }
+        },
+        { tag: 'structural' },
+      );
     },
   });
 

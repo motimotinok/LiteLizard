@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  base: process.env.GITHUB_PAGES === 'true' ? '/liteLizard/' : './',
+  base: './',
   plugins: [react()],
   root: './src/renderer',
   build: {
@@ -24,5 +24,8 @@ export default defineConfig({
     fs: {
       allow: ['.'],
     },
+  },
+  test: {
+    include: ['../**/*.{test,spec}.?(c|m)[jt]s?(x)'],
   },
 });

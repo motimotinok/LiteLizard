@@ -5,14 +5,57 @@
   "type": "module",
   "main": "dist/main/main.js",
   "scripts": {
-    "build": "pnpm --filter @litelizard/shared build && tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && vite build",
-    "dev": "pnpm --filter @litelizard/shared build && concurrently -k \"pnpm dev:main\" \"pnpm dev:preload\" \"pnpm dev:renderer\" \"pnpm dev:electron\"",
+    "build": "pnpm --filter @litelizard/shared build && tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json && pnpm build:preload && vite build",
+    "build:preload": "esbuild src/preload/preload.cts --bundle --platform=node --format=cjs --target=node22 --external:electron --outfile=dist/preload/preload.cjs",
+    "electron:install": "electron_config_cache=../../tmp/electron-cache install-electron --no",
+    "dev": "node scripts/run-with-supported-node.mjs dev:runtime",
+    "dev:runtime": "pnpm electron:install && pnpm --filter @litelizard/shared build && concurrently -k \"pnpm dev:main\" \"pnpm dev:preload\" \"pnpm dev:renderer\" \"pnpm dev:electron\"",
     "dev:main": "tsc -p tsconfig.main.json -w",
-    "dev:preload": "tsc -p tsconfig.preload.json -w",
+    "dev:preload": "esbuild src/preload/preload.cts --bundle --platform=node --format=cjs --target=node22 --external:electron --outfile=dist/preload/preload.cjs --watch",
     "dev:renderer": "vite",
     "dev:electron": "wait-on dist/main/main.js dist/preload/preload.cjs http://127.0.0.1:5173 && VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
+    "package:mac": "node scripts/run-with-supported-node.mjs package:mac:runtime",
+    "package:mac:runtime": "pnpm electron:install && pnpm build && ELECTRON_CACHE=../../tmp/electron-cache ELECTRON_BUILDER_CACHE=../../tmp/electron-builder-cache electron-builder --mac dir --publish never",
+    "package:mac:dmg": "node scripts/run-with-supported-node.mjs package:mac:dmg:runtime",
+    "package:mac:dmg:runtime": "pnpm electron:install && pnpm build && ELECTRON_CACHE=../../tmp/electron-cache ELECTRON_BUILDER_CACHE=../../tmp/electron-builder-cache electron-builder --mac dmg --publish never",
+    "smoke:package:mac": "node scripts/smoke-packaged-mac.mjs",
     "test": "vitest run",
     "lint": "eslint src --ext .ts,.tsx"
+  },
+  "build": {
+    "appId": "app.litelizard.desktop",
+    "productName": "LiteLizard",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "!dist/**/*.map",
+      "!node_modules/@litelizard/shared/src/**/*",
+      "!node_modules/@litelizard/shared/tsconfig.json",
+      "!node_modules/@litelizard/shared/**/*.tsbuildinfo",
+      "!node_modules/@litelizard/shared/**/*.test.ts",
+      "!node_modules/**/*.map"
+    ],
+    "mac": {
+      "target": [
+        "dir",
+        "dmg"
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "icon": "build/icon.icns",
+      "artifactName": "${productName}-latest-${arch}.${ext}"
+    },
+    "dmg": {
+      "writeUpdateInfo": false,
+      "sign": false
+    }
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -20,6 +63,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@lexical/react": "^0.19.0",
     "@litelizard/shared": "workspace:*",
+    "electron-store": "^11.0.2",
     "lexical": "^0.19.0",
     "openai": "^4.81.0",
     "react": "^19.0.0",
@@ -31,7 +75,9 @@
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "electron": "^34.2.0",
+    "electron": "^42.4.0",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.0",
     "tsx": "^4.19.2",
     "vite": "^6.0.11",
     "wait-on": "^8.0.1"

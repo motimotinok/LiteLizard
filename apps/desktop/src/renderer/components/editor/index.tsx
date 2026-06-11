@@ -11,28 +11,32 @@ interface Props {
   dirty: boolean;
   viewScale: 'micro' | 'macro';
   activeParagraphId: string | null;
+  linkedHighlightParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onSetViewScale: (viewScale: 'micro' | 'macro') => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onReorderChapters?: (orderedIds: string[]) => void;
+  onDeleteChapter?: (chapterId: string) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
 }
 
 export function EditorPane({
-  isExpanded,
   document,
-  dirty,
   viewScale,
   activeParagraphId,
+  linkedHighlightParagraphId,
   scrollRequest,
   setActiveParagraphId,
+  onPreviewParagraphLink,
   onSetViewScale,
   onSyncStructure,
   onReorderParagraphs,
   onReorderChapters,
+  onDeleteChapter,
   onCreateEssay,
   onOpenFolder,
 }: Props) {
@@ -58,40 +62,32 @@ export function EditorPane({
   }, [onSetViewScale, editorBodyEl]);
 
   if (!document) {
-    return (
-      <EditorEmptyState
-        isExpanded={isExpanded}
-        onCreateEssay={onCreateEssay}
-        onOpenFolder={onOpenFolder}
-      />
-    );
+    return <EditorEmptyState onCreateEssay={onCreateEssay} onOpenFolder={onOpenFolder} />;
   }
 
-  const charCount = document.paragraphs.reduce((sum, paragraph) => sum + paragraph.light.text.length, 0);
-
   return (
-    <section className={isExpanded ? 'editor-shell editor-shell-expanded' : 'editor-shell'}>
+    <section className="editor-shell">
       <div className="editor-frame">
         <div className="editor-body" ref={setEditorBodyEl}>
+          <header className="editor-title">
+            <h1 className="editor-title-name">{document.title}</h1>
+            <div className="editor-title-rule" />
+          </header>
           {viewScale === 'macro' ? (
-            <MacroView document={document} onReorderChapters={onReorderChapters} />
+            <MacroView document={document} onReorderChapters={onReorderChapters} onDeleteChapter={onDeleteChapter} />
           ) : (
             <MicroEditorView
               document={document}
               activeParagraphId={activeParagraphId}
+              linkedHighlightParagraphId={linkedHighlightParagraphId}
               scrollRequest={scrollRequest}
               setActiveParagraphId={setActiveParagraphId}
+              onPreviewParagraphLink={onPreviewParagraphLink}
               onSyncStructure={onSyncStructure}
               onReorderParagraphs={onReorderParagraphs}
             />
           )}
         </div>
-
-        <footer className="editor-footer">
-          <div className="editor-footer-left">
-            <span>{charCount} 文字</span>
-          </div>
-        </footer>
       </div>
     </section>
   );

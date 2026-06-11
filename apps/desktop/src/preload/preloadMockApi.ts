@@ -1,4 +1,19 @@
-import type { AnalysisRunInput, AnalysisRunResult, FileNode, LiteLizardDocument } from '@litelizard/shared';
+import {
+  buildImportedDocument,
+  DEFAULT_ANALYSIS_SETTINGS,
+  exportDocumentToPlainText,
+  parseTextToImportResult,
+  type AnalysisRunInput,
+  type AnalysisSettings,
+  type AnalysisSettingsInput,
+  type BridgeApi,
+  type FileNode,
+  type GenerationalAnalysisFile,
+  type LiteLizardDocument,
+  type ParagraphAnalysisPattern,
+  type ReadingAgent,
+  type ReadingAgentInput,
+} from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
   initialMockDocuments,
@@ -6,41 +21,32 @@ import {
   mockRootPath,
 } from './preloadMockData.js';
 
-export interface PreloadBridgeApi {
-  openFolder: () => Promise<string | null>;
-  listTree: (root: string) => Promise<FileNode[]>;
-  createEntry: (
-    root: string,
-    type: 'file' | 'folder',
-    name: string
-  ) => Promise<{ ok: boolean; path: string; type: 'file' | 'folder' }>;
-  renameEntry: (targetPath: string, nextName: string) => Promise<{ ok: boolean; path: string }>;
-  deleteEntry: (targetPath: string) => Promise<{ ok: boolean }>;
-  loadDocument: (filePath: string) => Promise<LiteLizardDocument>;
-  createDocument: (
-    root: string,
-    title: string
-  ) => Promise<{ filePath: string; document: LiteLizardDocument }>;
-  saveDocument: (
-    filePath: string,
-    doc: LiteLizardDocument,
-    revision: number
-  ) => Promise<{ ok: boolean; code?: string; revision: number }>;
-  runAnalysis: (input: AnalysisRunInput) => Promise<AnalysisRunResult>;
-  getApiKeyStatus: () => Promise<{ configured: boolean }>;
-  saveApiKey: (apiKey: string) => Promise<{ ok: boolean }>;
-  clearApiKey: () => Promise<{ ok: boolean }>;
-}
-
 interface MockState {
   tree: FileNode[];
   documents: Map<string, LiteLizardDocument>;
   revisions: Map<string, number>;
-  apiKeyConfigured: boolean;
+  exportedTextFiles: Map<string, string>;
+  analysisFiles: Map<string, GenerationalAnalysisFile>;
+  analysisSettings: AnalysisSettings;
+  readingAgents: Map<string, ReadingAgent>;
+  activeReadingAgentId: string | null;
 }
+
+const LEGACY_ANTHROPIC_DEFAULT_MODELS = new Set([
+  'claude-3-5-sonnet-latest',
+  'claude-haiku-4-5',
+]);
 
 function clone<T>(value: T): T {
   return structuredClone(value);
+}
+
+function normalizeAnthropicDefaultModel(input: string) {
+  const model = input.trim();
+  if (!model || LEGACY_ANTHROPIC_DEFAULT_MODELS.has(model)) {
+    return DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel;
+  }
+  return model;
 }
 
 function normalizePath(value: string) {
@@ -66,8 +72,8 @@ function dirName(filePath: string) {
   return normalized.slice(0, index);
 }
 
-function withMarkdownExtension(fileName: string) {
-  return /\.md$/i.test(fileName) ? fileName : `${fileName}.md`;
+function withLzlExtension(fileName: string) {
+  return /\.lzl$/i.test(fileName) ? fileName : `${fileName}.lzl`;
 }
 
 function sanitizeName(name: string) {
@@ -101,7 +107,7 @@ function isSameOrNestedPath(value: string, base: string) {
 }
 
 function toTitle(filePath: string) {
-  return baseName(filePath).replace(/\.md$/i, '');
+  return baseName(filePath).replace(/\.(md|lzl)$/i, '');
 }
 
 function buildInitialDocument(filePath: string, title: string): LiteLizardDocument {
@@ -259,18 +265,148 @@ function paragraphAnalysisFromText(text: string) {
   };
 }
 
-export function createMockPreloadApi(): PreloadBridgeApi {
+function paragraphAnalysisFromAgent(text: string, agent: ReadingAgentInput) {
+  const base = paragraphAnalysisFromText(`${agent.name}:${agent.role}:${agent.systemPrompt}:${text}`);
+  return {
+    ...base,
+    deepMeaning: `『${agent.name}』は、${base.deepMeaning}`,
+    model: agent.model?.trim() || base.model,
+  };
+}
+
+function analysisFileKey(documentId: string) {
+  return documentId;
+}
+
+function appendAnalysisPattern(
+  state: MockState,
+  documentId: string,
+  paragraphId: string,
+  pattern: ParagraphAnalysisPattern,
+) {
+  const key = analysisFileKey(documentId);
+  const current = state.analysisFiles.get(key);
+  const now = new Date().toISOString();
+  const nextFile: GenerationalAnalysisFile = current
+    ? clone(current)
+    : {
+        version: 1,
+        documentId,
+        generation: 1,
+        createdAt: now,
+        updatedAt: now,
+        paragraphs: {},
+      };
+
+  const history = nextFile.paragraphs[paragraphId]?.patterns ?? [];
+  nextFile.paragraphs[paragraphId] = {
+    patterns: [...history, clone(pattern)],
+  };
+  nextFile.updatedAt = now;
+  state.analysisFiles.set(key, nextFile);
+}
+
+function createInitialReadingAgents(): ReadingAgent[] {
+  const now = '2026-05-02T00:00:00.000Z';
+  const buildPrompt = (name: string, role: string) =>
+    `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。\n\n## 視点\n${role}。読み手の身体感覚に近い、率直な反応を優先してください。\n\n## 出力\n- 100〜200字\n- タグを4つ（情緒・印象を表すもの）\n- 0〜100の確度\n\n## 禁則\n- 文章の良し悪しの断定\n- 著者への助言\n- 修正案の提示`;
+  return [
+    {
+      id: 'reader-quiet',
+      name: '静かな読者',
+      role: '情緒や余韻を中心に短く',
+      systemPrompt: buildPrompt('静かな読者', '情緒や余韻を中心に短く'),
+      model: null,
+      temperature: 0.7,
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-critical',
+      name: '批評的な読者',
+      role: '構成・論理・破綻を指摘',
+      systemPrompt: buildPrompt('批評的な読者', '構成・論理・破綻を指摘'),
+      model: null,
+      temperature: 0.7,
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-first',
+      name: 'はじめての読者',
+      role: '予備知識ゼロで率直に',
+      systemPrompt: buildPrompt('はじめての読者', '予備知識ゼロで率直に'),
+      model: null,
+      temperature: 0.7,
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+    {
+      id: 'reader-editor',
+      name: '担当編集',
+      role: '売り・引っかかりを評価',
+      systemPrompt: buildPrompt('担当編集', '売り・引っかかりを評価'),
+      model: null,
+      temperature: 0.7,
+      createdAt: now,
+      updatedAt: now,
+      builtIn: true,
+    },
+  ];
+}
+
+function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: string }): ReadingAgent {
+  const now = new Date().toISOString();
+  const id = input.id?.trim() || `reader-${Math.random().toString(36).slice(2, 10)}`;
+  const current = state.readingAgents.get(id);
+  const next: ReadingAgent = {
+    id,
+    name: input.name.trim(),
+    role: input.role.trim(),
+    systemPrompt: input.systemPrompt.trim(),
+    model: input.model?.trim() || null,
+    temperature: input.temperature,
+    createdAt: current?.createdAt ?? now,
+    updatedAt: now,
+    builtIn: current?.builtIn ?? false,
+  };
+  state.readingAgents.set(id, next);
+  return clone(next);
+}
+
+export function createMockPreloadApi(): BridgeApi {
   const state: MockState = {
     tree: clone(initialMockTree),
     documents: new Map(
       Object.entries(initialMockDocuments).map(([filePath, document]) => [normalizePath(filePath), clone(document)])
     ),
     revisions: new Map(Object.keys(initialMockDocuments).map((filePath) => [normalizePath(filePath), 0])),
-    apiKeyConfigured: initialMockApiKeyConfigured,
+    exportedTextFiles: new Map(),
+    analysisFiles: new Map(),
+    analysisSettings: {
+      ...structuredClone(DEFAULT_ANALYSIS_SETTINGS),
+      providers: {
+        ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers),
+        openai: {
+          ...structuredClone(DEFAULT_ANALYSIS_SETTINGS.providers.openai),
+          apiKeyConfigured: initialMockApiKeyConfigured,
+        },
+      },
+    },
+    readingAgents: new Map(createInitialReadingAgents().map((agent) => [agent.id, agent])),
+    activeReadingAgentId: 'reader-quiet',
   };
 
   return {
     openFolder: async () => mockRootPath,
+    getLastOpenedFolder: async () => mockRootPath,
+    setLastOpenedFolder: async () => ({ ok: true }),
+    getRecentProjects: async () => [],
+    removeRecentProject: async () => ({ ok: true }),
+    onRequestOpenFolder: () => () => {},
 
     listTree: async (_root: string) => clone(state.tree),
 
@@ -292,7 +428,7 @@ export function createMockPreloadApi(): PreloadBridgeApi {
         return { ok: true, path: folderPath, type };
       }
 
-      const fileName = withMarkdownExtension(safeName);
+      const fileName = withLzlExtension(safeName);
       const filePath = joinPath(root, fileName);
       if (pathExists(state.tree, filePath)) {
         throw new Error(`Target already exists: ${filePath}`);
@@ -322,7 +458,7 @@ export function createMockPreloadApi(): PreloadBridgeApi {
       const safeName = sanitizeName(nextName);
       const nextPath =
         found.node.type === 'file'
-          ? joinPath(parentPath, withMarkdownExtension(safeName))
+          ? joinPath(parentPath, withLzlExtension(safeName))
           : joinPath(parentPath, safeName);
 
       if (pathExists(state.tree, nextPath)) {
@@ -351,6 +487,36 @@ export function createMockPreloadApi(): PreloadBridgeApi {
       return { ok: true, path: nextPath };
     },
 
+    moveEntry: async (sourcePath: string, destinationFolderPath: string) => {
+      const found = deepFindNode(state.tree, sourcePath);
+      if (!found) {
+        throw new Error(`Path not found: ${sourcePath}`);
+      }
+      if (found.node.type === 'directory') {
+        throw new Error('Folders cannot be moved with this operation.');
+      }
+
+      const destinationChildren = findDirectoryChildren(state, destinationFolderPath);
+      const oldPath = normalizePath(found.node.path);
+      const nextPath = joinPath(destinationFolderPath, baseName(oldPath));
+
+      if (oldPath === normalizePath(nextPath)) {
+        return { ok: true, path: oldPath };
+      }
+
+      if (pathExists(state.tree, nextPath)) {
+        throw new Error(`Target already exists: ${nextPath}`);
+      }
+
+      found.siblings.splice(found.index, 1);
+      found.node.path = nextPath;
+      found.node.name = baseName(nextPath);
+      destinationChildren.push(found.node);
+      remapDocumentPaths(state, oldPath, nextPath);
+
+      return { ok: true, path: nextPath };
+    },
+
     deleteEntry: async (targetPath: string) => {
       const found = deepFindNode(state.tree, targetPath);
       if (!found) {
@@ -373,7 +539,7 @@ export function createMockPreloadApi(): PreloadBridgeApi {
 
     createDocument: async (root: string, title: string) => {
       const safeStem = sanitizeName(title);
-      const fileName = withMarkdownExtension(safeStem);
+      const fileName = withLzlExtension(safeStem);
       const filePath = joinPath(root, fileName);
 
       const children = findDirectoryChildren(state, root);
@@ -413,17 +579,29 @@ export function createMockPreloadApi(): PreloadBridgeApi {
       return { ok: true, revision: nextRevision };
     },
 
+    exportDocumentText: async (filePath: string | null, doc: LiteLizardDocument) => {
+      const sourcePath = filePath ? normalizePath(filePath) : joinPath(mockRootPath, `${doc.title || 'Untitled'}.lzl`);
+      const outputPath = sourcePath.replace(/\.[^.]+$/, '.txt');
+      state.exportedTextFiles.set(outputPath, exportDocumentToPlainText(doc));
+      return { ok: true as const, filePath: outputPath };
+    },
+
     runAnalysis: async (input: AnalysisRunInput) => {
       const analyzedAt = new Date().toISOString();
       const requestId = `req_mock_${input.documentId}_${input.paragraphs.length}`;
+      const agent = state.readingAgents.get(input.agentId) ?? Array.from(state.readingAgents.values())[0];
+      if (!agent) {
+        throw new Error(`Reading Agent not found: ${input.agentId}`);
+      }
 
       return {
         requestId,
         documentId: input.documentId,
+        agentId: input.agentId,
         personaMode: input.personaMode,
         promptVersion: input.promptVersion,
         results: input.paragraphs.map((paragraph) => {
-          const analysis = paragraphAnalysisFromText(paragraph.text);
+          const analysis = paragraphAnalysisFromAgent(paragraph.text, agent);
           return {
             paragraphId: paragraph.paragraphId,
             emotion: analysis.emotion,
@@ -438,19 +616,168 @@ export function createMockPreloadApi(): PreloadBridgeApi {
       };
     },
 
-    getApiKeyStatus: async () => ({ configured: state.apiKeyConfigured }),
+    loadAnalysisSettings: async () => clone(state.analysisSettings),
 
-    saveApiKey: async (apiKey: string) => {
+    saveProviderApiKey: async (providerId: string, apiKey: string) => {
       if (!apiKey.trim()) {
         throw new Error('API key must not be empty.');
       }
-      state.apiKeyConfigured = true;
+      if (providerId === 'openai' || providerId === 'anthropic') {
+        state.analysisSettings.providers[providerId].apiKeyConfigured = true;
+      }
       return { ok: true };
     },
 
-    clearApiKey: async () => {
-      state.apiKeyConfigured = false;
+    clearProviderApiKey: async (providerId: string) => {
+      if (providerId === 'openai' || providerId === 'anthropic') {
+        state.analysisSettings.providers[providerId].apiKeyConfigured = false;
+      }
       return { ok: true };
+    },
+
+    saveAnalysisSettings: async (input: AnalysisSettingsInput) => {
+      state.analysisSettings = {
+        ...state.analysisSettings,
+        defaultProvider: input.defaultProvider,
+        providers: {
+          openai: {
+            ...state.analysisSettings.providers.openai,
+            defaultModel: input.providers.openai.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel,
+          },
+          anthropic: {
+            ...state.analysisSettings.providers.anthropic,
+            defaultModel: normalizeAnthropicDefaultModel(input.providers.anthropic.defaultModel),
+          },
+        },
+        localLlm: {
+          endpoint: input.localLlm.endpoint.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.endpoint,
+          defaultModel: input.localLlm.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.defaultModel,
+          configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
+        },
+        contextPolicy: input.contextPolicy
+          ? { ...input.contextPolicy }
+          : { ...state.analysisSettings.contextPolicy },
+        editorTweaks: input.editorTweaks
+          ? { ...input.editorTweaks }
+          : { ...state.analysisSettings.editorTweaks },
+      };
+      return { ok: true };
+    },
+
+    testLocalLlmConnection: async (input: { endpoint: string; model: string }) => {
+      if (!input.endpoint.trim()) {
+        return { ok: false as const, message: 'エンドポイント URL を入力してください。' };
+      }
+      if (!input.model.trim()) {
+        return { ok: false as const, message: 'モデル名を入力してください。' };
+      }
+      if (/fail/i.test(input.endpoint) || /missing/i.test(input.model)) {
+        return { ok: false as const, message: '接続できましたが、指定モデルは見つかりませんでした。' };
+      }
+      return { ok: true as const, model: input.model.trim() };
+    },
+
+    onAnalysisProgress: () => () => {},
+
+    loadAnalysis: async (_projectRoot: string, _documentId: string, _filePath?: string) => {
+      return clone(state.analysisFiles.get(analysisFileKey(_documentId)) ?? null);
+    },
+
+    saveAnalysisResult: async (
+      _projectRoot: string,
+      _documentId: string,
+      _paragraphId: string,
+      _pattern: ParagraphAnalysisPattern,
+    ) => {
+      appendAnalysisPattern(state, _documentId, _paragraphId, _pattern);
+    },
+
+    createAnalysisGeneration: async (_projectRoot: string, _documentId: string) => {
+      const key = analysisFileKey(_documentId);
+      const current = state.analysisFiles.get(key);
+      const generation = (current?.generation ?? 0) + 1;
+      const now = new Date().toISOString();
+      state.analysisFiles.set(key, {
+        version: 1,
+        documentId: _documentId,
+        generation,
+        createdAt: now,
+        updatedAt: now,
+        paragraphs: {},
+      });
+      return generation;
+    },
+
+    importTextFile: async (createParent: string) => {
+      const sampleText = `# サンプル章\n\nサンプル段落1。\n\nサンプル段落2。`;
+      const fileName = withLzlExtension('imported-sample');
+      const filePath = joinPath(createParent, fileName);
+
+      if (pathExists(state.tree, filePath)) {
+        throw new Error(`IMPORT_FILE_ALREADY_EXISTS: ${filePath}`);
+      }
+
+      const importResult = parseTextToImportResult(sampleText, 'imported-sample');
+      const document = buildImportedDocument(importResult, filePath);
+      const children = findDirectoryChildren(state, createParent);
+      children.push({ path: filePath, name: fileName, type: 'file' });
+      state.documents.set(normalizePath(filePath), document);
+      state.revisions.set(normalizePath(filePath), 0);
+
+      return { ok: true as const, filePath, document: clone(document) };
+    },
+
+    getActiveReadingAgentId: async () => state.activeReadingAgentId,
+
+    setActiveReadingAgentId: async (id: string) => {
+      state.activeReadingAgentId = id;
+      return { ok: true };
+    },
+
+    listReadingAgents: async () => Array.from(state.readingAgents.values()).map(clone),
+
+    getReadingAgent: async (id: string) => clone(state.readingAgents.get(id) ?? null),
+
+    saveReadingAgent: async (input: ReadingAgentInput & { id?: string }) => upsertReadingAgent(state, input),
+
+    deleteReadingAgent: async (id: string) => {
+      state.readingAgents.delete(id);
+      return { ok: true };
+    },
+
+    resetReadingAgents: async () => {
+      state.readingAgents = new Map(createInitialReadingAgents().map((agent) => [agent.id, agent]));
+      state.activeReadingAgentId = 'reader-quiet';
+      return Array.from(state.readingAgents.values()).map(clone);
+    },
+
+    getAppVersion: async () => '0.1.0-mock',
+
+    checkForUpdates: async () => ({
+      currentVersion: '0.1.0-mock',
+      latestVersion: null,
+      releaseUrl: 'https://github.com/motimotinok/LiteLizard/releases/tag/mvp-latest',
+      updateAvailable: false,
+      checkedAt: new Date().toISOString(),
+    }),
+
+    openReleasesPage: async () => ({ ok: true }),
+
+    downloadLatestRelease: async () => ({ ok: true }),
+
+    dryRunReadingAgent: async (input) => {
+      const analyzedAt = new Date().toISOString();
+      const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);
+      return {
+        paragraphId: input.paragraph.paragraphId,
+        emotion: analysis.emotion,
+        theme: analysis.theme,
+        deepMeaning: analysis.deepMeaning,
+        confidence: analysis.confidence,
+        model: analysis.model,
+        analyzedAt,
+        promptVersion: input.promptVersion,
+      };
     },
   };
 }

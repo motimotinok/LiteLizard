@@ -1,56 +1,62 @@
 import React from 'react';
+import { useAppStore } from '../store/useAppStore.js';
+import { IconAgent, IconFolder, IconSearch, IconSettings } from './ui/icons.js';
 
-const ICON_SIZE = 20;
-
-function DocumentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={ICON_SIZE} height={ICON_SIZE} aria-hidden>
-      <path
-        d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm6 1.5V9h4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M9 13.2h6M9 16.7h6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width={ICON_SIZE} height={ICON_SIZE} aria-hidden>
-      <path
-        d="M10.36 3.62a1 1 0 0 1 1.28 0l1.12.9a1 1 0 0 0 .82.2l1.38-.22a1 1 0 0 1 1.1.66l.46 1.32a1 1 0 0 0 .6.6l1.32.46a1 1 0 0 1 .66 1.1l-.22 1.38a1 1 0 0 0 .2.82l.9 1.12a1 1 0 0 1 0 1.28l-.9 1.12a1 1 0 0 0-.2.82l.22 1.38a1 1 0 0 1-.66 1.1l-1.32.46a1 1 0 0 0-.6.6l-.46 1.32a1 1 0 0 1-1.1.66l-1.38-.22a1 1 0 0 0-.82.2l-1.12.9a1 1 0 0 1-1.28 0l-1.12-.9a1 1 0 0 0-.82-.2l-1.38.22a1 1 0 0 1-1.1-.66l-.46-1.32a1 1 0 0 0-.6-.6l-1.32-.46a1 1 0 0 1-.66-1.1l.22-1.38a1 1 0 0 0-.2-.82l-.9-1.12a1 1 0 0 1 0-1.28l.9-1.12a1 1 0 0 0 .2-.82l-.22-1.38a1 1 0 0 1 .66-1.1l1.32-.46a1 1 0 0 0 .6-.6l.46-1.32a1 1 0 0 1 1.1-.66l1.38.22a1 1 0 0 0 .82-.2l1.12-.9Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="2.8" fill="none" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
+export type LeftIconRailPanel = 'editor' | 'agents' | 'settings' | 'search';
 
 interface LeftIconRailProps {
-  onSettingsClick?: () => void;
+  activePanel: LeftIconRailPanel;
+  onSelectPanel: (panel: LeftIconRailPanel) => void;
 }
 
-export function LeftIconRail({ onSettingsClick }: LeftIconRailProps) {
+interface NavItem {
+  id: LeftIconRailPanel;
+  label: string;
+  Icon: (props: { size?: number }) => React.ReactElement;
+}
+
+const PRIMARY_NAV: NavItem[] = [
+  { id: 'editor', label: 'エクスプローラー', Icon: IconFolder },
+  { id: 'agents', label: '分析エージェント', Icon: IconAgent },
+  { id: 'search', label: '検索', Icon: IconSearch },
+];
+
+export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) {
+  const updateAvailable = useAppStore((state) => state.updateCheck?.updateAvailable ?? false);
+  const settingsLabel = updateAvailable ? '設定（新しいバージョンあり）' : '設定';
+
   return (
-    <aside className="left-icon-rail" aria-label="primary-navigation">
-      <button className="rail-icon-button is-active" aria-label="Documents" title="Documents">
-        <DocumentIcon />
-      </button>
+    <nav className="left-icon-rail" aria-label="primary-navigation">
+      {PRIMARY_NAV.map(({ id, label, Icon }) => {
+        const active = activePanel === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            className={active ? 'rail-icon-button is-active' : 'rail-icon-button'}
+            aria-label={label}
+            title={label}
+            onClick={() => onSelectPanel(id)}
+          >
+            <Icon size={17} />
+          </button>
+        );
+      })}
+      <span className="left-icon-rail-spacer" />
       <button
-        className="rail-icon-button"
-        aria-label="Settings"
-        title="Settings"
-        onClick={() => onSettingsClick?.()}
+        type="button"
+        className={
+          activePanel === 'settings'
+            ? 'rail-icon-button rail-icon-button-footer is-active'
+            : 'rail-icon-button rail-icon-button-footer'
+        }
+        aria-label={settingsLabel}
+        title={settingsLabel}
+        onClick={() => onSelectPanel('settings')}
       >
-        <SettingsIcon />
+        <IconSettings size={17} />
+        {updateAvailable ? <span className="rail-icon-badge" aria-hidden="true" /> : null}
       </button>
-    </aside>
+    </nav>
   );
 }

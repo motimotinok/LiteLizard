@@ -1,94 +1,147 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { LiteLizardDocument } from '@litelizard/shared';
+import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
+import type { AnalysisMode } from '../store/useAppStore.js';
 import { reorderByKey } from '../utils/arrayUtils.js';
+import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
+import { ChapterSummaryList } from './ChapterSummaryList.js';
+import { AnalysisRunConfirm } from './AnalysisRunConfirm.js';
 import { useAppStore } from '../store/useAppStore.js';
+import {
+  getVisiblePatternIndices,
+  resolveDisplayedPatternIndex,
+} from '../store/analysisHistory.js';
+import { toKanjiIndex } from './ui/kanji.js';
+import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
 
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
+  linkedHighlightParagraphId?: string | null;
   onSetActiveParagraphId?: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
   onRequestScrollToParagraph?: (id: string) => void;
 }
 
-type TagStyle = { background: string; borderColor: string; color: string };
-
-const EMOTION_COLOR_MAP: Record<string, TagStyle> = {
-  '期待':   { background: '#fef9c3', borderColor: '#fde68a', color: '#713f12' },
-  '安心':   { background: '#dcfce7', borderColor: '#86efac', color: '#14532d' },
-  '孤独':   { background: '#dbeafe', borderColor: '#93c5fd', color: '#1e3a5f' },
-  '後悔':   { background: '#ede9fe', borderColor: '#c4b5fd', color: '#4c1d95' },
-  '焦り':   { background: '#fee2e2', borderColor: '#fca5a5', color: '#7f1d1d' },
-  '内省':   { background: '#ccfbf1', borderColor: '#5eead4', color: '#134e4a' },
-  '罪悪感': { background: '#fce7f3', borderColor: '#f9a8d4', color: '#831843' },
-  '緊張':   { background: '#fff7ed', borderColor: '#fdba74', color: '#7c2d12' },
-  '納得':   { background: '#ecfeff', borderColor: '#a5f3fc', color: '#164e63' },
-  '集中':   { background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' },
-};
-
-const FALLBACK_PALETTE: TagStyle[] = [
-  { background: '#f3f4f6', borderColor: '#d1d5db', color: '#374151' },
-  { background: '#fdf4ff', borderColor: '#e9d5ff', color: '#6b21a8' },
-  { background: '#fff1f2', borderColor: '#fecdd3', color: '#881337' },
-  { background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' },
-];
-
-function hashString(s: string): number {
-  let h = 0;
-  for (const c of s) h = (Math.imul(31, h) + c.charCodeAt(0)) | 0;
-  return Math.abs(h);
-}
-
-function getEmotionStyle(emotion: string): TagStyle {
-  return EMOTION_COLOR_MAP[emotion] ?? FALLBACK_PALETTE[hashString(emotion) % FALLBACK_PALETTE.length];
-}
-
-function statusLabel(document: LiteLizardDocument['paragraphs'][number]['lizard']['status']) {
-  if (document === 'pending') {
+function statusLabel(
+  status: LiteLizardDocument['paragraphs'][number]['lizard']['status'],
+  hasPreviousAnalysis: boolean,
+) {
+  if (status === 'pending') {
     return '解析中です。完了後に生成結果が表示されます。';
   }
-  if (document === 'failed') {
+  if (status === 'failed') {
     return '解析に失敗しました。再実行してください。';
   }
-  if (document === 'stale') {
-    return '本文更新により再解析待ちです。';
+  if (status === 'stale') {
+    return hasPreviousAnalysis
+      ? '本文が更新されました。再解析してください。'
+      : 'まだ解析されていません。';
   }
   return '生成結果はまだありません。';
 }
 
-function formatAnalyzedAt(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
+function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
+  if (analysisSettings.defaultProvider === 'openai') {
+    const configured = analysisSettings.providers.openai.apiKeyConfigured;
+    return {
+      label: 'OpenAI',
+      configured,
+      runnable: configured,
+      missingTitle: 'OpenAI API キーを設定すると解析を開始できます。',
+      missingBody: '設定画面で OpenAI のキーを保存してください。',
+      disabledTitle: 'OpenAI API キーが未設定です',
+    };
   }
-  return parsed.toLocaleString('ja-JP', {
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+
+  if (analysisSettings.defaultProvider === 'anthropic') {
+    const configured = analysisSettings.providers.anthropic.apiKeyConfigured;
+    return {
+      label: 'Anthropic',
+      configured,
+      runnable: configured,
+      missingTitle: 'Anthropic API キーを設定すると解析を開始できます。',
+      missingBody: '設定画面で Anthropic のキーを保存してください。',
+      disabledTitle: 'Anthropic API キーが未設定です',
+    };
+  }
+
+  return {
+    label: 'Local LLM',
+    configured: analysisSettings.localLlm.configured,
+    runnable: analysisSettings.localLlm.configured,
+    missingTitle: 'ローカル LLM の設定が必要です。',
+    missingBody: '設定画面でエンドポイントとモデル名を保存してください。',
+    disabledTitle: 'ローカル LLM が未設定です',
+  };
+}
+
+const analysisModeOptions: Array<{
+  id: AnalysisMode;
+  label: string;
+  status: string;
+}> = [
+  { id: 'paragraph', label: '段落', status: '実行可' },
+  { id: 'chapter', label: '章', status: '準備中' },
+  { id: 'document', label: '全体', status: '準備中' },
+];
+
+function analysisModeRunLabel(mode: AnalysisMode) {
+  if (mode === 'paragraph') {
+    return '段落を読ませる';
+  }
+  if (mode === 'chapter') {
+    return '章解析は準備中です';
+  }
+  return '全体解析は準備中です';
 }
 
 export function AnalysisPane({
   document,
   activeParagraphId,
+  linkedHighlightParagraphId = null,
   onSetActiveParagraphId,
+  onPreviewParagraphLink,
   onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
-  const runAnalysis = useAppStore((s) => s.runAnalysis);
+  const requestAnalysisRun = useAppStore((s) => s.requestAnalysisRun);
+  const confirmAnalysisRun = useAppStore((s) => s.confirmAnalysisRun);
+  const cancelAnalysisRun = useAppStore((s) => s.cancelAnalysisRun);
+  const pendingAnalysisRun = useAppStore((s) => s.pendingAnalysisRun);
   const runAnalysisFor = useAppStore((s) => s.runAnalysisFor);
-  const apiKeyConfigured = useAppStore((s) => s.apiKeyConfigured);
+  const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
+  const openAgentsPanel = useAppStore((s) => s.openAgentsPanel);
+  const analysisSettings = useAppStore((s) => s.analysisSettings);
+  const analysisMode = useAppStore((s) => s.analysisMode);
+  const setAnalysisMode = useAppStore((s) => s.setAnalysisMode);
+  const analysisRunSummary = useAppStore((s) => s.analysisRunSummary);
+  const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
+  const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
+  const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
+  const agents = useAppStore((s) => s.agents);
+  const activeAgentId = useAppStore((s) => s.activeAgentId);
+  const agentsLoaded = useAppStore((s) => s.agentsLoaded);
+  const setActiveAgent = useAppStore((s) => s.setActiveAgent);
+  const viewScale = useAppStore((s) => s.viewScale);
+  const providerUi = getAnalysisProviderUiState(analysisSettings);
+  const chapterSummaries = useMemo(() => aggregateChapterAnalyses(document), [document]);
 
   const staleCount = document?.paragraphs.filter((p) => p.lizard.status === 'stale').length ?? 0;
   const hasPending = document?.paragraphs.some((p) => p.lizard.status === 'pending') ?? false;
-  const generateAllDisabled = staleCount === 0 || hasPending || !apiKeyConfigured;
+  const selectedModeImplemented = analysisMode === 'paragraph';
+  const generateAllDisabled =
+    !selectedModeImplemented || staleCount === 0 || hasPending || !providerUi.runnable || !activeAgentId;
 
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false);
   const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
   const [draggingParagraphId, setDraggingParagraphId] = useState<string | null>(null);
   const [dropTargetParagraphId, setDropTargetParagraphId] = useState<string | null>(null);
+
+  const activeAgent = useMemo(
+    () => agents.find((agent) => agent.id === activeAgentId) ?? agents[0] ?? null,
+    [activeAgentId, agents],
+  );
 
   useEffect(() => {
     if (!document) {
@@ -109,6 +162,15 @@ export function AnalysisPane({
     });
   }, [document]);
 
+  useEffect(() => {
+    const close = () => setAgentMenuOpen(false);
+    if (agentMenuOpen) {
+      window.addEventListener('click', close);
+      return () => window.removeEventListener('click', close);
+    }
+    return undefined;
+  }, [agentMenuOpen]);
+
   const orderedParagraphIds = useMemo(() => {
     if (!document) {
       return [];
@@ -127,60 +189,179 @@ export function AnalysisPane({
     onReorderParagraphs(nextOrder);
   };
 
+  const runButtonTitle = !providerUi.runnable
+    ? providerUi.disabledTitle
+    : !selectedModeImplemented
+      ? '章解析と全体解析は今後の実装対象です'
+      : !activeAgentId
+        ? '分析エージェントを選択してください'
+        : hasPending
+          ? '解析実行中です'
+          : staleCount === 0
+            ? '再解析が必要な段落はありません'
+            : `${staleCount}件の段落を解析`;
+
   return (
-    <section className="analysis-shell analysis-shell-chat">
+    <aside className="analysis-shell" aria-label="analysis-panel">
       <header className="analysis-header">
-        <div className="analysis-title-wrap">
-          <span className="analysis-title-icon" aria-hidden>
-            ¶
-          </span>
-          <div>
-            <h2 className="analysis-title">段落解析</h2>
-            <p className="analysis-subtitle">各段落の感情・テーマ・解釈</p>
-          </div>
+        <div className="analysis-section-label">Reading Agent</div>
+        <div className="agent-select" onClick={(event) => event.stopPropagation()}>
+          <button
+            type="button"
+            className="agent-select-trigger"
+            onClick={() => setAgentMenuOpen((value) => !value)}
+            aria-haspopup="listbox"
+            aria-expanded={agentMenuOpen}
+          >
+            <span className="agent-select-trigger-label">
+              <span className="agent-select-trigger-dot" aria-hidden />
+              <span className="agent-select-trigger-name">
+                {activeAgent?.name ?? (agentsLoaded ? '未設定' : '読み込み中')}
+              </span>
+              <span className="agent-select-trigger-desc">
+                {activeAgent?.role ?? '分析エージェント'}
+              </span>
+            </span>
+            <IconChevronDown size={13} />
+          </button>
+          {agentMenuOpen ? (
+            <div className="agent-select-menu" role="listbox">
+              {agents.length > 0 ? agents.map((agent) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  className={
+                    agent.id === activeAgent?.id
+                      ? 'agent-select-option is-active'
+                      : 'agent-select-option'
+                  }
+                  onClick={() => {
+                    void setActiveAgent(agent.id);
+                    setAgentMenuOpen(false);
+                  }}
+                >
+                  <div className="agent-select-option-name">{agent.name}</div>
+                  <div className="agent-select-option-desc">{agent.role}</div>
+                </button>
+              )) : (
+                <div className="agent-select-option-name" style={{ padding: '10px 12px' }}>
+                  分析エージェントがありません
+                </div>
+              )}
+              <div className="agent-select-divider" />
+              <button
+                type="button"
+                className="agent-select-create"
+                onClick={() => {
+                  setAgentMenuOpen(false);
+                  openAgentsPanel({ intent: 'new' });
+                }}
+              >
+                <IconPlus size={12} /> 新しいエージェントを作成
+              </button>
+            </div>
+          ) : null}
+        </div>
+        <div className="analysis-mode-control" role="radiogroup" aria-label="分析モード">
+          {analysisModeOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={
+                option.id === analysisMode
+                  ? 'analysis-mode-option is-active'
+                  : 'analysis-mode-option'
+              }
+              role="radio"
+              aria-checked={option.id === analysisMode}
+              onClick={() => setAnalysisMode(option.id)}
+            >
+              <span className="analysis-mode-option-label">{option.label}</span>
+              <span className="analysis-mode-option-status">{option.status}</span>
+            </button>
+          ))}
         </div>
         <button
           type="button"
-          className="analysis-generate-btn"
-          onClick={runAnalysis}
-          disabled={generateAllDisabled}
-          title={
-            !apiKeyConfigured
-              ? 'APIキーが未設定です'
-              : hasPending
-                ? '解析実行中です'
-                : staleCount === 0
-                  ? '再解析が必要な段落はありません'
-                  : `${staleCount}件の段落を解析`
-          }
+          className="analysis-run-button"
+          onClick={requestAnalysisRun}
+          disabled={generateAllDisabled || pendingAnalysisRun !== null}
+          title={runButtonTitle}
         >
-          生成
+          <IconPlay size={10} /> {analysisModeRunLabel(analysisMode)}
         </button>
+        {!pendingAnalysisRun && analysisRunSummary ? (
+          <div className="analysis-run-summary" aria-label="解析実行結果">
+            <span>対象 {analysisRunSummary.targetCount}</span>
+            <span>成功 {analysisRunSummary.successCount}</span>
+            <span>失敗 {analysisRunSummary.failureCount}</span>
+          </div>
+        ) : null}
       </header>
+      {pendingAnalysisRun ? (
+        <AnalysisRunConfirm
+          estimate={pendingAnalysisRun.estimate}
+          onCancel={cancelAnalysisRun}
+          onConfirm={() => {
+            void confirmAnalysisRun();
+          }}
+        />
+      ) : null}
 
       {!document ? (
         <div className="analysis-empty">ドキュメントを開くと分析カードが表示されます。</div>
       ) : (
         <div className="analysis-scroll">
+          {!providerUi.runnable ? (
+            <div className="analysis-settings-callout">
+              <strong>{providerUi.missingTitle}</strong>
+              <p>{providerUi.missingBody}</p>
+              <button
+                type="button"
+                className="analysis-settings-link"
+                onClick={() => openSettingsPanel()}
+              >
+                設定を開く
+              </button>
+            </div>
+          ) : null}
+          {viewScale === 'macro' ? (
+            <ChapterSummaryList summaries={chapterSummaries} />
+          ) : (
           <div className="analysis-card-list">
             {document.paragraphs.map((paragraph, index) => {
               const expanded = Boolean(expandedByParagraphId[paragraph.id]);
               const active = paragraph.id === activeParagraphId;
+              const isLinkedHighlight = paragraph.id === linkedHighlightParagraphId;
               const isDragging = draggingParagraphId === paragraph.id;
               const isDropTarget = dropTargetParagraphId === paragraph.id;
               const isComplete = paragraph.lizard.status === 'complete';
-              const analyzedAt = paragraph.lizard.analyzedAt
-                ? formatAnalyzedAt(paragraph.lizard.analyzedAt)
-                : null;
               const confidence =
                 typeof paragraph.lizard.confidence === 'number'
-                  ? `${Math.round(paragraph.lizard.confidence * 100)}%`
+                  ? Math.round(paragraph.lizard.confidence * 100)
                   : null;
-              const statusText = statusLabel(paragraph.lizard.status);
+              const history = analysisHistoriesByParagraphId[paragraph.id];
+              const hasHistory = Array.isArray(history) && history.length > 0;
+              const hasPreviousAnalysis = hasHistory || Boolean(paragraph.lizard.analyzedAt);
+              const isStaleWithPreviousAnalysis =
+                paragraph.lizard.status === 'stale' && hasPreviousAnalysis;
+              const statusText = statusLabel(paragraph.lizard.status, hasPreviousAnalysis);
               const tags = [
-                ...(paragraph.lizard.theme ?? []).map((value) => ({ value, kind: 'theme' as const })),
-                ...(paragraph.lizard.emotion ?? []).map((value) => ({ value, kind: 'emotion' as const })),
+                ...(paragraph.lizard.theme ?? []),
+                ...(paragraph.lizard.emotion ?? []),
               ];
+              const visiblePatternIndices = getVisiblePatternIndices(history, paragraph.light.text);
+              const activePatternIndex = resolveDisplayedPatternIndex(
+                history,
+                paragraph.light.text,
+                selectedPatternIndexByParagraphId[paragraph.id],
+              );
+              const activePatternPosition =
+                activePatternIndex === null ? 0 : visiblePatternIndices.indexOf(activePatternIndex) + 1;
+              const canMoveToPreviousPattern = activePatternPosition > 1;
+              const canMoveToNextPattern =
+                activePatternIndex !== null && activePatternPosition < visiblePatternIndices.length;
+              const showHistoryNavigation = visiblePatternIndices.length > 1;
 
               return (
                 <article
@@ -188,8 +369,10 @@ export function AnalysisPane({
                   className={[
                     'analysis-card',
                     active ? 'analysis-card-active' : '',
+                    isLinkedHighlight ? 'analysis-card-linked-highlight' : '',
                     isDragging ? 'analysis-card-dragging' : '',
                     isDropTarget ? 'analysis-card-drop-target' : '',
+                    isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -197,30 +380,48 @@ export function AnalysisPane({
                     onSetActiveParagraphId?.(paragraph.id);
                     onRequestScrollToParagraph?.(paragraph.id);
                   }}
+                  onMouseEnter={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onMouseLeave={() => onPreviewParagraphLink?.(null)}
+                  onFocus={() => onPreviewParagraphLink?.(paragraph.id)}
+                  onBlur={() => onPreviewParagraphLink?.(null)}
                 >
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
-                      <span className="analysis-card-index">P{String(index + 1).padStart(2, '0')}</span>
+                      <span className="analysis-card-index">{toKanjiIndex(index + 1)}</span>
+                      {isStaleWithPreviousAnalysis ? (
+                        <span
+                          className="analysis-card-stale-badge"
+                          title="本文が更新されました。再解析してください。"
+                        >
+                          要再解析
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="analysis-card-actions">
+                      {confidence !== null ? (
+                        <span className="analysis-card-meta-confidence" title="解析の確度">
+                          {confidence}
+                        </span>
+                      ) : null}
+
                       <button
                         type="button"
-                        className="analysis-card-regen-btn"
+                        className="analysis-card-icon-button"
                         onClick={(event) => {
                           event.stopPropagation();
                           runAnalysisFor(paragraph.id);
                         }}
-                        disabled={paragraph.lizard.status === 'pending' || hasPending || !apiKeyConfigured}
+                        disabled={paragraph.lizard.status === 'pending' || hasPending || !providerUi.runnable}
                         title="この段落だけ再解析"
-                        aria-label={`P${index + 1} を再解析`}
+                        aria-label={`${toKanjiIndex(index + 1)} を再解析`}
                       >
-                        ↺
+                        <IconRefresh size={11} />
                       </button>
 
                       <button
                         type="button"
-                        className="analysis-card-toggle"
+                        className="analysis-card-icon-button"
                         onClick={(event) => {
                           event.stopPropagation();
                           setExpandedByParagraphId((current) => ({
@@ -228,13 +429,60 @@ export function AnalysisPane({
                             [paragraph.id]: !current[paragraph.id],
                           }));
                         }}
+                        title={expanded ? '折りたたむ' : '全文を表示'}
+                        aria-label={expanded ? '折りたたむ' : '全文を表示'}
                       >
-                        {expanded ? '折りたたむ' : '全文'}
+                        {expanded ? '−' : '＋'}
                       </button>
+
+                      {showHistoryNavigation ? (
+                        <div
+                          className="analysis-card-history-nav"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            className="analysis-card-history-btn"
+                            disabled={!canMoveToPreviousPattern}
+                            onClick={() => {
+                              if (!canMoveToPreviousPattern || activePatternIndex === null) {
+                                return;
+                              }
+                              selectAnalysisPatternIndex(
+                                paragraph.id,
+                                visiblePatternIndices[activePatternPosition - 2],
+                              );
+                            }}
+                            aria-label="前の解析結果を表示"
+                          >
+                            &lt;
+                          </button>
+                          <span className="analysis-card-history-index">
+                            {activePatternPosition} / {visiblePatternIndices.length}
+                          </span>
+                          <button
+                            type="button"
+                            className="analysis-card-history-btn"
+                            disabled={!canMoveToNextPattern}
+                            onClick={() => {
+                              if (!canMoveToNextPattern || activePatternIndex === null) {
+                                return;
+                              }
+                              selectAnalysisPatternIndex(
+                                paragraph.id,
+                                visiblePatternIndices[activePatternPosition],
+                              );
+                            }}
+                            aria-label="次の解析結果を表示"
+                          >
+                            &gt;
+                          </button>
+                        </div>
+                      ) : null}
 
                       <button
                         type="button"
-                        className="analysis-card-drag-handle"
+                        className="analysis-card-icon-button analysis-card-drag-handle"
                         draggable
                         onClick={(event) => event.stopPropagation()}
                         onDragStart={(event) => {
@@ -263,7 +511,7 @@ export function AnalysisPane({
                           setDraggingParagraphId(null);
                           setDropTargetParagraphId(null);
                         }}
-                        aria-label={`P${index + 1} をドラッグ`}
+                        aria-label="ドラッグして並び替え"
                         title="ドラッグして並び替え"
                       >
                         ⋮⋮
@@ -276,25 +524,23 @@ export function AnalysisPane({
                       {tags.length > 0 ? (
                         <ul className="analysis-tag-list">
                           {tags.map((tag, tagIndex) => (
-                            <li
-                              key={`${paragraph.id}-${tag.kind}-${tag.value}-${tagIndex}`}
-                              className={`analysis-tag analysis-tag-${tag.kind}`}
-                              style={tag.kind === 'emotion' ? getEmotionStyle(tag.value) : undefined}
-                            >
-                              {tag.value}
-                            </li>
+                            <React.Fragment key={`${paragraph.id}-${tag}-${tagIndex}`}>
+                              {tagIndex > 0 ? (
+                                <span className="analysis-tag-separator" aria-hidden>
+                                  ·
+                                </span>
+                              ) : null}
+                              <li className="analysis-tag">{tag}</li>
+                            </React.Fragment>
                           ))}
                         </ul>
                       ) : null}
 
-                      {confidence || analyzedAt ? (
-                        <div className="analysis-card-meta">
-                          {confidence ? <span>信頼度 {confidence}</span> : <span>信頼度 -</span>}
-                          {analyzedAt ? <span>{analyzedAt}</span> : null}
-                        </div>
-                      ) : null}
-
-                      <p className={expanded ? 'analysis-card-body analysis-card-body-expanded' : 'analysis-card-body'}>
+                      <p
+                        className={
+                          expanded ? 'analysis-card-body analysis-card-body-expanded' : 'analysis-card-body'
+                        }
+                      >
                         {paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。'}
                       </p>
                     </>
@@ -310,8 +556,10 @@ export function AnalysisPane({
               );
             })}
           </div>
+          )}
         </div>
       )}
-    </section>
+    </aside>
   );
 }
+

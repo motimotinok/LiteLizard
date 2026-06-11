@@ -1,16 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LiteLizardDocument } from '@litelizard/shared';
 import type { DocumentStructureInput } from '../../types/documentStructure.js';
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getRoot,
-  type LexicalEditor,
-} from 'lexical';
+import { type LexicalEditor } from 'lexical';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
+import { UndoPlugin } from './plugins/UndoPlugin.js';
 import { LexicalErrorBoundary, type LexicalErrorBoundaryProps } from '@lexical/react/LexicalErrorBoundary';
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -19,6 +14,7 @@ import { StructureChromePlugin } from './plugins/StructureChromePlugin.js';
 import { ChapterCommandPlugin } from './plugins/ChapterCommandPlugin.js';
 import { LexicalEditorRefPlugin } from './plugins/LexicalEditorRefPlugin.js';
 import { DragHandlePlugin } from './plugins/DragHandlePlugin.js';
+import { ChapterDeletePlugin } from './plugins/ChapterDeletePlugin.js';
 import {
   buildChapterInputs,
   buildFallbackChapterNodeIndexes,
@@ -28,14 +24,18 @@ import {
   type StructureSnapshot,
 } from './utils/structureBuilder.js';
 import { mergeChapterIdByNodeKey, mergeParagraphIdByNodeKey } from './utils/nodeKeyMapping.js';
+import { applyDocumentToLexicalRoot } from './utils/buildLexicalFromDocument.js';
+import { useAppStore } from '../../store/useAppStore.js';
 
 const RichTextErrorBoundary: React.ComponentType<LexicalErrorBoundaryProps> = LexicalErrorBoundary;
 
 interface Props {
   document: LiteLizardDocument;
   activeParagraphId: string | null;
+  linkedHighlightParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (id: string | null) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
 }
@@ -43,10 +43,12 @@ interface Props {
 export function MicroEditorView({
   document,
   activeParagraphId,
+  linkedHighlightParagraphId,
   scrollRequest,
   setActiveParagraphId,
+  onPreviewParagraphLink,
   onSyncStructure,
-  onReorderParagraphs,
+  onReorderParagraphs: _onReorderParagraphs,
 }: Props) {
   const [structureSnapshot, setStructureSnapshot] = useState<StructureSnapshot>({ chapters: [], paragraphs: [] });
   const [chapterNodeKeys, setChapterNodeKeys] = useState<string[]>([]);
@@ -81,6 +83,7 @@ export function MicroEditorView({
     chapterNodeKeySetRef.current = new Set();
     consumedScrollRequestNonceRef.current = null;
     initialBaselineCapturedRef.current = false;
+    useAppStore.getState().clearUndoStacks();
   }, [document.documentId]);
 
   // nodeKey ↔ ID マッピングの同期
@@ -216,6 +219,7 @@ export function MicroEditorView({
   }, [scrollRequest, paragraphNodeKeys]);
 
   const fallbackChapterNodeIndexes = useMemo(() => buildFallbackChapterNodeIndexes(document), [document]);
+  const paragraphIds = useMemo(() => document.paragraphs.map((paragraph) => paragraph.id), [document.paragraphs]);
 
   const initialConfig = useMemo(
     () => ({
@@ -228,52 +232,8 @@ export function MicroEditorView({
         paragraph: 'editor-paragraph-row',
       },
       editorState: () => {
-        const root = $getRoot();
-        root.clear();
-
-        if (document.chapters.length === 0) {
-          const chapter = $createParagraphNode();
-          chapter.append($createTextNode('章1'));
-          root.append(chapter);
-          root.append($createParagraphNode());
-          chapterNodeKeySetRef.current = new Set([chapter.getKey()]);
-          return;
-        }
-
         const chapterSet = new Set<string>();
-        const chapterList = document.chapters.slice().sort((left, right) => left.order - right.order);
-        const paragraphsByChapterId = new Map<string, Array<{ text: string }>>();
-
-        document.paragraphs
-          .slice()
-          .sort((left, right) => left.order - right.order)
-          .forEach((paragraph) => {
-            const list = paragraphsByChapterId.get(paragraph.chapterId) ?? [];
-            list.push({ text: paragraph.light.text });
-            paragraphsByChapterId.set(paragraph.chapterId, list);
-          });
-
-        chapterList.forEach((chapter) => {
-          const chapterNode = $createParagraphNode();
-          chapterNode.append($createTextNode(chapter.title));
-          root.append(chapterNode);
-          chapterSet.add(chapterNode.getKey());
-
-          const chapterParagraphs = paragraphsByChapterId.get(chapter.id) ?? [];
-          if (chapterParagraphs.length === 0) {
-            root.append($createParagraphNode());
-            return;
-          }
-
-          chapterParagraphs.forEach((paragraph) => {
-            const paragraphNode = $createParagraphNode();
-            if (paragraph.text.length > 0) {
-              paragraphNode.append($createTextNode(paragraph.text));
-            }
-            root.append(paragraphNode);
-          });
-        });
-
+        applyDocumentToLexicalRoot(document, chapterSet);
         chapterNodeKeySetRef.current = chapterSet;
       },
     }),
@@ -316,15 +276,24 @@ export function MicroEditorView({
             <StructureChromePlugin
               chapterNodeKeys={chapterNodeKeys}
               paragraphNodeKeys={paragraphNodeKeys}
+              paragraphIds={paragraphIds}
               active={activeElement}
+              linkedHighlightParagraphId={linkedHighlightParagraphId}
               emptyParagraphNodeKeys={emptyParagraphNodeKeys}
+              onPreviewParagraphLink={onPreviewParagraphLink}
             />
 
             <ChapterCommandPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
 
             <DragHandlePlugin paragraphNodeKeys={paragraphNodeKeys} containerRef={containerRef} />
 
-            <HistoryPlugin />
+            <ChapterDeletePlugin
+              chapterNodeKeys={chapterNodeKeys}
+              chapterNodeKeySetRef={chapterNodeKeySetRef}
+              containerRef={containerRef}
+            />
+
+            <UndoPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
 
             <RichTextPlugin
               contentEditable={<ContentEditable className="editor-paragraph-textarea" />}
