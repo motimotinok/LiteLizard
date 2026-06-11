@@ -1,3 +1,6 @@
+[2026/06/11]#90 ランディングページの最小構成を追加
+同一モノレポのapps/landingにLiteLizardのタイトルとmacOS版ダウンロードリンクだけを持つViteサイトを追加し、mainのLP関連変更からGitHub Pagesへ自動デプロイする構成へ切り替えて、旧ブラウザデモのPages公開を終了した。
+
 [2026/06/10]#107 サポート中の Electron へ更新
 Electron を34.5.8から42.4.0へ更新し、console-message APIとバイナリ取得方法の変更へ追従した。Node 21でElectronインストーラーがESMエラーになる問題に対してNode 22.12以上を明示し、nvm/nodebrewの対応Nodeを自動選択する起動ラッパーを追加したうえで、全体テスト、macOS arm64のapp・DMG生成、開発起動、packaged smokeを確認した。
 
