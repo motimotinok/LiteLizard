@@ -11,6 +11,7 @@
     "build": "pnpm -r build",
     "dev": "pnpm --filter @litelizard/api dev",
     "dev:desktop": "pnpm --filter @litelizard/desktop dev",
+    "dev:landing": "pnpm --filter @litelizard/landing dev",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "format": "prettier --write ."

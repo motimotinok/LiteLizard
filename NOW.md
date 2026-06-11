@@ -1,23 +1,22 @@
 # LiteLizard NOW
 
-最終更新: 2026-05-23
+最終更新: 2026-06-11
 
 このファイルは LLM が最初に読む現在地。タスク台帳ではなく、詳細な backlog は GitHub Issues を見る。
 
 ## 現在の主目的
 
-MVP を外部公開できる状態にする。まず macOS 向けの未署名 `.dmg` を GitHub Releases で配布し、note などから誘導する前提で整える。
+LiteLizard は公開可能な状態まで到達した。機能追加より先に、ランディングページと記事導線を整え、誰にどの価値が届くか、利用開始につながるかを検証する。
+
+反応を一定期間観測し、訴求を修正して継続するか、別のアプリ開発へ移るかを判断する。
 
 ## 優先判断
 
-- #95 MVP 公開コントロールを親 Issue として見る。
-- #100 の判断により、MVP は Apple Silicon 向け `arm64.dmg` 配布で進める。
-- #93 provider contract の残確認: OpenAI / Anthropic は再確認済み、local-llm endpoint への接続は `http://localhost:11434` 到達不能のため未完了。schema 経路ではなく環境問題として公開判断に回す。
-- #101 軽量更新通知（GitHub Releases `mvp-latest` 参照、起動時チェック、設定画面の `LiteLizard について` タブ）は実装済み。右下フローティングバナーから歯車アイコンの青いバッジ + 設定 About タブの DMG ダウンロードボタンに 2026-05-23 で置き換え済み。
-- #89 はアプリ内自動更新ではなく「最新版検知 + 手動 DMG ダウンロード導線」として MVP 範囲で完了扱い。本格自動更新（electron-updater + Developer ID 署名 + notarization）は MVP 後対応。
-- MVP 配布導線として、`main` 更新時に `.github/workflows/release.yml` が macos-latest 上で `LiteLizard-latest-arm64.dmg` をビルドし `mvp-latest` Release を上書き。LP 等からは `https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg` の静的 URL を直リンク可能。
-- 公開直前は `docs/release-checklist.md` の自動検証と手動 GUI 確認を通す。
-- #90 ランディングページ、#94 Gemini provider は原則 MVP 後候補。
+- #90 ランディングページを最優先の入口として扱う。
+- 使い方記事で最初の価値体験を説明し、note 等の記事から LP・ダウンロードへつなぐ。
+- 現段階では新機能やUI改善より、流入・価値理解・利用開始の検証を優先する。
+- 成功判断を閲覧数だけに置かず、記事からLPへの遷移、使い方閲覧、ダウンロードなどを観測する。
+- macOS 公開版は Apple Silicon 向けで、動作確認済み環境は macOS Tahoe 26.5.1。
 
 ## Backlog
 
@@ -27,6 +26,6 @@ MVP を外部公開できる状態にする。まず macOS 向けの未署名 `.
 ## 参照先
 
 - backlog: GitHub Issues
-- 親 Issue: #95
+- 優先 Issue: #90
 - 完了履歴: `CHANGELOG.md`
 - 確定仕様: `docs/specs/` と `docs/decisions.md`

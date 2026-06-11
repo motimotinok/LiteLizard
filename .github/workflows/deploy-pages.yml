@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'apps/landing/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -26,13 +31,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build for GitHub Pages
-        run: pnpm --filter @litelizard/desktop build
-        env:
-          GITHUB_PAGES: 'true'
+      - name: Build landing page
+        run: pnpm --filter @litelizard/landing build
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./apps/desktop/dist/renderer
+          publish_dir: ./apps/landing/dist
