@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="LiteLizard - 小説や長い文章がどう読まれるかを、段落単位で観測するためのデスクトップ執筆環境"
+      content="LiteLizard - 小説やエッセイがどう読まれるかを、さまざまな読み手の視点から観測するデスクトップ執筆環境"
     />
     <title>LiteLizard — 文章の読まれ方を観測する執筆環境</title>
     <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.js"></script>
   </head>
   <body>
     <header class="site-header">
@@ -48,26 +49,91 @@
           <p class="download-note">Apple Silicon Mac向け・MVP / β版</p>
         </div>
 
-        <div class="observation" aria-label="本文と読まれ方を並べて確認するイメージ">
-          <div class="observation-column manuscript">
-            <p class="observation-label">本文</p>
-            <p>
-              彼女は返事の代わりに、冷めたカップへ指を添えた。窓の外では、雨がまだ降り始める場所を探していた。
-            </p>
-            <span class="paragraph-number">一</span>
+        <div class="product-preview" aria-label="本文と複数の読み手による分析を並べた画面イメージ">
+          <div class="preview-manuscript">
+            <p class="preview-label">Manuscript</p>
+            <button
+              class="manuscript-passage is-active"
+              type="button"
+              data-preview-index="0"
+              aria-label="1つ目の段落と対応する読みを表示"
+              aria-pressed="true"
+            >
+              彼女は返事の代わりに、冷めたカップへ指を添えた。
+            </button>
+            <button
+              class="manuscript-passage"
+              type="button"
+              data-preview-index="1"
+              aria-label="2つ目の段落と対応する読みを表示"
+              aria-pressed="false"
+            >
+              窓の外では、雨がまだ降り始める場所を探していた。言葉にしなかった返事だけが、二人のあいだに残っている。
+            </button>
+            <button
+              class="manuscript-passage"
+              type="button"
+              data-preview-index="2"
+              aria-label="3つ目の段落と対応する読みを表示"
+              aria-pressed="false"
+            >
+              彼はしばらく待ってから、空いた椅子へ視線を戻した。
+            </button>
           </div>
-          <div class="observation-column reading">
-            <p class="observation-label">読まれ方</p>
-            <dl>
-              <div>
-                <dt>感情</dt>
-                <dd>ためらいと静かな距離</dd>
-              </div>
-              <div>
-                <dt>含み</dt>
-                <dd>言葉にしない選択が、二人の関係を示している</dd>
-              </div>
-            </dl>
+
+          <div class="preview-readings">
+            <p class="preview-label">Readings</p>
+            <button
+              class="reading-result is-active"
+              type="button"
+              data-preview-index="0"
+              aria-label="物語を読む人の読みを選択"
+              aria-pressed="true"
+            >
+              <span class="reader-name">物語を読む人</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>ためらい</span>
+                <span>静かな距離</span>
+                <span>未完の対話</span>
+              </span>
+              <span class="reading-description">
+                返事を避ける仕草から、二人の関係が変わり始める直前の緊張として読めます。
+              </span>
+            </button>
+            <button
+              class="reading-result"
+              type="button"
+              data-preview-index="1"
+              aria-label="編集者の視点を選択"
+              aria-pressed="false"
+            >
+              <span class="reader-name">編集者の視点</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>情景描写</span>
+                <span>余白</span>
+                <span>転換点</span>
+              </span>
+              <span class="reading-description">
+                雨と空席が感情を直接説明せずに示し、場面の静けさを保っています。
+              </span>
+            </button>
+            <button
+              class="reading-result"
+              type="button"
+              data-preview-index="2"
+              aria-label="初めて読む人の読みを選択"
+              aria-pressed="false"
+            >
+              <span class="reader-name">初めて読む人</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>別れの予感</span>
+                <span>曖昧さ</span>
+                <span>続きへの期待</span>
+              </span>
+              <span class="reading-description">
+                何が起きたのかはまだ分からないまま、二人が離れていく予感が残ります。
+              </span>
+            </button>
           </div>
         </div>
       </section>
