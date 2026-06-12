@@ -523,6 +523,30 @@ describe('registerIpcHandlers', () => {
     });
   });
 
+  it('deleting a folder removes analysis generations for documents below it', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      const targetFolder = path.join(projectRoot, 'archive');
+      const nestedFolder = path.join(targetFolder, 'nested');
+      const firstDocumentId = 'd_abcdefghij';
+      const secondDocumentId = 'd_klmnopqrst';
+
+      await fs.mkdir(nestedFolder, { recursive: true });
+      await fs.writeFile(path.join(targetFolder, 'first.lzl'), `documentId: ${firstDocumentId}`, 'utf8');
+      await fs.writeFile(path.join(nestedFolder, 'second.lzl'), `documentId: ${secondDocumentId}`, 'utf8');
+
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.deleteEntry)(undefined as never, targetFolder as never),
+      ).resolves.toEqual({ ok: true });
+
+      await expect(fs.access(targetFolder)).rejects.toThrow();
+      expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledTimes(2);
+      expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledWith(projectRoot, firstDocumentId);
+      expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledWith(projectRoot, secondDocumentId);
+    });
+  });
+
   it('rejects delete, rename, move, load, and save calls outside a project before filesystem work runs', async () => {
     await withTempProject(async ({ outsidePath }) => {
       const renameSpy = vi.spyOn(fs, 'rename');

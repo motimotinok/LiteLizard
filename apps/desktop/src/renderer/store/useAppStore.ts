@@ -507,7 +507,12 @@ export const useAppStore = create<AppState>((set, get) => {
   };
 
   const runAnalysisForTargetIds = async (targetParagraphIds?: string[]) => {
-    const { document, analysisSettings, activeAgentId } = get();
+    const {
+      document,
+      analysisSettings,
+      activeAgentId,
+      currentFilePath: analysisTargetFilePath,
+    } = get();
     if (!document) {
       return;
     }
@@ -570,15 +575,19 @@ export const useAppStore = create<AppState>((set, get) => {
     const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
     const progressedParagraphIds = new Set<string>();
     const analysisTargetSignature = getAnalysisStructureSignature(document);
+    const isAnalysisTargetCurrent = () => {
+      const state = get();
+      return Boolean(
+        state.document &&
+          state.currentFilePath === analysisTargetFilePath &&
+          state.document.documentId === document.documentId &&
+          !state.generationSyncPending &&
+          getAnalysisStructureSignature(state.document) === analysisTargetSignature,
+      );
+    };
 
     const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
-      const state = get();
-      if (
-        !state.document ||
-        state.document.documentId !== document.documentId ||
-        state.generationSyncPending ||
-        getAnalysisStructureSignature(state.document) !== analysisTargetSignature
-      ) {
+      if (!isAnalysisTargetCurrent()) {
         return;
       }
 
@@ -598,6 +607,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
     try {
       const result = await window.litelizard.runAnalysis(payload);
+      if (!isAnalysisTargetCurrent() || result.documentId !== document.documentId) {
+        return;
+      }
       result.results.forEach((analyzed) => {
         if (!progressedParagraphIds.has(analyzed.paragraphId)) {
           appendPatternToStore(
@@ -652,6 +664,9 @@ export const useAppStore = create<AppState>((set, get) => {
         };
       });
     } catch (error) {
+      if (!isAnalysisTargetCurrent()) {
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Analysis failed';
       const successCount = staleParagraphs.filter((paragraph) =>
         progressedParagraphIds.has(paragraph.id),
