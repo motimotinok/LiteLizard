@@ -813,6 +813,60 @@ describe('useAppStore L-06 analysis state', () => {
     expect(saveAnalysisResult).not.toHaveBeenCalled();
     expect(useAppStore.getState().analysisHistoriesByParagraphId).toEqual({});
   });
+
+  it('解析中に同じ構造と documentId を持つ別ファイルへ切り替えた場合は完了結果を反映しない', async () => {
+    const document = createLzlDocument();
+    const deferred = createDeferred<AnalysisRunResult>();
+    const runAnalysis = vi.fn(() => deferred.promise);
+    window.litelizard = createBridge({ runAnalysis });
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      currentFilePath: '/projects/novel/draft.lzl',
+      document,
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+      },
+    });
+
+    const analysisPromise = useAppStore.getState().runAnalysis();
+    useAppStore.setState({
+      currentFilePath: '/projects/novel/copied.lzl',
+      document: createLzlDocument({
+        title: 'copied',
+        source: { format: 'lzl-v1', originPath: '/projects/novel/copied.lzl' },
+      }),
+    });
+    deferred.resolve({
+      requestId: 'req_stale',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          emotion: ['混入'],
+          theme: ['別文書'],
+          deepMeaning: 'stale final result',
+          confidence: 0.9,
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-06-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    });
+
+    await analysisPromise;
+
+    expect(useAppStore.getState().currentFilePath).toBe('/projects/novel/copied.lzl');
+    expect(useAppStore.getState().analysisHistoriesByParagraphId).toEqual({});
+    expect(useAppStore.getState().document?.paragraphs[0].lizard.deepMeaning).toBeUndefined();
+  });
 });
 
 describe('useAppStore R-15 DnD reorder undo/redo', () => {

@@ -220,6 +220,35 @@ async function extractDocumentId(filePath: string): Promise<string | null> {
   return null;
 }
 
+async function collectDocumentIdsInDirectory(directoryPath: string): Promise<string[]> {
+  const documentIds = new Set<string>();
+  const pendingDirectories = [directoryPath];
+
+  while (pendingDirectories.length > 0) {
+    const currentDirectory = pendingDirectories.pop()!;
+    const entries = await fs.readdir(currentDirectory, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentDirectory, entry.name);
+      if (entry.isDirectory()) {
+        pendingDirectories.push(entryPath);
+        continue;
+      }
+      if (!entry.isFile() || !/\.(md|lzl)$/i.test(entry.name)) {
+        continue;
+      }
+
+      const documentId = await extractDocumentId(entryPath);
+      if (documentId) {
+        assertDocumentId(documentId);
+        documentIds.add(documentId);
+      }
+    }
+  }
+
+  return [...documentIds];
+}
+
 async function assertRenameTargetAvailable(sourcePath: string, targetPath: string) {
   if (sourcePath === targetPath) {
     return;
@@ -415,7 +444,11 @@ export function registerIpcHandlers() {
       const stats = await fs.stat(validatedTarget.path);
 
       if (stats.isDirectory()) {
+        const documentIds = await collectDocumentIdsInDirectory(validatedTarget.path);
         await fs.rm(validatedTarget.path, { recursive: true, force: true });
+        await Promise.all(
+          documentIds.map((documentId) => deleteAnalysisFiles(validatedTarget.projectRoot, documentId)),
+        );
         return { ok: true as const };
       }
 

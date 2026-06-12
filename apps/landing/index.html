@@ -5,19 +5,180 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="LiteLizard - 文章がどう読まれるかを観測するためのデスクトップ執筆環境"
+      content="LiteLizard - 小説や長い文章がどう読まれるかを、段落単位で観測するためのデスクトップ執筆環境"
     />
-    <title>LiteLizard</title>
+    <title>LiteLizard — 文章の読まれ方を観測する執筆環境</title>
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <main>
-      <h1>LiteLizard</h1>
+    <header class="site-header">
+      <a class="wordmark" href="#top" aria-label="LiteLizard トップ">LiteLizard</a>
+      <nav aria-label="ページ内ナビゲーション">
+        <a href="#features">特徴</a>
+        <a href="#how-to-use">使い方</a>
+        <a href="#story">開発について</a>
+      </nav>
       <a
+        class="header-download"
         href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
       >
-        macOS版をダウンロード
+        ダウンロード
       </a>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Desktop writing environment for macOS</p>
+          <h1 id="hero-title">LiteLizard</h1>
+          <p class="hero-lead">
+            文章を生成するのではなく、<br />
+            どう読まれるかを観測する。
+          </p>
+          <p class="hero-description">
+            小説やエッセイを、さまざまな読み手の視点から多角的に観測しながら書き進められる執筆環境です。
+          </p>
+          <a
+            class="download-link"
+            href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+          >
+            macOS版をダウンロード
+            <span aria-hidden="true">↓</span>
+          </a>
+          <p class="download-note">Apple Silicon Mac向け・MVP / β版</p>
+        </div>
+
+        <div class="observation" aria-label="本文と読まれ方を並べて確認するイメージ">
+          <div class="observation-column manuscript">
+            <p class="observation-label">本文</p>
+            <p>
+              彼女は返事の代わりに、冷めたカップへ指を添えた。窓の外では、雨がまだ降り始める場所を探していた。
+            </p>
+            <span class="paragraph-number">一</span>
+          </div>
+          <div class="observation-column reading">
+            <p class="observation-label">読まれ方</p>
+            <dl>
+              <div>
+                <dt>感情</dt>
+                <dd>ためらいと静かな距離</dd>
+              </div>
+              <div>
+                <dt>含み</dt>
+                <dd>言葉にしない選択が、二人の関係を示している</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section features" aria-labelledby="features-title">
+        <div class="section-intro">
+          <p class="eyebrow">Features</p>
+          <h2 id="features-title">答えではなく、<br />判断するための材料を。</h2>
+          <p>
+            チャットで文章全体を評価してもらうと、返答が大きすぎたり、褒めすぎたり、問題点が増えすぎたりすることがあります。LiteLizardは、書く場所を離れずに、必要な粒度で読みを確かめます。
+          </p>
+        </div>
+
+        <div class="feature-list">
+          <article>
+            <p class="feature-number">01</p>
+            <h3>段落ごとに観測する</h3>
+            <p>
+              どんな感情やテーマとして届くか、どんな深読みが起きそうか。本文の横で段落単位に確認できます。
+            </p>
+          </article>
+          <article>
+            <p class="feature-number">02</p>
+            <h3>読む視点を切り替える</h3>
+            <p>
+              仮想読者、編集者、批判的な読者。Reading Agentを選び、同じ文章を異なる視点から読み直せます。
+            </p>
+          </article>
+          <article>
+            <p class="feature-number">03</p>
+            <h3>書く主導権を渡さない</h3>
+            <p>
+              AIの読みは最終評価ではありません。直すか、意図を残すかを決めるのは、いつでも書き手です。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="how-to-use" class="section how-to-use" aria-labelledby="how-to-use-title">
+        <div class="section-heading">
+          <p class="eyebrow">How to use</p>
+          <h2 id="how-to-use-title">書く。読ませる。<br />自分で決める。</h2>
+        </div>
+
+        <ol class="steps">
+          <li>
+            <span class="step-number">1</span>
+            <div>
+              <h3>文章を書く</h3>
+              <p>静かなエディターで、段落ごとに文章を書きます。原稿は選んだローカルフォルダへ保存されます。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">2</span>
+            <div>
+              <h3>読者を選んで、読ませる</h3>
+              <p>確かめたいReading Agentを選び、現在の段落を読ませます。必要なときだけAIを呼び出します。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">3</span>
+            <div>
+              <h3>読まれ方を見て、判断する</h3>
+              <p>感情、テーマ、含みを本文と並べて確認します。修正するか、そのまま残すかは自分で決めます。</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="story" class="section story" aria-labelledby="story-title">
+        <div class="story-statement">
+          <p class="eyebrow">Why I built it</p>
+          <h2 id="story-title">書く場所と、<br />見直す場所を、<br />ひとつにしたかった。</h2>
+        </div>
+        <div class="story-copy">
+          <p>
+            長い文章を書いていると、自分では意図して書いたつもりでも、「読者にはどう見えるんだろう」と分からなくなる瞬間があります。
+          </p>
+          <p>
+            フィードバックがほしいたびに文章をコピーし、チャットへ貼り、返答を読んで、また執筆画面へ戻る。その往復は、書くリズムを少しずつ壊します。
+          </p>
+          <p>
+            静かに書き、必要なときだけ、もう一人の読者に尋ねられる。そのためにLiteLizardを作りました。
+          </p>
+        </div>
+      </section>
+
+      <section class="download-section" aria-labelledby="download-title">
+        <p class="eyebrow">Download</p>
+        <h2 id="download-title">あなたの文章を、<br />別の視点から読む。</h2>
+        <a
+          class="download-button"
+          href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+        >
+          LiteLizard for macOS
+          <span aria-hidden="true">↓</span>
+        </a>
+        <div class="requirements">
+          <p>Apple Silicon Mac（arm64）向け</p>
+          <p>macOS Tahoe 26.5.1で動作確認済み</p>
+          <p>未署名のMVP / β版です</p>
+        </div>
+      </section>
     </main>
+
+    <footer>
+      <p>LiteLizard</p>
+      <div>
+        <a href="https://github.com/motimotinok/LiteLizard">GitHub</a>
+        <a href="https://github.com/motimotinok/LiteLizard/blob/dev/PRIVACY.md">Privacy</a>
+      </div>
+    </footer>
   </body>
 </html>

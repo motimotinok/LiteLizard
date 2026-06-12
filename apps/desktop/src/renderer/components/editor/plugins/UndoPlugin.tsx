@@ -28,6 +28,21 @@ function applySnapshotToEditor(
 
 const TEXT_DEBOUNCE_MS = 500;
 
+export function commitPendingUndoSnapshot(
+  debounceTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>,
+  pendingSnapshotRef: React.MutableRefObject<UndoSnapshot | null>,
+  pushUndo: (snapshot: UndoSnapshot) => void,
+) {
+  if (debounceTimerRef.current !== null) {
+    clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = null;
+  }
+  if (pendingSnapshotRef.current) {
+    pushUndo(pendingSnapshotRef.current);
+    pendingSnapshotRef.current = null;
+  }
+}
+
 export function UndoPlugin({
   chapterNodeKeySetRef,
 }: {
@@ -71,11 +86,11 @@ export function UndoPlugin({
       }
 
       debounceTimerRef.current = setTimeout(() => {
-        debounceTimerRef.current = null;
-        if (pendingSnapshotRef.current) {
-          useAppStore.getState().pushUndo(pendingSnapshotRef.current);
-          pendingSnapshotRef.current = null;
-        }
+        commitPendingUndoSnapshot(
+          debounceTimerRef,
+          pendingSnapshotRef,
+          useAppStore.getState().pushUndo,
+        );
       }, TEXT_DEBOUNCE_MS);
     });
 
@@ -100,6 +115,11 @@ export function UndoPlugin({
     const unregisterUndo = editor.registerCommand(
       UNDO_COMMAND,
       () => {
+        commitPendingUndoSnapshot(
+          debounceTimerRef,
+          pendingSnapshotRef,
+          useAppStore.getState().pushUndo,
+        );
         const store = useAppStore.getState();
         if (store.undoStack.length === 0) return true;
         const doc = store.document;
