@@ -5,9 +5,12 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "predev": "node scripts/ensure-native-runtime.mjs",
     "dev": "tsx watch src/server.ts",
+    "prestart": "node scripts/ensure-native-runtime.mjs",
     "start": "node dist/server.js",
-    "test": "vitest run",
+    "pretest": "node scripts/ensure-native-runtime.mjs",
+    "test": "node --test scripts/*.node-test.mjs && vitest run",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

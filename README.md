@@ -69,6 +69,8 @@ Node.js 24（`.nvmrc` は `24.13.0`）と pnpm 9.12.3 を使用します。Elect
 
 デスクトップの起動・パッケージコマンドは、Node.js 22.12.0未満で実行された場合、nvmまたはnodebrewにインストール済みの対応Nodeを自動検出します。対応Nodeが見つからない場合はNode.js 24をインストールしてから再実行してください。
 
+`apps/api` の test/dev/start は、Node.js 切替後に古い ABI の `better-sqlite3` が残っていた場合、現在のNode向けに自動再ビルドしてから起動する。
+
 ### Test
 
 - Unit/integration: `pnpm test`
@@ -83,6 +85,7 @@ Node.js 24（`.nvmrc` は `24.13.0`）と pnpm 9.12.3 を使用します。Elect
   - 出力先: `apps/desktop/release/LiteLizard-latest-<arch>.dmg`（例: `LiteLizard-latest-arm64.dmg`）
   - LP からの常時最新版リンクを成立させるため、ファイル名は `latest` 固定にしています。実際のバージョンは Release body / アプリの「LiteLizard について」タブで確認できます。
   - GitHub Releases にはこの `.dmg` を添付します。
+  - 制限された実行環境で `hdiutil: create failed - 装置が構成されていません` になる場合は、macOS自体の故障とは限らない。`hdiutil` がディスクイメージ用デバイスを使える通常のターミナルまたは許可済み環境で再実行する。
 
 MVP 公開では未署名の `.dmg` を GitHub Releases に置く方針です。Developer ID 署名、notarization、自動更新は MVP 後の対応です。未署名配布のため初回起動時に macOS Gatekeeper の警告が出る前提です。
 

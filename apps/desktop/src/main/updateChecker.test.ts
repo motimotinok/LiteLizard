@@ -57,6 +57,15 @@ describe('pickLatestVersion', () => {
   it('falls back to tag_name if no asset matches', () => {
     expect(pickLatestVersion({ tag_name: 'v1.4.2', assets: [] })).toBe('1.4.2');
   });
+  it('extracts the workflow-generated version from the release name', () => {
+    expect(
+      pickLatestVersion({
+        tag_name: 'mvp-latest',
+        name: 'LiteLizard MVP latest v0.1.9',
+        assets: [{ name: 'LiteLizard-latest-arm64.dmg' }],
+      }),
+    ).toBe('0.1.9');
+  });
   it('falls back to body if tag_name lacks a semver', () => {
     expect(
       pickLatestVersion({

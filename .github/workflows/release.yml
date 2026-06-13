@@ -11,7 +11,7 @@ permissions:
 
 env:
   RELEASE_TAG: mvp-latest
-  RELEASE_TITLE: LiteLizard MVP latest
+  RELEASE_TITLE_BASE: LiteLizard MVP latest
 
 jobs:
   release:
@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare release app version
+        id: app-version
+        run: node apps/desktop/scripts/prepare-release-version.mjs "$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
       - name: Build shared package
         run: pnpm --filter @litelizard/shared build
 
@@ -47,11 +51,17 @@ jobs:
       - name: Package macOS DMG (arm64)
         run: pnpm --filter @litelizard/desktop package:mac:dmg
 
-      - name: Read desktop app version
-        id: app-version
+      - name: Verify packaged app version
+        env:
+          APP_VERSION: ${{ steps.app-version.outputs.version }}
         run: |
-          VERSION=$(node -p "require('./apps/desktop/package.json').version")
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          BUNDLED_VERSION=$(/usr/libexec/PlistBuddy \
+            -c 'Print :CFBundleShortVersionString' \
+            apps/desktop/release/mac-arm64/LiteLizard.app/Contents/Info.plist)
+          if [ "$BUNDLED_VERSION" != "$APP_VERSION" ]; then
+            echo "Packaged app version mismatch: expected $APP_VERSION, got $BUNDLED_VERSION" >&2
+            exit 1
+          fi
 
       - name: Locate DMG artifact
         id: artifact
@@ -69,11 +79,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ env.RELEASE_TAG }}
-          TITLE: ${{ env.RELEASE_TITLE }}
+          TITLE_BASE: ${{ env.RELEASE_TITLE_BASE }}
           DMG_PATH: ${{ steps.artifact.outputs.path }}
           APP_VERSION: ${{ steps.app-version.outputs.version }}
         run: |
           set -euo pipefail
+          TITLE="${TITLE_BASE} v${APP_VERSION}"
 
           NOTES=$(cat <<EOF
           LiteLizard MVP の最新ビルドです (v${APP_VERSION}, commit ${GITHUB_SHA::7})。
