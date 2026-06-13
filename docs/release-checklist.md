@@ -20,8 +20,11 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 6. 公開用 `.dmg` 生成: `pnpm --filter @litelizard/desktop package:mac:dmg`
    - 出力: `apps/desktop/release/LiteLizard-latest-<arch>.dmg`（Apple Silicon 向けは `LiteLizard-latest-arm64.dmg`）
    - GitHub Releases に添付するのはこのファイル。
+   - 制限された実行環境で `hdiutil: create failed - 装置が構成されていません` になり、同じコマンドが通常のmacOS環境では成功する場合はサンドボックス制約として扱う。DMG生成工程を許可済み環境で再実行し、成果物の存在まで確認する。
 
 `package:mac` と `package:mac:dmg` は同じ `release/` ディレクトリに出力するため、両方を続けて回す場合はその間に `release/` を整理するか、必要な成果物だけを残す。`smoke:package:mac` は `package:mac` で出した `.app` を見にいくため、`package:mac:dmg` だけを回した直後では確認できない。
+
+`MVP Release` workflow は `apps/desktop/package.json` の major / minor と `GITHUB_RUN_NUMBER` を組み合わせた SemVer をビルド前に設定する。同じ workflow run の再実行では同じバージョンになり、新しい run では patch が増える。package 後に `.app` の `CFBundleShortVersionString` と算出値を比較し、不一致なら公開前に失敗する。
 
 ## 手動 GUI 確認（人間が macOS 上で実行）
 
@@ -30,6 +33,8 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 ### インストール導線
 
 - [ ] Apple Silicon Mac（arm64）かつ macOS Tahoe 26.5.1 の環境で確認していることを記録する。
+- [ ] GitHub Release 名・本文のバージョンと、`.app` の `CFBundleShortVersionString` が一致する。
+- [ ] 1つ前のバージョンから更新確認を実行すると、新しい Release を検知できる。
 - [ ] `apps/desktop/release/LiteLizard-latest-arm64.dmg` を Finder で開く。
 - [ ] `LiteLizard.app` を `Applications` フォルダへドラッグしてコピーできる。
 - [ ] `Applications` の `LiteLizard.app` を右クリック / Control + クリック → `開く` で Gatekeeper 警告を経て起動できる。

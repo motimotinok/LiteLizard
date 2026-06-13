@@ -19,7 +19,7 @@
     "package:mac:dmg": "node scripts/run-with-supported-node.mjs package:mac:dmg:runtime",
     "package:mac:dmg:runtime": "pnpm electron:install && pnpm build && ELECTRON_CACHE=../../tmp/electron-cache ELECTRON_BUILDER_CACHE=../../tmp/electron-builder-cache electron-builder --mac dmg --publish never",
     "smoke:package:mac": "node scripts/smoke-packaged-mac.mjs",
-    "test": "vitest run",
+    "test": "node --test scripts/*.test.mjs && vitest run",
     "lint": "eslint src --ext .ts,.tsx"
   },
   "build": {
