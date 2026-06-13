@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">LiteLizard icon concept A</title>
+  <desc id="desc">A dark lizard and a gold fountain pen curve into a circular form.</desc>
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/>
+      <stop offset="1" stop-color="#f4efe7"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="238" y1="216" x2="558" y2="828" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#142733"/>
+      <stop offset="1" stop-color="#07131b"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="650" y1="220" x2="750" y2="812" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9e6b09"/>
+      <stop offset=".55" stop-color="#c18b18"/>
+      <stop offset="1" stop-color="#9f6d0d"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#17202a" flood-opacity=".16"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="60" width="880" height="880" rx="210" fill="url(#bg)" filter="url(#shadow)"/>
+
+  <path fill="url(#ink)" d="M478 190C368 160 259 225 205 338c-61 127-39 294 50 402 74 89 182 128 293 103-84 3-160-26-212-86-73-84-91-213-48-315 31-74 86-126 145-137 57-10 105-4 128-34 23-30 0-65-83-81Z"/>
+  <path fill="#fdfaf3" d="M415 344c32 8 76 5 111-15-27 30-72 42-111 15Z"/>
+  <circle cx="446" cy="237" r="22" fill="#fdfaf3"/>
+  <circle cx="449" cy="234" r="8" fill="#d8d1c7" opacity=".55"/>
+
+  <path fill="none" stroke="url(#gold)" stroke-width="18" stroke-linecap="round" d="M590 187c93 20 164 99 183 198 22 113-16 225-83 304"/>
+  <path fill="url(#gold)" d="m684 629 63 39-35 58-63-39 35-58Z"/>
+  <path fill="#fffaf0" stroke="url(#gold)" stroke-width="12" stroke-linejoin="round" d="m651 690 61 38-43 103-109 74 21-130 70-85Z"/>
+  <path fill="none" stroke="url(#gold)" stroke-width="10" stroke-linecap="round" d="m629 844 38-61"/>
+  <circle cx="649" cy="813" r="13" fill="url(#gold)"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">LiteLizard icon concept D</title>
+  <desc id="desc">A minimal circular mark merges a lizard head with a pen nib.</desc>
+  <defs>
+    <linearGradient id="bg" x1="150" y1="100" x2="870" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fffdf8"/>
+      <stop offset="1" stop-color="#f3ede3"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#17202a" flood-opacity=".14"/>
+    </filter>
+  </defs>
+
+  <rect x="72" y="60" width="880" height="880" rx="210" fill="url(#bg)" filter="url(#shadow)"/>
+
+  <path fill="none" stroke="#0b1e29" stroke-width="112" stroke-linecap="round" d="M559 225c-180-35-348 89-371 270-23 187 105 351 288 380"/>
+  <path fill="#0b1e29" d="M489 166c75-1 143 14 172 52-4 46-54 82-146 105l-26-157Z"/>
+  <circle cx="566" cy="222" r="18" fill="#fffaf1"/>
+
+  <path fill="none" stroke="#b57f13" stroke-width="50" stroke-linecap="round" d="M669 233c93 62 148 168 143 282-5 108-61 207-151 268"/>
+  <path fill="#b57f13" d="M674 724 800 805 548 950l126-226Z"/>
+  <path fill="#fffaf1" d="m673 782 58 37-116 67 58-104Z"/>
+  <circle cx="674" cy="816" r="13" fill="#b57f13"/>
+</svg>
