@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
 import type { AnalysisMode } from '../store/useAppStore.js';
 import { reorderByKey } from '../utils/arrayUtils.js';
@@ -10,13 +10,13 @@ import {
   getVisiblePatternIndices,
   resolveDisplayedPatternIndex,
 } from '../store/analysisHistory.js';
-import { toKanjiIndex } from './ui/kanji.js';
 import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
 
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
   linkedHighlightParagraphId?: string | null;
+  scrollRequest?: { paragraphId: string; nonce: number } | null;
   onSetActiveParagraphId?: (id: string | null) => void;
   onPreviewParagraphLink?: (id: string | null) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
@@ -100,6 +100,7 @@ export function AnalysisPane({
   document,
   activeParagraphId,
   linkedHighlightParagraphId = null,
+  scrollRequest = null,
   onSetActiveParagraphId,
   onPreviewParagraphLink,
   onReorderParagraphs,
@@ -124,6 +125,8 @@ export function AnalysisPane({
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
   const setActiveAgent = useAppStore((s) => s.setActiveAgent);
   const viewScale = useAppStore((s) => s.viewScale);
+  const cardElementByParagraphIdRef = useRef<Map<string, HTMLElement>>(new Map());
+  const consumedScrollRequestNonceRef = useRef<number | null>(null);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
   const chapterSummaries = useMemo(() => aggregateChapterAnalyses(document), [document]);
 
@@ -170,6 +173,23 @@ export function AnalysisPane({
     }
     return undefined;
   }, [agentMenuOpen]);
+
+  useEffect(() => {
+    if (!scrollRequest) {
+      return;
+    }
+    if (consumedScrollRequestNonceRef.current === scrollRequest.nonce) {
+      return;
+    }
+
+    const element = cardElementByParagraphIdRef.current.get(scrollRequest.paragraphId);
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    consumedScrollRequestNonceRef.current = scrollRequest.nonce;
+  }, [scrollRequest, document?.documentId]);
 
   const orderedParagraphIds = useMemo(() => {
     if (!document) {
@@ -366,6 +386,14 @@ export function AnalysisPane({
               return (
                 <article
                   key={paragraph.id}
+                  ref={(element) => {
+                    if (element) {
+                      cardElementByParagraphIdRef.current.set(paragraph.id, element);
+                    } else {
+                      cardElementByParagraphIdRef.current.delete(paragraph.id);
+                    }
+                  }}
+                  data-analysis-paragraph-id={paragraph.id}
                   className={[
                     'analysis-card',
                     active ? 'analysis-card-active' : '',
@@ -387,7 +415,7 @@ export function AnalysisPane({
                 >
                   <header className="analysis-card-header">
                     <div className="analysis-card-heading">
-                      <span className="analysis-card-index">{toKanjiIndex(index + 1)}</span>
+                      <span className="analysis-card-index">{index + 1}</span>
                       {isStaleWithPreviousAnalysis ? (
                         <span
                           className="analysis-card-stale-badge"
@@ -414,7 +442,7 @@ export function AnalysisPane({
                         }}
                         disabled={paragraph.lizard.status === 'pending' || hasPending || !providerUi.runnable}
                         title="この段落だけ再解析"
-                        aria-label={`${toKanjiIndex(index + 1)} を再解析`}
+                        aria-label={`${index + 1} を再解析`}
                       >
                         <IconRefresh size={11} />
                       </button>
@@ -562,4 +590,3 @@ export function AnalysisPane({
     </aside>
   );
 }
-

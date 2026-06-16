@@ -14,6 +14,7 @@ interface Props {
   linkedHighlightParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (id: string | null) => void;
+  onRequestScrollToAnalysis?: (id: string) => void;
   onPreviewParagraphLink?: (id: string | null) => void;
   onSetViewScale: (viewScale: 'micro' | 'macro') => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
@@ -31,6 +32,7 @@ export function EditorPane({
   linkedHighlightParagraphId,
   scrollRequest,
   setActiveParagraphId,
+  onRequestScrollToAnalysis,
   onPreviewParagraphLink,
   onSetViewScale,
   onSyncStructure,
@@ -82,6 +84,7 @@ export function EditorPane({
               linkedHighlightParagraphId={linkedHighlightParagraphId}
               scrollRequest={scrollRequest}
               setActiveParagraphId={setActiveParagraphId}
+              onRequestScrollToAnalysis={onRequestScrollToAnalysis}
               onPreviewParagraphLink={onPreviewParagraphLink}
               onSyncStructure={onSyncStructure}
               onReorderParagraphs={onReorderParagraphs}

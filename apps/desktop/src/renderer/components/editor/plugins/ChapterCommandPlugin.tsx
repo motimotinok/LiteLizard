@@ -148,7 +148,7 @@ export function ChapterCommandPlugin({
             insertAfter.insertAfter(chapterParagraph);
             chapterParagraph.insertAfter(bodyParagraph);
             chapterNodeKeySetRef.current.add(chapterParagraph.getKey());
-            chapterParagraph.selectStart();
+            bodyParagraph.selectStart();
           }, { tag: 'structural' });
           return true;
         }

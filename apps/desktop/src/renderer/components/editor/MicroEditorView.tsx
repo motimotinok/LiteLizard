@@ -14,7 +14,6 @@ import { StructureChromePlugin } from './plugins/StructureChromePlugin.js';
 import { ChapterCommandPlugin } from './plugins/ChapterCommandPlugin.js';
 import { LexicalEditorRefPlugin } from './plugins/LexicalEditorRefPlugin.js';
 import { DragHandlePlugin } from './plugins/DragHandlePlugin.js';
-import { ChapterDeletePlugin } from './plugins/ChapterDeletePlugin.js';
 import {
   buildChapterInputs,
   buildFallbackChapterNodeIndexes,
@@ -35,6 +34,7 @@ interface Props {
   linkedHighlightParagraphId: string | null;
   scrollRequest: { paragraphId: string; nonce: number } | null;
   setActiveParagraphId: (id: string | null) => void;
+  onRequestScrollToAnalysis?: (id: string) => void;
   onPreviewParagraphLink?: (id: string | null) => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
@@ -46,6 +46,7 @@ export function MicroEditorView({
   linkedHighlightParagraphId,
   scrollRequest,
   setActiveParagraphId,
+  onRequestScrollToAnalysis,
   onPreviewParagraphLink,
   onSyncStructure,
   onReorderParagraphs: _onReorderParagraphs,
@@ -178,8 +179,16 @@ export function MicroEditorView({
     const paragraphId = document.paragraphs[activeIndex]?.id ?? null;
     if (paragraphId && paragraphId !== activeParagraphId) {
       setActiveParagraphId(paragraphId);
+      onRequestScrollToAnalysis?.(paragraphId);
     }
-  }, [activeElement, activeParagraphId, document.paragraphs, paragraphNodeKeys, setActiveParagraphId]);
+  }, [
+    activeElement,
+    activeParagraphId,
+    document.paragraphs,
+    onRequestScrollToAnalysis,
+    paragraphNodeKeys,
+    setActiveParagraphId,
+  ]);
 
   // スクロールリクエストの処理
   useEffect(() => {
@@ -277,6 +286,7 @@ export function MicroEditorView({
               chapterNodeKeys={chapterNodeKeys}
               paragraphNodeKeys={paragraphNodeKeys}
               paragraphIds={paragraphIds}
+              structureSnapshot={structureSnapshot}
               active={activeElement}
               linkedHighlightParagraphId={linkedHighlightParagraphId}
               emptyParagraphNodeKeys={emptyParagraphNodeKeys}
@@ -285,11 +295,9 @@ export function MicroEditorView({
 
             <ChapterCommandPlugin chapterNodeKeySetRef={chapterNodeKeySetRef} />
 
-            <DragHandlePlugin paragraphNodeKeys={paragraphNodeKeys} containerRef={containerRef} />
-
-            <ChapterDeletePlugin
-              chapterNodeKeys={chapterNodeKeys}
-              chapterNodeKeySetRef={chapterNodeKeySetRef}
+            <DragHandlePlugin
+              paragraphNodeKeys={paragraphNodeKeys}
+              structureSnapshot={structureSnapshot}
               containerRef={containerRef}
             />
 

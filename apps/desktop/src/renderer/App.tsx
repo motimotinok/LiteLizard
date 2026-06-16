@@ -1,4 +1,4 @@
-import React, { type CSSProperties, useEffect, useState } from 'react';
+import React, { type CSSProperties, useCallback, useEffect, useState } from 'react';
 import type { EditorTweaks } from '@litelizard/shared';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
@@ -66,6 +66,13 @@ function WorkspaceShell() {
   const [linkedHighlightParagraphId, setLinkedHighlightParagraphId] = useState<string | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(true);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
+  const [analysisScrollRequest, setAnalysisScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(
+    null,
+  );
+
+  const requestScrollToAnalysis = useCallback((paragraphId: string) => {
+    setAnalysisScrollRequest({ paragraphId, nonce: Date.now() });
+  }, []);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -245,6 +252,7 @@ function WorkspaceShell() {
           linkedHighlightParagraphId={linkedHighlightParagraphId}
           scrollRequest={scrollRequest}
           setActiveParagraphId={setActiveParagraphId}
+          onRequestScrollToAnalysis={requestScrollToAnalysis}
           onPreviewParagraphLink={setLinkedHighlightParagraphId}
           viewScale={viewScale}
           onSetViewScale={setViewScale}
@@ -267,6 +275,7 @@ function WorkspaceShell() {
             document={currentDocument}
             activeParagraphId={activeParagraphId}
             linkedHighlightParagraphId={linkedHighlightParagraphId}
+            scrollRequest={analysisScrollRequest}
             onSetActiveParagraphId={setActiveParagraphId}
             onPreviewParagraphLink={setLinkedHighlightParagraphId}
             onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}

@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { toKanjiIndex } from '../../ui/kanji.js';
+import { buildParagraphGutterMeta, type StructureSnapshot } from '../utils/structureBuilder.js';
 
 export function StructureChromePlugin({
   chapterNodeKeys,
   paragraphNodeKeys,
   paragraphIds,
+  structureSnapshot,
   active,
   linkedHighlightParagraphId,
   emptyParagraphNodeKeys,
@@ -14,6 +15,7 @@ export function StructureChromePlugin({
   chapterNodeKeys: string[];
   paragraphNodeKeys: string[];
   paragraphIds: string[];
+  structureSnapshot: StructureSnapshot;
   active: { nodeKey: string | null; type: 'chapter' | 'paragraph' | null };
   linkedHighlightParagraphId: string | null;
   emptyParagraphNodeKeys: Set<string>;
@@ -32,13 +34,20 @@ export function StructureChromePlugin({
 
       element.classList.add('editor-chapter-row');
       element.classList.toggle('editor-chapter-row-active', active.type === 'chapter' && active.nodeKey === nodeKey);
-      element.setAttribute('data-chapter-index', `第${toKanjiIndex(index + 1)}章`);
+      element.setAttribute('data-chapter-index', String(index + 1));
       element.setAttribute('data-testid', `editor-chapter-row-${index + 1}`);
     });
+
+    const paragraphGutterMeta = buildParagraphGutterMeta(structureSnapshot);
 
     paragraphNodeKeys.forEach((nodeKey, index) => {
       const element = editor.getElementByKey(nodeKey);
       const paragraphId = paragraphIds[index] ?? null;
+      const meta = paragraphGutterMeta[index] ?? {
+        paragraphIndex: index + 1,
+        chapterIndex: 1,
+        chapterPosition: 'single' as const,
+      };
       if (!element) {
         return;
       }
@@ -49,7 +58,12 @@ export function StructureChromePlugin({
         'editor-paragraph-row-linked-highlight',
         Boolean(paragraphId && paragraphId === linkedHighlightParagraphId),
       );
-      element.setAttribute('data-paragraph-index', toKanjiIndex(index + 1));
+      element.classList.toggle('editor-paragraph-row-chapter-single', meta.chapterPosition === 'single');
+      element.classList.toggle('editor-paragraph-row-chapter-start', meta.chapterPosition === 'start');
+      element.classList.toggle('editor-paragraph-row-chapter-middle', meta.chapterPosition === 'middle');
+      element.classList.toggle('editor-paragraph-row-chapter-end', meta.chapterPosition === 'end');
+      element.setAttribute('data-paragraph-index', String(meta.paragraphIndex));
+      element.setAttribute('data-chapter-index', String(meta.chapterIndex));
       element.setAttribute('data-testid', `editor-paragraph-row-${index + 1}`);
 
       if (paragraphId && onPreviewParagraphLink) {
@@ -89,6 +103,7 @@ export function StructureChromePlugin({
     onPreviewParagraphLink,
     paragraphIds,
     paragraphNodeKeys,
+    structureSnapshot,
   ]);
 
   return null;

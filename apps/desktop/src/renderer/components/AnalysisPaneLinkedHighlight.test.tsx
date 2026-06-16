@@ -50,4 +50,17 @@ describe('AnalysisPane linked highlight', () => {
 
     expect(html).toContain('analysis-card-linked-highlight');
   });
+
+  it('本文側からのスクロール連動で対象にできる段落 ID をカードへ付ける', () => {
+    const html = renderToStaticMarkup(
+      <AnalysisPane
+        document={createDocument()}
+        activeParagraphId="p1"
+        scrollRequest={{ paragraphId: 'p1', nonce: 1 }}
+      />,
+    );
+
+    expect(html).toContain('data-analysis-paragraph-id="p1"');
+    expect(html).toContain('analysis-card-active');
+  });
 });

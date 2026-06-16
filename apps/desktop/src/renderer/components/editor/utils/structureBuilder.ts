@@ -7,6 +7,12 @@ export interface StructureSnapshot {
   paragraphs: Array<{ nodeKey: string; chapterNodeKey: string | null; text: string }>;
 }
 
+export interface ParagraphGutterMeta {
+  paragraphIndex: number;
+  chapterIndex: number;
+  chapterPosition: 'single' | 'start' | 'middle' | 'end';
+}
+
 export interface TopLevelParagraphSnapshot {
   nodeKey: string;
   text: string;
@@ -88,6 +94,46 @@ export function toStructureSignature(snapshot: StructureSnapshot): string {
   return JSON.stringify({
     chapters: snapshot.chapters.map((chapter) => chapter.title),
     paragraphs: snapshot.paragraphs.map((paragraph) => [paragraph.chapterNodeKey, paragraph.text]),
+  });
+}
+
+export function buildParagraphGutterMeta(structureSnapshot: StructureSnapshot): ParagraphGutterMeta[] {
+  const chapterIndexByNodeKey = new Map(
+    structureSnapshot.chapters.map((chapter, index) => [chapter.nodeKey, index + 1]),
+  );
+  const paragraphCountByChapterNodeKey = new Map<string, number>();
+  structureSnapshot.paragraphs.forEach((paragraph) => {
+    if (!paragraph.chapterNodeKey) return;
+    paragraphCountByChapterNodeKey.set(
+      paragraph.chapterNodeKey,
+      (paragraphCountByChapterNodeKey.get(paragraph.chapterNodeKey) ?? 0) + 1,
+    );
+  });
+
+  const seenParagraphCountByChapterNodeKey = new Map<string, number>();
+  return structureSnapshot.paragraphs.map((paragraph, index) => {
+    const chapterNodeKey = paragraph.chapterNodeKey;
+    const chapterIndex = chapterNodeKey ? (chapterIndexByNodeKey.get(chapterNodeKey) ?? 1) : 1;
+    const countInChapter = chapterNodeKey ? (paragraphCountByChapterNodeKey.get(chapterNodeKey) ?? 1) : 1;
+    const positionInChapter = chapterNodeKey
+      ? (seenParagraphCountByChapterNodeKey.get(chapterNodeKey) ?? 0) + 1
+      : 1;
+    if (chapterNodeKey) {
+      seenParagraphCountByChapterNodeKey.set(chapterNodeKey, positionInChapter);
+    }
+
+    return {
+      paragraphIndex: index + 1,
+      chapterIndex,
+      chapterPosition:
+        countInChapter === 1
+          ? 'single'
+          : positionInChapter === 1
+            ? 'start'
+            : positionInChapter === countInChapter
+              ? 'end'
+              : 'middle',
+    };
   });
 }
 
