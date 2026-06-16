@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildChapterInputs,
+  buildParagraphGutterMeta,
   buildParagraphInputs,
   deriveStructureSnapshotFromTopLevelParagraphs,
   shouldSyncStructure,
@@ -160,5 +161,27 @@ describe('EditorPane lexical helpers', () => {
     });
     expect(result.chapterNodeKeySet).toEqual(new Set(['k_chapter']));
     expect(result.emptyParagraphNodeKeys).toEqual(new Set(['k_p2']));
+  });
+
+  it('builds arabic paragraph indexes and chapter rail positions for the editor gutter', () => {
+    const result = buildParagraphGutterMeta({
+      chapters: [
+        { nodeKey: 'k_chapter_1', title: '章1' },
+        { nodeKey: 'k_chapter_2', title: '章2' },
+      ],
+      paragraphs: [
+        { nodeKey: 'k_p1', chapterNodeKey: 'k_chapter_1', text: 'a' },
+        { nodeKey: 'k_p2', chapterNodeKey: 'k_chapter_1', text: 'b' },
+        { nodeKey: 'k_p3', chapterNodeKey: 'k_chapter_1', text: 'c' },
+        { nodeKey: 'k_p4', chapterNodeKey: 'k_chapter_2', text: 'd' },
+      ],
+    });
+
+    expect(result).toEqual([
+      { paragraphIndex: 1, chapterIndex: 1, chapterPosition: 'start' },
+      { paragraphIndex: 2, chapterIndex: 1, chapterPosition: 'middle' },
+      { paragraphIndex: 3, chapterIndex: 1, chapterPosition: 'end' },
+      { paragraphIndex: 4, chapterIndex: 2, chapterPosition: 'single' },
+    ]);
   });
 });

@@ -574,7 +574,7 @@ button {
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: 0 56px;
+  padding: 0 56px 0 72px;
   display: block;
 }
 
@@ -590,32 +590,30 @@ button {
 /* 章 */
 .editor-chapter-row {
   position: relative;
-  margin: 32px -16px 16px;
-  padding: 12px 16px 12px 56px;
+  min-height: 0;
+  height: 0;
+  margin: 24px -16px 4px;
+  padding: 0 16px;
   font-family: var(--editor-typeface, var(--serif));
-  font-size: 22px;
-  line-height: 1.5;
+  font-size: 1px;
+  line-height: 0;
   letter-spacing: 0.06em;
-  font-weight: 500;
-  color: var(--ink);
+  font-weight: 400;
+  color: transparent;
   border-radius: 2px;
+  overflow: hidden;
 }
 
 .editor-chapter-row:first-child {
-  margin-top: 0;
+  margin-top: 12px;
 }
 
 .editor-chapter-row::before {
-  content: attr(data-chapter-index);
-  position: absolute;
-  left: 12px;
-  top: 18px;
-  font-family: var(--editor-typeface, var(--serif));
-  font-size: 13px;
-  line-height: 1;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-  white-space: nowrap;
+  content: none;
+}
+
+.editor-paragraph-row.editor-chapter-row {
+  display: none;
 }
 
 /* 段落 */
@@ -631,49 +629,32 @@ button {
   color: var(--ink);
   border-radius: 2px;
   border-top: 1px solid transparent;
-  transition:
-    background 0.4s ease,
-    box-shadow 0.2s ease,
-    opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 }
 
 .editor-paragraph-row::before {
-  content: attr(data-paragraph-index);
-  position: absolute;
-  left: -28px;
-  top: 14px;
-  width: 18px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  font-family: var(--editor-typeface, var(--serif));
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  color: var(--ink-4);
-  pointer-events: none;
-  user-select: none;
-  transition: color 0.2s ease;
+  content: none;
 }
 
 .editor-paragraph-row:hover {
-  background: rgba(28, 40, 80, 0.025);
-  box-shadow: inset 1.5px 0 0 var(--accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-paragraph-row-linked-highlight:not(.editor-paragraph-row-active):not(.editor-paragraph-row-dragging) {
-  background: rgba(28, 40, 80, 0.025);
-  box-shadow: inset 1.5px 0 0 color-mix(in oklch, var(--accent) 52%, transparent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-paragraph-row:hover::before,
 .editor-paragraph-row-active::before,
 .editor-paragraph-row-linked-highlight::before {
-  color: var(--accent);
+  color: inherit;
 }
 
 .editor-paragraph-row-active {
-  background: rgba(28, 40, 80, 0.02);
-  box-shadow: inset 1.5px 0 0 var(--accent);
+  background: transparent;
+  box-shadow: none;
 }
 
 .editor-paragraph-row-dragging {
@@ -714,28 +695,101 @@ button {
   z-index: 2;
 }
 
-.paragraph-drag-handle {
-  position: static;
-  width: 18px;
-  height: 22px;
+.paragraph-chapter-rail {
+  position: absolute;
+  left: 7px;
+  top: -10px;
+  bottom: -10px;
+  width: 1px;
+  background: color-mix(in oklch, var(--accent) 18%, var(--rule));
+  opacity: 0.72;
+}
+
+.paragraph-drag-wrapper-chapter-single .paragraph-chapter-rail {
+  top: 13px;
+  bottom: 13px;
+}
+
+.paragraph-drag-wrapper-chapter-start .paragraph-chapter-rail {
+  top: 13px;
+}
+
+.paragraph-drag-wrapper-chapter-end .paragraph-chapter-rail {
+  bottom: 13px;
+}
+
+.paragraph-chapter-label {
+  position: absolute;
+  left: 0;
+  top: 8px;
+  width: 15px;
+  height: 15px;
   display: grid;
   place-items: center;
   color: var(--ink-4);
+  background: var(--editor-paper, var(--paper));
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.paragraph-drag-handle {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
   background: transparent;
   border: none;
   cursor: grab;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1;
   letter-spacing: -1px;
   border-radius: 3px;
-  opacity: 0.28;
+  opacity: 0;
   transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.paragraph-index {
+  position: absolute;
+  left: 52px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  display: block;
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: right;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.paragraph-drag-wrapper-visible .paragraph-drag-handle,
+.paragraph-drag-wrapper-visible .paragraph-index,
+.paragraph-drag-wrapper-dragging .paragraph-drag-handle,
+.paragraph-drag-wrapper-dragging .paragraph-index {
+  opacity: 0.82;
 }
 
 .paragraph-drag-handle:hover,
 .paragraph-drag-handle:focus-visible {
   opacity: 1;
-  color: var(--ink-2);
+  color: var(--ink);
+}
+
+.paragraph-drag-handle:hover + .paragraph-index,
+.paragraph-drag-handle:focus-visible + .paragraph-index {
+  opacity: 1;
+  color: var(--ink-3);
 }
 
 .paragraph-drag-handle:active {
