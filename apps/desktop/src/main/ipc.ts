@@ -239,8 +239,7 @@ async function collectDocumentIdsInDirectory(directoryPath: string): Promise<str
       }
 
       const documentId = await extractDocumentId(entryPath);
-      if (documentId) {
-        assertDocumentId(documentId);
+      if (documentId && DOCUMENT_ID_PATTERN.test(documentId)) {
         documentIds.add(documentId);
       }
     }

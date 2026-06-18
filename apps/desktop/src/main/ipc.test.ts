@@ -529,10 +529,12 @@ describe('registerIpcHandlers', () => {
       const nestedFolder = path.join(targetFolder, 'nested');
       const firstDocumentId = 'd_abcdefghij';
       const secondDocumentId = 'd_klmnopqrst';
+      const legacyDocumentId = 'legacy-document-id';
 
       await fs.mkdir(nestedFolder, { recursive: true });
       await fs.writeFile(path.join(targetFolder, 'first.lzl'), `documentId: ${firstDocumentId}`, 'utf8');
       await fs.writeFile(path.join(nestedFolder, 'second.lzl'), `documentId: ${secondDocumentId}`, 'utf8');
+      await fs.writeFile(path.join(nestedFolder, 'legacy.lzl'), `documentId: ${legacyDocumentId}`, 'utf8');
 
       registerIpcHandlers();
 
@@ -544,6 +546,7 @@ describe('registerIpcHandlers', () => {
       expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledTimes(2);
       expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledWith(projectRoot, firstDocumentId);
       expect(analysisStoreMock.deleteAnalysisFiles).toHaveBeenCalledWith(projectRoot, secondDocumentId);
+      expect(analysisStoreMock.deleteAnalysisFiles).not.toHaveBeenCalledWith(projectRoot, legacyDocumentId);
     });
   });
 
