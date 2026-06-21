@@ -1,6 +1,8 @@
 # UI リデザイン仕様（案 A Minimal）
 
-**状態**: stable（2026-04-25 採用） / **関連タスク**: R-16 / **関連 decisions**: [2026-04-25 UI 全面刷新](../decisions.md)
+**状態**: implemented baseline（2026-04-25 採用） / **関連タスク**: R-16 / **関連 decisions**: [2026-04-25 UI 全面刷新](../decisions.md)
+
+> この文書は現行実装の基準となった案 A Minimal を記録する。2026-06-20 以降のUI方向はルートの [`DESIGN.md`](../../DESIGN.md) を正とし、競合する場合は `DESIGN.md` の移行方針を優先する。
 
 ---
 
