@@ -6,6 +6,8 @@
 
 ---
 
+> この文書は2026-06-22時点の実装契約を記録する。Reading Agent の自由度、プロンプト階層、Agent単位の文脈、将来の `response` と任意タグ契約は [`analysis-philosophy.md`](analysis-philosophy.md) を正とし、後続実装で移行する。
+
 ## 1. 概要
 
 Reading Agent は、解析時にどの読者視点で段落を読むかを決めるアプリ横断の読者プロファイルである。AgentsScreen で編集した内容は renderer store から main process の agent store に保存され、AnalysisPane の選択と解析実行の `agentId` によって同じ agent が参照される。

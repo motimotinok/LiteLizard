@@ -10,6 +10,7 @@
 | [auth-session.md](auth-session.md) | 認証・セッションフロー | S-05, S-09 | revised（S-09 でローカル完結主軸に改訂） |
 | [save-model.md](save-model.md) | 保存確定モデル（完全自動保存） | S-02 | stable |
 | [project-management.md](project-management.md) | プロジェクト管理フロー（フォルダベース） | S-04 | stable |
+| [analysis-philosophy.md](analysis-philosophy.md) | ユーザー主導の分析環境・Reading Agent・出力・文脈・履歴の原則 | #126 | stable |
 | [analysis-api.md](analysis-api.md) | 解析 API エンドポイント（リクエスト・レスポンス・保存・コンテキストポリシー） | S-06, S-09, L-09 | revised（S-09 でローカル処理主軸に改訂、L-09 を将来拡張として追記） |
 | [chapter-paragraph-ops.md](chapter-paragraph-ops.md) | 章削除・段落統合エッジケース | S-07 | stable |
 | [undo-redo.md](undo-redo.md) | Undo/Redo 対象範囲・実装方針（Zustand 統合 Command スタック） | S-08 | stable |

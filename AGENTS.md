@@ -19,6 +19,7 @@
 - ゴール、成功条件、制約、検証方法を先に確認する
 - 既存コード、仕様、`NOW.md`、GitHub Issues、`CHANGELOG.md` を根拠に判断する
 - UI の実装・調整・レビューでは `DESIGN.md` を読み、現行実装と競合する場合は文書内の移行方針に従う
+- 分析機能、Reading Agent、プロンプト、タグ、分析履歴を変更するときは `docs/specs/analysis-philosophy.md` を読み、評価内容をシステム側で一律に固定しない
 - 実装経路は必要以上に固定せず、既存設計に沿って最小変更を選ぶ
 - 可能な範囲でテスト、ビルド、レビューを行い、結果を報告する
 - 不明点は勝手に大きく解釈せず、影響が大きい場合だけユーザーに確認する
@@ -62,6 +63,7 @@
 | `docs/decisions.md` | 設計判断ログ |
 | `docs/LiteLizard_spec_v003.md` | 仕様書 |
 | `docs/specs/*.md` | トピック別詳細仕様（実装者向け。決定経緯は decisions.md） |
+| `docs/specs/analysis-philosophy.md` | ユーザー主導の分析環境を守るための原則。Reading Agent、出力、文脈、履歴の判断基準 |
 | 退役済み Product Map | `docs/old/` 配下に履歴参照のみで残す。更新しない |
 | `docs/old/wbs.md` | 退役済み WBS。履歴参照のみで更新しない |
 | `docs/old/agent-flow.md` | 退役済み GitHub Issue 自律エージェント運用 |
