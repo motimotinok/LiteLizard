@@ -262,10 +262,16 @@ describe('createMockPreloadApi', () => {
     const agents = await api.listReadingAgents();
 
     expect(agents.map((agent) => agent.id)).toEqual([
-      'reader-quiet',
-      'reader-critical',
-      'reader-first',
-      'reader-editor',
+      'reader-first-impression',
+      'reader-sensory',
+      'reader-structure-editor',
+      'reader-writing-companion',
+    ]);
+    expect(agents.map((agent) => agent.name)).toEqual([
+      '初見の読者',
+      '感覚を読む読者',
+      '構造編集者',
+      '書き続ける伴走者',
     ]);
     expect(agents.every((agent) => agent.builtIn)).toBe(true);
   });

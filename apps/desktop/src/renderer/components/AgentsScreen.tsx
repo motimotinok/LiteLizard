@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_READING_AGENT_TEMPERATURE,
+  buildNewReadingAgentPrompt,
   type AnalysisResult,
   type ReadingAgent,
   type ReadingAgentInput,
@@ -21,30 +22,13 @@ interface AgentDraft {
   temperature: string;
 }
 
-function buildDefaultPrompt(name: string, role: string) {
-  return `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。
-
-## 視点
-${role}。読み手の身体感覚に近い、率直な反応を優先してください。
-
-## 出力
-- 100〜200字
-- タグを4つ（情緒・印象を表すもの）
-- 0〜100の確度
-
-## 禁則
-- 文章の良し悪しの断定
-- 著者への助言
-- 修正案の提示`;
-}
-
 function createNewDraft(): AgentDraft {
-  const name = '新しい読者';
-  const role = '文章の手触りを率直に読む';
+  const name = '新しいエージェント';
+  const role = '指定した観点で文章を評価する';
   return {
     name,
     role,
-    systemPrompt: buildDefaultPrompt(name, role),
+    systemPrompt: buildNewReadingAgentPrompt(name, role),
     model: '',
     temperature: String(DEFAULT_READING_AGENT_TEMPERATURE),
   };
@@ -316,7 +300,7 @@ export function AgentsScreen() {
       titlebar={titlebar}
     >
       <div className="aux-content">
-        <CenteredHeader overline="reading agent" title={draft.name || '新しい読者'} />
+        <CenteredHeader overline="reading agent" title={draft.name || '新しいエージェント'} />
 
         <section className="settings-section">
           <div className="settings-section-heading">
