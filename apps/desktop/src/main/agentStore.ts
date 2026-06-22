@@ -2,9 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
-  DEFAULT_READING_AGENT_TEMPERATURE,
   ReadingAgentInputSchema,
   ReadingAgentSchema,
+  createDefaultReadingAgentsFromPresets,
   type ReadingAgent,
   type ReadingAgentInput,
 } from '@litelizard/shared';
@@ -20,40 +20,8 @@ export interface ReadingAgentStoreOptions {
   createId?: IdGenerator;
 }
 
-function buildSystemPrompt(name: string, role: string) {
-  return `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。
-
-## 視点
-${role}。読み手の身体感覚に近い、率直な反応を優先してください。
-
-## 出力
-- 100〜200字
-- タグを4つ（情緒・印象を表すもの）
-- 0〜100の確度
-
-## 禁則
-- 文章の良し悪しの断定
-- 著者への助言
-- 修正案の提示`;
-}
-
 export function createDefaultReadingAgents(now: string): ReadingAgent[] {
-  const presets = [
-    { id: 'reader-quiet', name: '静かな読者', role: '情緒や余韻を中心に短く' },
-    { id: 'reader-critical', name: '批評的な読者', role: '構成・論理・破綻を指摘' },
-    { id: 'reader-first', name: 'はじめての読者', role: '予備知識ゼロで率直に' },
-    { id: 'reader-editor', name: '担当編集', role: '売り・引っかかりを評価' },
-  ];
-
-  return presets.map((preset) => ({
-    ...preset,
-    systemPrompt: buildSystemPrompt(preset.name, preset.role),
-    model: null,
-    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
-    createdAt: now,
-    updatedAt: now,
-    builtIn: true,
-  }));
+  return createDefaultReadingAgentsFromPresets(now);
 }
 
 function isMissingFileError(error: unknown) {

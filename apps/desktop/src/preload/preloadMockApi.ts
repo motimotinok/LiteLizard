@@ -1,5 +1,6 @@
 import {
   buildImportedDocument,
+  createDefaultReadingAgentsFromPresets,
   DEFAULT_ANALYSIS_SETTINGS,
   exportDocumentToPlainText,
   parseTextToImportResult,
@@ -308,54 +309,7 @@ function appendAnalysisPattern(
 
 function createInitialReadingAgents(): ReadingAgent[] {
   const now = '2026-05-02T00:00:00.000Z';
-  const buildPrompt = (name: string, role: string) =>
-    `あなたは『${name}』として、エッセイの一段落を読んだ感想を書きます。\n\n## 視点\n${role}。読み手の身体感覚に近い、率直な反応を優先してください。\n\n## 出力\n- 100〜200字\n- タグを4つ（情緒・印象を表すもの）\n- 0〜100の確度\n\n## 禁則\n- 文章の良し悪しの断定\n- 著者への助言\n- 修正案の提示`;
-  return [
-    {
-      id: 'reader-quiet',
-      name: '静かな読者',
-      role: '情緒や余韻を中心に短く',
-      systemPrompt: buildPrompt('静かな読者', '情緒や余韻を中心に短く'),
-      model: null,
-      temperature: 0.7,
-      createdAt: now,
-      updatedAt: now,
-      builtIn: true,
-    },
-    {
-      id: 'reader-critical',
-      name: '批評的な読者',
-      role: '構成・論理・破綻を指摘',
-      systemPrompt: buildPrompt('批評的な読者', '構成・論理・破綻を指摘'),
-      model: null,
-      temperature: 0.7,
-      createdAt: now,
-      updatedAt: now,
-      builtIn: true,
-    },
-    {
-      id: 'reader-first',
-      name: 'はじめての読者',
-      role: '予備知識ゼロで率直に',
-      systemPrompt: buildPrompt('はじめての読者', '予備知識ゼロで率直に'),
-      model: null,
-      temperature: 0.7,
-      createdAt: now,
-      updatedAt: now,
-      builtIn: true,
-    },
-    {
-      id: 'reader-editor',
-      name: '担当編集',
-      role: '売り・引っかかりを評価',
-      systemPrompt: buildPrompt('担当編集', '売り・引っかかりを評価'),
-      model: null,
-      temperature: 0.7,
-      createdAt: now,
-      updatedAt: now,
-      builtIn: true,
-    },
-  ];
+  return createDefaultReadingAgentsFromPresets(now);
 }
 
 function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: string }): ReadingAgent {
@@ -378,6 +332,7 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
 }
 
 export function createMockPreloadApi(): BridgeApi {
+  const initialReadingAgents = createInitialReadingAgents();
   const state: MockState = {
     tree: clone(initialMockTree),
     documents: new Map(
@@ -396,8 +351,8 @@ export function createMockPreloadApi(): BridgeApi {
         },
       },
     },
-    readingAgents: new Map(createInitialReadingAgents().map((agent) => [agent.id, agent])),
-    activeReadingAgentId: 'reader-quiet',
+    readingAgents: new Map(initialReadingAgents.map((agent) => [agent.id, agent])),
+    activeReadingAgentId: initialReadingAgents[0]?.id ?? null,
   };
 
   return {
@@ -746,8 +701,9 @@ export function createMockPreloadApi(): BridgeApi {
     },
 
     resetReadingAgents: async () => {
-      state.readingAgents = new Map(createInitialReadingAgents().map((agent) => [agent.id, agent]));
-      state.activeReadingAgentId = 'reader-quiet';
+      const defaults = createInitialReadingAgents();
+      state.readingAgents = new Map(defaults.map((agent) => [agent.id, agent]));
+      state.activeReadingAgentId = defaults[0]?.id ?? null;
       return Array.from(state.readingAgents.values()).map(clone);
     },
 
