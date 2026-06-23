@@ -1,12 +1,14 @@
-# 解析 API エンドポイント仕様
+# 分析実行・IPC仕様
 
 関連タスク: S-06, S-09
 決定経緯: `docs/decisions.md` [2026-03-28] S-06, [2026-03-30] S-09
-改訂: 2026-03-30 S-09 によりローカル完結主軸に改訂
+改訂: 2026-06-23 legacy API 削除により現行のElectron IPCと将来のクラウド方式を整理
 
 ---
 
-> この文書は2026-06-22時点の実装済みAPI・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、将来の `response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とし、互換を保ちながら後続実装で移行する。
+> この文書は2026-06-23時点のElectron IPC・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、将来の `response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とし、互換を保ちながら後続実装で移行する。
+>
+> 現在、自社サーバーの分析APIは存在しない。旧Fastify APIは削除済みであり、将来のクラウド方式はOAuth、ストリーミング、利用量・課金管理を含めて新規設計する。
 
 ## 1. リクエスト
 
@@ -156,7 +158,7 @@ interface ParagraphAnalysisResult {
 
 - **外部 API キー方式**（MVP 主軸）: ユーザーが設定画面で API キーを登録。`safeStorage` で暗号化保存。main プロセスが直接 LLM API を呼び出す
 - **ローカル LLM 方式**: ユーザーが Ollama 等をインストールし、エンドポイント URL + モデル名を設定。main プロセスが `localhost` 経由で呼び出す
-- **クラウド方式**（将来）: OAuth ログイン後、自社サーバー API 経由で分析。OAuth の詳細は `docs/specs/auth-session.md` を参照
+- **クラウド方式**（将来）: OAuth ログイン後、自社サーバー API 経由で分析する構想。現時点にサーバー実装はなく、旧legacy APIを復元せず新規設計する。OAuth の詳細は `docs/specs/auth-session.md` を参照
 
 ---
 
