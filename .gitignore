@@ -9,7 +9,6 @@ playwright-report
 .env
 .env.*
 !.env.example
-apps/api/data
 .pnpm-store
 *.tsbuildinfo
 

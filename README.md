@@ -58,7 +58,6 @@ xattr -dr com.apple.quarantine /Applications/LiteLizard.app
 
 ### Workspaces
 
-- `apps/api`: 互換性・テスト用に残している legacy API
 - `apps/desktop`: Electron + React のデスクトップアプリ
 - `packages/shared`: 共有型、API 契約、JSON schema
 - `tests/e2e`: Electron 起動の Playwright smoke test
@@ -69,11 +68,9 @@ Node.js 24（`.nvmrc` は `24.13.0`）と pnpm 9.12.3 を使用します。Elect
 
 1. Node.js を切り替え: `nvm use`
 2. 依存関係をインストール: `pnpm install`
-3. デスクトップアプリを起動: `pnpm --filter @litelizard/desktop dev`
+3. デスクトップアプリを起動: `pnpm dev`
 
 デスクトップの起動・パッケージコマンドは、Node.js 22.12.0未満で実行された場合、nvmまたはnodebrewにインストール済みの対応Nodeを自動検出します。対応Nodeが見つからない場合はNode.js 24をインストールしてから再実行してください。
-
-`apps/api` の test/dev/start は、Node.js 切替後に古い ABI の `better-sqlite3` が残っていた場合、現在のNode向けに自動再ビルドしてから起動する。
 
 ### Test
 
