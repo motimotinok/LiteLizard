@@ -12,6 +12,11 @@ playwright-report
 .pnpm-store
 *.tsbuildinfo
 
+# Legacy API local database (may contain local auth/usage data)
+apps/api/data/
+*.sqlite3
+*.sqlite3-*
+
 # Generated desktop JS/types (Vite/tsc handle compilation; source lives in TS/TSX)
 apps/desktop/src/renderer/**/*.js
 apps/desktop/src/renderer/**/*.js.map
