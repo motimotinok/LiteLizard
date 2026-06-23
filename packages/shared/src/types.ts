@@ -141,33 +141,6 @@ export interface RecentProjectEntry {
   exists?: boolean;
 }
 
-export interface Session {
-  accessToken: string;
-  userId: string;
-  email: string;
-  expiresAt: string;
-}
-
-export interface UsageResponse {
-  today: {
-    requestCount: number;
-    inputTokens: number;
-    outputTokens: number;
-    estimatedCost: number;
-  };
-  month: {
-    requestCount: number;
-    inputTokens: number;
-    outputTokens: number;
-    estimatedCost: number;
-  };
-}
-
-export interface RevisionMismatchError {
-  code: 'REVISION_MISMATCH';
-  message: string;
-}
-
 export interface CloudProviderSettings {
   apiKeyConfigured: boolean;
   defaultModel: string;

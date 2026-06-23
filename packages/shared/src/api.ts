@@ -1,15 +1,4 @@
 import { z } from 'zod';
-import type { PersonaMode, UsageResponse } from './types.js';
-
-export const EmailLinkRequestSchema = z.object({
-  email: z.string().email(),
-});
-
-export const EmailLinkVerifySchema = z.object({
-  email: z.string().email(),
-  code: z.string().min(6).max(6),
-  requestId: z.string().min(1),
-});
 
 export const AnalysisParagraphSchema = z.object({
   paragraphId: z.string().min(1),
@@ -48,15 +37,6 @@ export const AnalysisSuccessSchema = z.object({
   results: z.array(AnalysisResultSchema),
 });
 
-export const ApiErrorSchema = z.object({
-  requestId: z.string().min(1).optional(),
-  error: z.object({
-    code: z.string().min(1),
-    message: z.string().min(1),
-    retryable: z.boolean().optional(),
-  }),
-});
-
 export const DEFAULT_READING_AGENT_TEMPERATURE = 0.7;
 
 const ReadingAgentModelSchema = z.preprocess(
@@ -88,21 +68,7 @@ export type AnalysisRequest = z.infer<typeof AnalysisRequestSchema>;
 export type AnalysisParagraph = z.infer<typeof AnalysisParagraphSchema>;
 export type AnalysisResult = z.infer<typeof AnalysisResultSchema>;
 export type AnalysisSuccess = z.infer<typeof AnalysisSuccessSchema>;
-export type ApiError = z.infer<typeof ApiErrorSchema>;
 export type AnalysisRunInput = AnalysisRequest;
 export type AnalysisRunResult = AnalysisSuccess;
-export type EmailLinkRequest = z.infer<typeof EmailLinkRequestSchema>;
-export type EmailLinkVerify = z.infer<typeof EmailLinkVerifySchema>;
 export type ReadingAgentInputPayload = z.infer<typeof ReadingAgentInputSchema>;
 export type ReadingAgentPayload = z.infer<typeof ReadingAgentSchema>;
-export type Persona = PersonaMode;
-export type Usage = UsageResponse;
-
-export const ERROR_CODES = {
-  ANALYSIS_ABORTED: 'ANALYSIS_ABORTED',
-  REVISION_MISMATCH: 'REVISION_MISMATCH',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
-} as const;

@@ -1,3 +1,7 @@
+[2026/06/23]PRレビュー指摘: legacy API DB ignoreを復旧
+旧API起動済みの開発環境で生成され得るapps/api/data配下とSQLiteファイルを引き続き未追跡化し、ローカル認証・利用量データが誤って露出しないようにした。
+[2026/06/23]#139・#140 未使用のlegacy APIを削除
+製品から参照されていないFastify APIと認証・利用量管理・SQLite依存を除去し、標準の開発起動をElectronデスクトップへ統一した。将来のクラウド分析とOAuthは旧実装を流用せず新規設計する方針を記録した。
 [2026/06/23]#127・#130 LPのリンクプレビューとサイトアイコン
 LiteLizardの価値が伝わる1200×630の共有画像とOpen Graph・Twitter Cardメタ情報を追加し、既存アプリアイコンからfavicon、Apple Touch Icon、Web向けアイコンを整備した。
 
