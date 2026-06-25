@@ -1421,7 +1421,7 @@ export const useAppStore = create<AppState>((set, get) => {
         chapterId: p.chapterId,
         order: p.order,
       })),
-      contextPolicy: analysisSettings.contextPolicy,
+      contextPolicy: activeAgent?.contextPolicy,
       agent: activeAgent
         ? {
             name: activeAgent.name,
@@ -1923,9 +1923,6 @@ export const useAppStore = create<AppState>((set, get) => {
           defaultModel: input.localLlm.defaultModel,
           configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
         },
-        contextPolicy: input.contextPolicy
-          ? { ...input.contextPolicy }
-          : { ...current.contextPolicy },
         editorTweaks: input.editorTweaks
           ? { ...input.editorTweaks }
           : { ...current.editorTweaks },

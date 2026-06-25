@@ -28,6 +28,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 問題点を探すために読まず、自然に起きた理解と反応を優先する`,
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+    contextPolicy: { mode: 'preceding', range: 'all' },
   },
   {
     id: 'reader-sensory',
@@ -51,6 +52,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 添削や構造評価へ広げず、感覚としてどう届いたかに集中する`,
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+    contextPolicy: { mode: 'preceding', range: 'all' },
   },
   {
     id: 'reader-structure-editor',
@@ -77,6 +79,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 反論や反対視点は機械的に追加せず、文章の主題に関係し、検討不足が影響する場合に指摘する`,
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+    contextPolicy: { mode: 'whole-document' },
   },
   {
     id: 'reader-writing-companion',
@@ -101,6 +104,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 結論や完成形を押しつけず、書き手が次の一文へ進める余地を残す`,
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+    contextPolicy: { mode: 'whole-document' },
   },
 ];
 

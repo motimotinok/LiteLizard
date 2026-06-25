@@ -1,13 +1,9 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
-  DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_ANALYSIS_SETTINGS,
   DEFAULT_EDITOR_TWEAKS,
   type AnalysisPanelMode,
-  type AnalysisContextLimitMode,
-  type AnalysisContextPolicy,
-  type AnalysisContextScope,
   type AnalysisSettings,
   type AnalysisSettingsInput,
   type EditorTweaks,
@@ -15,8 +11,6 @@ import {
 } from '@litelizard/shared';
 
 const SETTINGS_FILE_NAME = 'analysis-settings.json';
-const MIN_LAST_N = 1;
-const MAX_LAST_N = 999;
 const MIN_BODY_FONT_SIZE = 15;
 const MAX_BODY_FONT_SIZE = 22;
 const MIN_LINE_HEIGHT = 1.4;
@@ -30,25 +24,6 @@ const LEGACY_ANTHROPIC_DEFAULT_MODELS = new Set([
 
 function cloneDefaultSettings(): AnalysisSettings {
   return structuredClone(DEFAULT_ANALYSIS_SETTINGS);
-}
-
-function normalizeContextPolicy(
-  input?: Partial<AnalysisContextPolicy> | null,
-): AnalysisContextPolicy {
-  const scope: AnalysisContextScope =
-    input?.scope === 'chapter' || input?.scope === 'document'
-      ? input.scope
-      : DEFAULT_ANALYSIS_CONTEXT_POLICY.scope;
-  const limitMode: AnalysisContextLimitMode =
-    input?.limitMode === 'none' || input?.limitMode === 'lastN'
-      ? input.limitMode
-      : DEFAULT_ANALYSIS_CONTEXT_POLICY.limitMode;
-  const rawLastN = input?.lastN;
-  const lastN =
-    typeof rawLastN === 'number' && Number.isFinite(rawLastN)
-      ? Math.min(Math.max(Math.trunc(rawLastN), MIN_LAST_N), MAX_LAST_N)
-      : DEFAULT_ANALYSIS_CONTEXT_POLICY.lastN;
-  return { scope, limitMode, lastN };
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -124,7 +99,6 @@ function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): Analy
       endpoint: localEndpoint,
       defaultModel: localDefaultModel,
     },
-    contextPolicy: normalizeContextPolicy(input?.contextPolicy),
     editorTweaks: normalizeEditorTweaks(input?.editorTweaks),
   };
 }
@@ -144,8 +118,6 @@ export function mergeAnalysisSettings(
   settings.localLlm.endpoint = normalized.localLlm.endpoint;
   settings.localLlm.defaultModel = normalized.localLlm.defaultModel;
   settings.localLlm.configured = Boolean(normalized.localLlm.endpoint && normalized.localLlm.defaultModel);
-  // normalizeSettings 内で必ず値を埋めているが、型上 optional のため fallback を残す
-  settings.contextPolicy = normalized.contextPolicy ?? { ...DEFAULT_ANALYSIS_CONTEXT_POLICY };
   settings.editorTweaks = normalized.editorTweaks ?? { ...DEFAULT_EDITOR_TWEAKS };
 
   return settings;

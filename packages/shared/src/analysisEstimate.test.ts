@@ -63,53 +63,68 @@ describe('estimateAnalysisCost', () => {
     expect(estimate.estimatedOutputChars).toBe(OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT);
   });
 
-  it('limitMode が lastN だと前段落数が絞られて contextTextChars が小さくなる', () => {
+  it('preceding lastN だと前段落数が絞られて contextTextChars が小さくなる', () => {
     const paragraphs = makeParagraphs();
     const target = paragraphs[3]; // 直前に 3 段落ある
 
-    const noneEstimate = estimateAnalysisCost({
+    const allEstimate = estimateAnalysisCost({
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
       agent,
-      contextPolicy: { scope: 'document', limitMode: 'none', lastN: 999 },
+      contextPolicy: { mode: 'preceding', range: 'all' },
     });
 
     const lastNEstimate = estimateAnalysisCost({
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
       agent,
-      contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 1 },
+      contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 1 },
     });
 
-    expect(lastNEstimate.contextTextChars).toBeLessThan(noneEstimate.contextTextChars);
-    expect(lastNEstimate.totalInputChars).toBeLessThan(noneEstimate.totalInputChars);
+    expect(lastNEstimate.contextTextChars).toBeLessThan(allEstimate.contextTextChars);
+    expect(lastNEstimate.totalInputChars).toBeLessThan(allEstimate.totalInputChars);
   });
 
-  it('scope=chapter は別章の前段落を context から除外する', () => {
+  it('target-only は context を送らない', () => {
     const paragraphs = makeParagraphs();
-    const target = paragraphs[3]; // 章2 の 2段落目
+    const target = paragraphs[3];
 
-    const documentEstimate = estimateAnalysisCost({
+    const estimate = estimateAnalysisCost({
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
       agent,
-      contextPolicy: { scope: 'document', limitMode: 'none', lastN: 999 },
+      contextPolicy: { mode: 'target-only' },
     });
 
-    const chapterEstimate = estimateAnalysisCost({
+    expect(estimate.contextTextChars).toBe(0);
+    expect(estimate.totalInputChars).toBe(
+      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS + AGENT_CHARS + target.text.length,
+    );
+  });
+
+  it('whole-document は対象を重複させず後続を含む全文を context に含める', () => {
+    const paragraphs = makeParagraphs();
+    const target = paragraphs[1];
+
+    const estimate = estimateAnalysisCost({
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
       agent,
-      contextPolicy: { scope: 'chapter', limitMode: 'none', lastN: 999 },
+      contextPolicy: { mode: 'whole-document' },
     });
 
-    expect(chapterEstimate.contextTextChars).toBeLessThan(documentEstimate.contextTextChars);
+    const expectedContextChars =
+      paragraphs
+        .filter((paragraph) => paragraph.paragraphId !== target.paragraphId)
+        .reduce((sum, paragraph) => sum + paragraph.text.length, 0) +
+      (paragraphs.length - 1) * 5;
+    expect(estimate.contextTextChars).toBe(expectedContextChars);
   });
 
   it('totalInputChars には system prompt + agent + context + target 本文が含まれる', () => {
     const paragraphs = makeParagraphs();
     const target = paragraphs[1]; // 直前に p1 が 1 件
-    const policy: AnalysisContextPolicy = { scope: 'document', limitMode: 'none', lastN: 999 };
+    const policy: AnalysisContextPolicy = { mode: 'preceding', range: 'all' };
     const estimate = estimateAnalysisCost({
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
@@ -132,6 +147,7 @@ describe('estimateAnalysisCost', () => {
       targetParagraphs: [target],
       documentParagraphs: paragraphs,
       agent,
+      contextPolicy: { mode: 'preceding', range: 'all' },
     });
 
     expect(estimate.contextTextChars).toBe(0);
@@ -146,6 +162,7 @@ describe('estimateAnalysisCost', () => {
       targetParagraphs: [paragraphs[0]],
       documentParagraphs: paragraphs,
       agent: null,
+      contextPolicy: { mode: 'target-only' },
     });
 
     expect(estimate.totalInputChars).toBe(

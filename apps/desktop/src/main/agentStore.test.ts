@@ -58,6 +58,9 @@ describe('createReadingAgentStore', () => {
           name: '自作読者',
           role: '率直に読む',
           systemPrompt: '率直に読んでください。',
+          model: null,
+          temperature: 0.7,
+          contextPolicy: { mode: 'whole-document' },
           createdAt: '2026-05-01T00:00:00.000Z',
           updatedAt: '2026-05-01T00:00:00.000Z',
           builtIn: false,
@@ -67,12 +70,34 @@ describe('createReadingAgentStore', () => {
       const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
 
       await expect(store.list()).resolves.toEqual([
+        existing[0],
+      ]);
+    });
+  });
+
+  it('旧形式 agents.json は backup に退避して defaults を再生成する', async () => {
+    await withTempUserData(async (userDataPath) => {
+      const legacy = [
         {
-          ...existing[0],
+          id: 'legacy-reader',
+          name: '旧読者',
+          role: '旧形式',
+          systemPrompt: '旧形式のプロンプトです。',
           model: null,
           temperature: 0.7,
+          createdAt: '2026-05-01T00:00:00.000Z',
+          updatedAt: '2026-05-01T00:00:00.000Z',
+          builtIn: false,
         },
-      ]);
+      ];
+      await fs.writeFile(path.join(userDataPath, 'agents.json'), JSON.stringify(legacy, null, 2), 'utf8');
+      const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
+
+      const agents = await store.list();
+      const backup = JSON.parse(await fs.readFile(path.join(userDataPath, 'agents.json.bak'), 'utf8')) as unknown[];
+
+      expect(agents).toEqual(createDefaultReadingAgents('2026-05-02T00:00:00.000Z'));
+      expect(backup).toEqual(legacy);
     });
   });
 
@@ -89,6 +114,7 @@ describe('createReadingAgentStore', () => {
         systemPrompt: '  余白を中心に読んでください。  ',
         model: '  gpt-4.1-mini  ',
         temperature: 0.3,
+        contextPolicy: { mode: 'target-only' },
       });
       const updated = await store.save({
         id: 'reader-custom',
@@ -97,6 +123,7 @@ describe('createReadingAgentStore', () => {
         systemPrompt: '温度を中心に読んでください。',
         model: null,
         temperature: 0.8,
+        contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 4 },
       });
 
       expect(created).toMatchObject({
@@ -106,6 +133,7 @@ describe('createReadingAgentStore', () => {
         systemPrompt: '余白を中心に読んでください。',
         model: 'gpt-4.1-mini',
         temperature: 0.3,
+        contextPolicy: { mode: 'target-only' },
         createdAt: '2026-05-02T00:00:02.000Z',
         builtIn: false,
       });
@@ -114,6 +142,7 @@ describe('createReadingAgentStore', () => {
         name: '更新読者',
         model: null,
         temperature: 0.8,
+        contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 4 },
         createdAt: '2026-05-02T00:00:02.000Z',
         updatedAt: '2026-05-02T00:00:03.000Z',
         builtIn: false,
@@ -134,6 +163,7 @@ describe('createReadingAgentStore', () => {
         systemPrompt: '消える読者です。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'whole-document' },
       });
       await store.delete('reader-delete-me');
 
@@ -155,6 +185,7 @@ describe('createReadingAgentStore', () => {
         systemPrompt: '自由に読んでください。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'whole-document' },
       });
       const reset = await store.resetToDefaults();
 

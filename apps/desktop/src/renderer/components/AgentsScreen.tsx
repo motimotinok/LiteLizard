@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_READING_AGENT_TEMPERATURE,
   buildNewReadingAgentPrompt,
   type AnalysisResult,
+  type AnalysisContextPolicy,
   type ReadingAgent,
   type ReadingAgentInput,
 } from '@litelizard/shared';
@@ -20,6 +22,9 @@ interface AgentDraft {
   systemPrompt: string;
   model: string;
   temperature: string;
+  contextMode: AnalysisContextPolicy['mode'];
+  contextRange: 'all' | 'lastN';
+  contextLastN: string;
 }
 
 function createNewDraft(): AgentDraft {
@@ -31,10 +36,29 @@ function createNewDraft(): AgentDraft {
     systemPrompt: buildNewReadingAgentPrompt(name, role),
     model: '',
     temperature: String(DEFAULT_READING_AGENT_TEMPERATURE),
+    contextMode: DEFAULT_ANALYSIS_CONTEXT_POLICY.mode,
+    contextRange: 'all',
+    contextLastN: '10',
+  };
+}
+
+function policyToDraft(policy: AnalysisContextPolicy) {
+  if (policy.mode === 'preceding') {
+    return {
+      contextMode: policy.mode,
+      contextRange: policy.range,
+      contextLastN: policy.range === 'lastN' ? String(policy.lastN) : '10',
+    };
+  }
+  return {
+    contextMode: policy.mode,
+    contextRange: 'all' as const,
+    contextLastN: '10',
   };
 }
 
 function toDraft(agent: ReadingAgent): AgentDraft {
+  const contextDraft = policyToDraft(agent.contextPolicy);
   return {
     id: agent.id,
     name: agent.name,
@@ -42,7 +66,25 @@ function toDraft(agent: ReadingAgent): AgentDraft {
     systemPrompt: agent.systemPrompt,
     model: agent.model ?? '',
     temperature: String(agent.temperature),
+    ...contextDraft,
   };
+}
+
+function toContextPolicy(draft: AgentDraft): AnalysisContextPolicy {
+  if (draft.contextMode === 'preceding') {
+    if (draft.contextRange === 'lastN') {
+      return {
+        mode: 'preceding',
+        range: 'lastN',
+        lastN: Number(draft.contextLastN),
+      };
+    }
+    return { mode: 'preceding', range: 'all' };
+  }
+  if (draft.contextMode === 'target-only') {
+    return { mode: 'target-only' };
+  }
+  return { mode: 'whole-document' };
 }
 
 function toInput(draft: AgentDraft): ReadingAgentInput & { id?: string } {
@@ -54,6 +96,7 @@ function toInput(draft: AgentDraft): ReadingAgentInput & { id?: string } {
     systemPrompt: draft.systemPrompt.trim(),
     model: draft.model.trim() || null,
     temperature,
+    contextPolicy: toContextPolicy(draft),
   };
 }
 
@@ -68,6 +111,12 @@ function validateDraft(draft: AgentDraft): string | null {
   const temperature = Number(temperatureText);
   if (!Number.isFinite(temperature) || temperature < 0 || temperature > 1) {
     return '温度は 0〜1 の範囲で入力してください。';
+  }
+  if (draft.contextMode === 'preceding' && draft.contextRange === 'lastN') {
+    const lastN = Number(draft.contextLastN);
+    if (!Number.isInteger(lastN) || lastN < 1 || lastN > 999) {
+      return '参照段落数は 1〜999 の範囲で入力してください。';
+    }
   }
   return null;
 }
@@ -379,6 +428,111 @@ export function AgentsScreen() {
         <section className="settings-section">
           <div className="settings-section-heading">
             <span className="settings-section-kanji">{toKanjiIndex(3)}</span>
+            <h2 className="settings-section-title">参照範囲</h2>
+          </div>
+          <div className="settings-row">
+            <div>
+              <div className="settings-row-label">読み方</div>
+              <div className="settings-row-hint">分析対象を読むときに渡す本文</div>
+            </div>
+            <div className="settings-radio-group">
+              <label className="settings-radio-option">
+                <input
+                  type="radio"
+                  name="agent-context-mode"
+                  value="whole-document"
+                  checked={draft.contextMode === 'whole-document'}
+                  onChange={() =>
+                    setDraft((current) => ({ ...current, contextMode: 'whole-document' }))
+                  }
+                />
+                全文参照
+              </label>
+              <label className="settings-radio-option">
+                <input
+                  type="radio"
+                  name="agent-context-mode"
+                  value="preceding"
+                  checked={draft.contextMode === 'preceding'}
+                  onChange={() =>
+                    setDraft((current) => ({ ...current, contextMode: 'preceding' }))
+                  }
+                />
+                先行文脈
+              </label>
+              <label className="settings-radio-option">
+                <input
+                  type="radio"
+                  name="agent-context-mode"
+                  value="target-only"
+                  checked={draft.contextMode === 'target-only'}
+                  onChange={() =>
+                    setDraft((current) => ({ ...current, contextMode: 'target-only' }))
+                  }
+                />
+                対象のみ
+              </label>
+            </div>
+          </div>
+          {draft.contextMode === 'preceding' ? (
+            <>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-row-label">先行文脈</div>
+                  <div className="settings-row-hint">対象より前をどこまで読むか</div>
+                </div>
+                <div className="settings-radio-group">
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="agent-context-range"
+                      value="all"
+                      checked={draft.contextRange === 'all'}
+                      onChange={() =>
+                        setDraft((current) => ({ ...current, contextRange: 'all' }))
+                      }
+                    />
+                    先行全文
+                  </label>
+                  <label className="settings-radio-option">
+                    <input
+                      type="radio"
+                      name="agent-context-range"
+                      value="lastN"
+                      checked={draft.contextRange === 'lastN'}
+                      onChange={() =>
+                        setDraft((current) => ({ ...current, contextRange: 'lastN' }))
+                      }
+                    />
+                    直近N段落
+                  </label>
+                </div>
+              </div>
+              <div className="settings-row">
+                <div>
+                  <div className="settings-row-label">段落数</div>
+                  <div className="settings-row-hint">直近N段落のときだけ使用</div>
+                </div>
+                <input
+                  type="number"
+                  className="settings-input"
+                  value={draft.contextLastN}
+                  min={1}
+                  max={999}
+                  step={1}
+                  disabled={draft.contextRange !== 'lastN'}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, contextLastN: event.target.value }))
+                  }
+                />
+              </div>
+            </>
+          ) : null}
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span className="settings-section-kanji">{toKanjiIndex(4)}</span>
             <h2 className="settings-section-title">モデル設定</h2>
           </div>
           <div className="settings-row">

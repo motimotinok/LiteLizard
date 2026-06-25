@@ -153,6 +153,7 @@ describe('registerIpcHandlers', () => {
       systemPrompt: input.systemPrompt,
       model: input.model ?? null,
       temperature: input.temperature ?? 0.7,
+      contextPolicy: input.contextPolicy,
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
       builtIn: false,
@@ -204,6 +205,7 @@ describe('registerIpcHandlers', () => {
       systemPrompt: '静かに読んでください。',
       model: null,
       temperature: 0.7,
+      contextPolicy: { mode: 'whole-document' },
     };
     readingAgentStoreMock.list.mockResolvedValue([{ id: 'reader-quiet' }]);
     readingAgentStoreMock.get.mockResolvedValue({ id: 'reader-quiet' });
@@ -253,6 +255,7 @@ describe('registerIpcHandlers', () => {
       systemPrompt: '静かに読んでください。',
       model: null,
       temperature: 0.7,
+      contextPolicy: { mode: 'target-only' },
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
       builtIn: true,
@@ -290,7 +293,7 @@ describe('registerIpcHandlers', () => {
       expect.anything(),
       agent,
       expect.any(Function),
-      expect.objectContaining({ scope: expect.any(String), limitMode: expect.any(String) }),
+      agent.contextPolicy,
     );
     expect(send).toHaveBeenCalledWith(IPC_CHANNELS.analysisProgress, {
       paragraphId: 'p_123',
@@ -321,6 +324,7 @@ describe('registerIpcHandlers', () => {
         systemPrompt: '静かに読んでください。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'target-only' },
       },
       paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },
       documentParagraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
@@ -331,7 +335,6 @@ describe('registerIpcHandlers', () => {
     expect(apiBridgeMock.dryRunReadingAgent).toHaveBeenCalledWith(
       input,
       expect.anything(),
-      expect.objectContaining({ scope: expect.any(String), limitMode: expect.any(String) }),
     );
   });
 

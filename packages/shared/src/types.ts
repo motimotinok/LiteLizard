@@ -115,6 +115,7 @@ export interface ReadingAgent {
   systemPrompt: string;
   model: string | null;
   temperature: number;
+  contextPolicy: AnalysisContextPolicy;
   createdAt: string;
   updatedAt: string;
   builtIn: boolean;
@@ -126,6 +127,7 @@ export interface ReadingAgentInput {
   systemPrompt: string;
   model: string | null;
   temperature: number;
+  contextPolicy: AnalysisContextPolicy;
 }
 
 export interface FileNode {
@@ -153,24 +155,20 @@ export interface LocalLlmSettings {
 }
 
 /**
- * 分析コンテキストポリシー（仕様 docs/specs/analysis-api.md §2.1）。
- * - `scope`: 'document' は文書全体の前段落、'chapter' は対象段落と同一章の前段落のみ。
- * - `limitMode`: 'none' は前段落を全件、'lastN' は直近 `lastN` 件に絞る。
- * - `lastN`: `limitMode === 'lastN'` のときに使う件数。1 以上 999 以下。
+ * Reading Agent ごとの分析コンテキストポリシー。
+ * - `target-only`: 対象本文だけを送る。
+ * - `preceding/all`: 対象より前の全文を参照する。
+ * - `preceding/lastN`: 対象より前の直近 `lastN` 段落だけを参照する。
+ * - `whole-document`: 後続を含む文書全体を参照する。
  */
-export type AnalysisContextScope = 'document' | 'chapter';
-export type AnalysisContextLimitMode = 'none' | 'lastN';
-
-export interface AnalysisContextPolicy {
-  scope: AnalysisContextScope;
-  limitMode: AnalysisContextLimitMode;
-  lastN: number;
-}
+export type AnalysisContextPolicy =
+  | { mode: 'target-only' }
+  | { mode: 'preceding'; range: 'all' }
+  | { mode: 'preceding'; range: 'lastN'; lastN: number }
+  | { mode: 'whole-document' };
 
 export const DEFAULT_ANALYSIS_CONTEXT_POLICY: AnalysisContextPolicy = {
-  scope: 'document',
-  limitMode: 'lastN',
-  lastN: 10,
+  mode: 'whole-document',
 };
 
 export type EditorTypeface = 'serif' | 'sans';
@@ -199,7 +197,6 @@ export interface AnalysisSettings {
     anthropic: CloudProviderSettings;
   };
   localLlm: LocalLlmSettings;
-  contextPolicy: AnalysisContextPolicy;
   editorTweaks: EditorTweaks;
 }
 
@@ -217,8 +214,6 @@ export interface AnalysisSettingsInput {
     endpoint: string;
     defaultModel: string;
   };
-  // 旧クライアント互換のため optional。未指定時は DEFAULT_ANALYSIS_CONTEXT_POLICY が使われる。
-  contextPolicy?: AnalysisContextPolicy;
   // 旧クライアント互換のため optional。未指定時は DEFAULT_EDITOR_TWEAKS が使われる。
   editorTweaks?: EditorTweaks;
 }
@@ -240,6 +235,5 @@ export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
     defaultModel: 'llama3.1:8b',
     configured: false,
   },
-  contextPolicy: { ...DEFAULT_ANALYSIS_CONTEXT_POLICY },
   editorTweaks: { ...DEFAULT_EDITOR_TWEAKS },
 };

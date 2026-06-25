@@ -55,6 +55,7 @@ describe('createIpcBridge', () => {
       systemPrompt: 'あなたは静かな読者として段落を読みます。',
       model: null,
       temperature: 0.7,
+      contextPolicy: { mode: 'whole-document' },
     });
     await api.deleteReadingAgent('reader-quiet');
     await api.resetReadingAgents();
@@ -65,6 +66,7 @@ describe('createIpcBridge', () => {
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'whole-document' },
       },
       paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },
       documentParagraphs: [{ paragraphId: 'p_123', order: 1, text: '本文' }],
@@ -109,6 +111,7 @@ describe('createIpcBridge', () => {
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'whole-document' },
       },
     );
     expect(electronMock.invoke).toHaveBeenCalledWith(IPC_CHANNELS.deleteReadingAgent, 'reader-quiet');

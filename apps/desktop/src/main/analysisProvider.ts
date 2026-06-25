@@ -92,8 +92,8 @@ function extractJsonText(input: string): string {
 export function buildSystemPrompt(agent: ReadingAgentInput, contextTexts: string[]): string {
   const contextBlock =
     contextTexts.length > 0
-      ? `Context paragraphs (oldest first):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
-      : 'Context paragraphs: none';
+      ? `Reference paragraphs (document order):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+      : 'Reference paragraphs: none';
 
   return [
     'You are LiteLizard analysis model.',
@@ -103,6 +103,7 @@ export function buildSystemPrompt(agent: ReadingAgentInput, contextTexts: string
     agent.systemPrompt,
     'Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1).',
     contextBlock,
+    'Analyze only the target paragraph provided by the user. Use the reference paragraphs only as reading context.',
   ].join('\n\n');
 }
 
@@ -346,14 +347,7 @@ export function resolveAnalysisProvider(
 }
 
 /**
- * 解析対象段落の前段落を、コンテキストポリシーに従って組み立てる。
- *
- * - `scope === 'chapter'`: 対象段落と同じ `chapterId` を持つ前段落だけを使う。
- *   いずれかの段落で `chapterId` が欠けている場合は document scope と同じ挙動になる。
- * - `limitMode === 'lastN'`: 末尾 `lastN` 件に絞る。
- * - `limitMode === 'none'`: 全件をそのまま使う。
- *
- * 既存呼び出しとの互換のため、policy を省略すると `DEFAULT_ANALYSIS_CONTEXT_POLICY` が適用される。
+ * 解析対象段落の参照本文を、Reading Agent のコンテキストポリシーに従って組み立てる。
  */
 export function buildContextTexts(
   paragraphs: AnalysisRunInput['documentParagraphs'],
@@ -361,21 +355,24 @@ export function buildContextTexts(
   policy: AnalysisContextPolicy = DEFAULT_ANALYSIS_CONTEXT_POLICY,
 ): string[] {
   const index = paragraphs.findIndex((paragraph) => paragraph.paragraphId === paragraphId);
-  if (index <= 0) {
+  if (index < 0 || policy.mode === 'target-only') {
+    return [];
+  }
+
+  if (policy.mode === 'whole-document') {
+    return paragraphs
+      .filter((paragraph) => paragraph.paragraphId !== paragraphId)
+      .map((paragraph) => paragraph.text)
+      .filter((text) => text.trim().length > 0);
+  }
+
+  if (index === 0) {
     return [];
   }
 
   let candidates = paragraphs.slice(0, index);
 
-  if (policy.scope === 'chapter') {
-    const targetChapterId = paragraphs[index]?.chapterId;
-    if (targetChapterId) {
-      candidates = candidates.filter((paragraph) => paragraph.chapterId === targetChapterId);
-    }
-    // chapterId が無い場合は document scope と同じ扱い（互換維持）
-  }
-
-  if (policy.limitMode === 'lastN') {
+  if (policy.range === 'lastN') {
     const lastN = Math.max(0, Math.trunc(policy.lastN));
     candidates = candidates.slice(Math.max(0, candidates.length - lastN));
   }

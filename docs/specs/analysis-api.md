@@ -2,11 +2,11 @@
 
 関連タスク: S-06, S-09
 決定経緯: `docs/decisions.md` [2026-03-28] S-06, [2026-03-30] S-09
-改訂: 2026-06-23 legacy API 削除により現行のElectron IPCと将来のクラウド方式を整理
+改訂: 2026-06-25 contextPolicy を Reading Agent 所有の設定へ移行
 
 ---
 
-> この文書は2026-06-23時点のElectron IPC・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、将来の `response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とし、互換を保ちながら後続実装で移行する。
+> この文書は2026-06-25時点のElectron IPC・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、将来の `response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とする。
 >
 > 現在、自社サーバーの分析APIは存在しない。旧Fastify APIは削除済みであり、将来のクラウド方式はOAuth、ストリーミング、利用量・課金管理を含めて新規設計する。
 
@@ -45,7 +45,7 @@ type AnalysisProvider =
 interface AnalysisTargetParagraph {
   paragraphId: string;
   text: string;
-  context: string[]; // コンテキストポリシーに従って選ばれた前段落テキスト配列（古い順）
+  context: string[]; // Reading Agent の contextPolicy に従って選ばれた参照本文配列（文書順）
 }
 ```
 
@@ -53,46 +53,45 @@ interface AnalysisTargetParagraph {
 
 ## 2. コンテキスト
 
-- 段落 N の分析時に、対象段落より前の段落をコンテキストとして渡す
-- N+1 以降の段落は参照しない（読者は前から順に読むため）
-- コンテキスト候補は §2.1 のコンテキストポリシーに従って絞り込まれる
-
-```
-段落1: context = []
-段落2: context = [段落1]
-段落3: context = [段落1, 段落2]
-...
-段落11: context = [段落2, 段落3, ..., 段落10] (直前10段落)
-段落12: context = [段落3, 段落4, ..., 段落11] (直前10段落)
-```
-
-### 2.1 コンテキストポリシー切替
-
-分析に固定の最大段落数制限を設けると、長い章・伏線・前章から続く読者体験を拾えず、UX が大きく低下する可能性がある。一方で、常に全文脈を渡すとコスト・速度・モデル上限に影響する。そのため、設定で以下を切り替えられる。
+文脈ポリシーはグローバルな分析設定ではなく、Reading Agent の `contextPolicy` として保存する。通常分析、特定段落の再分析、dry-run、実行前見積もりは、選択中Agentの `contextPolicy` を同じ契約で参照する。
 
 ```typescript
-type AnalysisContextScope = 'document' | 'chapter';
-type AnalysisContextLimitMode = 'none' | 'lastN';
-
-interface AnalysisContextPolicy {
-  scope: AnalysisContextScope;
-  limitMode: AnalysisContextLimitMode;
-  lastN: number; // limitMode === 'lastN' のときに使う件数。1..999
-}
+type AnalysisContextPolicy =
+  | { mode: 'target-only' }
+  | { mode: 'preceding'; range: 'all' }
+  | { mode: 'preceding'; range: 'lastN'; lastN: number }
+  | { mode: 'whole-document' };
 ```
 
-| 設定 | 意味 | 主な利点 | 主な注意点 |
-|------|------|----------|------------|
-| `scope: 'document'` | 前章を含む文書全体の前段落を候補にする | 読者が前から読み続ける体験に近い | 章切り替えの独立性が薄まる場合がある |
-| `scope: 'chapter'` | 同一章内の前段落だけを候補にする | 章ごとの意図を保ちやすい | 前章から続く伏線や余韻を拾いにくい |
-| `limitMode: 'none'` | 段落数上限を設けない | 文脈を広く渡せる | コスト・速度・モデル上限に注意が必要 |
-| `limitMode: 'lastN'` | 直前 N 段落だけを渡す | コストと速度が安定する | 長い文脈を拾いきれない |
+| policy | 参照本文 | 主な用途 |
+|--------|----------|----------|
+| `target-only` | 対象本文のみ。参照本文なし | 1段落だけを軽く読む、コストを最小化する |
+| `preceding all` | 対象より前の全文 | 前から読む読者体験を保つ |
+| `preceding lastN` | 対象より前の直近N段落 | 長文でコストと速度を抑える |
+| `whole-document` | 対象以外の全文。対象本文は別枠で渡す | 後続を含む構造評価や全体整合の確認 |
 
 実装上の挙動:
-- `scope: 'chapter'` で対象段落の `chapterId` が欠けている場合は document scope と同等に振る舞い、互換を保つ。
-- `lastN` は 1〜999 にクランプされる。
-- 既定値は `{ scope: 'document', limitMode: 'lastN', lastN: 10 }`（従来挙動と一致）。
-- 設定は `analysis-settings.json` の `contextPolicy` フィールドに保存される。設定画面の「分析エンジン > 分析コンテキスト」セクションから変更できる。
+- `lastN` は schema validation で 1〜999 に制限する。
+- 既定値は `{ mode: 'whole-document' }`。新規作成Agentもこの既定値を使う。
+- 既存の `analysis-settings.json` に残る `contextPolicy` は読み込み時に無視し、保存契約からも外す。
+- `contextPolicy` を持たない旧 `agents.json` は互換補完せず、`agents.json.bak` へ退避して現在のデフォルトAgentを再生成する。
+- provider prompt は、固定指示、Reading Agent prompt、参照本文、対象本文の順に組み立てる。prompt caching、`prompt_cache_key`、provider別キャッシュ最適化は後続タスクで扱う。
+
+例:
+
+```
+target-only:
+段落3: reference = [], target = 段落3
+
+preceding all:
+段落3: reference = [段落1, 段落2], target = 段落3
+
+preceding lastN(1):
+段落3: reference = [段落2], target = 段落3
+
+whole-document:
+段落3: reference = [段落1, 段落2, 段落4, ...], target = 段落3
+```
 
 ---
 
@@ -238,6 +237,6 @@ interface ParagraphAnalysisPattern {
 
 > 以下は MVP スコープ外。実運用で問題が顕在化した時点で対応する。
 
-1. **コンテキスト圧縮**: L-09 のコンテキストポリシー切替後、「章タイトル + 冒頭要約 + 直近 N 段落」のような圧縮方式で精度とコストを両立
+1. **コンテキスト圧縮と prompt caching**: Agent単位の文脈ポリシーを前提に、固定指示 + Agent prompt をキャッシュし、参照本文や対象本文の送り方を最適化する
 2. **ストリーミングリジューム**: 全体分析時に途中でエラーが発生した場合、どの段落まで完了したかをクライアントが把握し、続きから再開する機構
 3. **世代ファイル自動削除**: 頻繁な構造変更で世代ファイルが増加する場合、直近 N 世代のみ保持するポリシー

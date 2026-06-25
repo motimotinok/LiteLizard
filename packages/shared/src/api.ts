@@ -39,6 +39,24 @@ export const AnalysisSuccessSchema = z.object({
 
 export const DEFAULT_READING_AGENT_TEMPERATURE = 0.7;
 
+const AnalysisContextPolicySchema = z.union([
+  z.object({
+    mode: z.literal('target-only'),
+  }),
+  z.object({
+    mode: z.literal('preceding'),
+    range: z.literal('all'),
+  }),
+  z.object({
+    mode: z.literal('preceding'),
+    range: z.literal('lastN'),
+    lastN: z.number().int().min(1).max(999),
+  }),
+  z.object({
+    mode: z.literal('whole-document'),
+  }),
+]);
+
 const ReadingAgentModelSchema = z.preprocess(
   (value) => {
     if (typeof value === 'string' && value.trim().length === 0) {
@@ -55,6 +73,7 @@ export const ReadingAgentInputSchema = z.object({
   systemPrompt: z.string().trim().min(1).max(8_000),
   model: ReadingAgentModelSchema,
   temperature: z.number().min(0).max(1).default(DEFAULT_READING_AGENT_TEMPERATURE),
+  contextPolicy: AnalysisContextPolicySchema,
 });
 
 export const ReadingAgentSchema = ReadingAgentInputSchema.extend({

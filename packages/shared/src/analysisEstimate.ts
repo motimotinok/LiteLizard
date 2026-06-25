@@ -44,7 +44,7 @@ export interface AnalysisEstimateInput {
   targetParagraphs: AnalysisEstimateParagraph[];
   /** コンテキスト候補となるドキュメント全段落（古い順）。 */
   documentParagraphs: AnalysisEstimateParagraph[];
-  /** 設定の contextPolicy。 */
+  /** 選択中 Reading Agent の contextPolicy。 */
   contextPolicy?: AnalysisContextPolicy;
   /** 現在選択中の Reading Agent。未選択時は null を渡す。 */
   agent: AnalysisEstimateAgent | null;
@@ -67,7 +67,7 @@ export const OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT = 500;
  * - "You are LiteLizard analysis model." 等のフレーム文
  * - "Reading agent name: ." 等の見出し
  * - "Return strict JSON with keys: ..." の指示文
- * - "Context paragraphs (oldest first):" もしくは "Context paragraphs: none"
+ * - "Reference paragraphs (document order):" もしくは "Reference paragraphs: none"
  *
  * 微小な差分は概算誤差として許容する。実際の system prompt 長を一字一句測る必要が出たら、
  * 共通の system prompt ビルダーを shared に移して両方から使う構成に変更する。
@@ -85,20 +85,24 @@ function selectContextTexts(
   policy: AnalysisContextPolicy,
 ): string[] {
   const index = documentParagraphs.findIndex((p) => p.paragraphId === targetParagraphId);
-  if (index <= 0) {
+  if (index < 0 || policy.mode === 'target-only') {
+    return [];
+  }
+
+  if (policy.mode === 'whole-document') {
+    return documentParagraphs
+      .filter((p) => p.paragraphId !== targetParagraphId)
+      .map((p) => p.text)
+      .filter((text) => text.trim().length > 0);
+  }
+
+  if (index === 0) {
     return [];
   }
 
   let candidates = documentParagraphs.slice(0, index);
 
-  if (policy.scope === 'chapter') {
-    const targetChapterId = documentParagraphs[index]?.chapterId;
-    if (targetChapterId) {
-      candidates = candidates.filter((p) => p.chapterId === targetChapterId);
-    }
-  }
-
-  if (policy.limitMode === 'lastN') {
+  if (policy.range === 'lastN') {
     const lastN = Math.max(0, Math.trunc(policy.lastN));
     candidates = candidates.slice(Math.max(0, candidates.length - lastN));
   }

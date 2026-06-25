@@ -323,6 +323,7 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
     systemPrompt: input.systemPrompt.trim(),
     model: input.model?.trim() || null,
     temperature: input.temperature,
+    contextPolicy: input.contextPolicy,
     createdAt: current?.createdAt ?? now,
     updatedAt: now,
     builtIn: current?.builtIn ?? false,
@@ -609,9 +610,6 @@ export function createMockPreloadApi(): BridgeApi {
           defaultModel: input.localLlm.defaultModel.trim() || DEFAULT_ANALYSIS_SETTINGS.localLlm.defaultModel,
           configured: Boolean(input.localLlm.endpoint.trim() && input.localLlm.defaultModel.trim()),
         },
-        contextPolicy: input.contextPolicy
-          ? { ...input.contextPolicy }
-          : { ...state.analysisSettings.contextPolicy },
         editorTweaks: input.editorTweaks
           ? { ...input.editorTweaks }
           : { ...state.analysisSettings.editorTweaks },

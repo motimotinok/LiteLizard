@@ -54,6 +54,7 @@ function createBridge(overrides: Partial<Window['litelizard']> = {}): Window['li
         systemPrompt: '余韻を中心に読んでください。',
         model: null,
         temperature: 0.7,
+        contextPolicy: { mode: 'whole-document' },
         createdAt: '2026-05-02T00:00:00.000Z',
         updatedAt: '2026-05-02T00:00:00.000Z',
         builtIn: true,
@@ -160,7 +161,6 @@ describe('useAppStore project startup flow', () => {
         endpoint: 'http://127.0.0.1:11434',
         defaultModel: 'llama3.1:8b',
       },
-      contextPolicy: { scope: 'chapter', limitMode: 'none', lastN: 8 },
       editorTweaks: {
         typeface: 'sans',
         bodyFontSize: 20,
@@ -458,6 +458,7 @@ describe('useAppStore L-06 analysis state', () => {
           systemPrompt: '余韻を中心に読んでください。',
           model: null,
           temperature: 0.7,
+          contextPolicy: { mode: 'whole-document' },
           createdAt: '2026-05-02T00:00:00.000Z',
           updatedAt: '2026-05-02T00:00:00.000Z',
           builtIn: true,
@@ -1050,6 +1051,7 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
           systemPrompt: '余韻を中心に読んでください。',
           model: null,
           temperature: 0.7,
+          contextPolicy: { mode: 'whole-document' },
           createdAt: '2026-05-02T00:00:00.000Z',
           updatedAt: '2026-05-02T00:00:00.000Z',
           builtIn: true,
@@ -1063,7 +1065,6 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
           anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
         },
         localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
-        contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 10 },
         editorTweaks: {
           typeface: 'serif',
           bodyFontSize: 17,
@@ -1125,20 +1126,22 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
     });
 
     useAppStore.setState((state) => ({
-      analysisSettings: {
-        ...state.analysisSettings,
-        contextPolicy: { scope: 'document', limitMode: 'none', lastN: 999 },
-      },
+      agents: state.agents.map((agent) =>
+        agent.id === 'reader-quiet'
+          ? { ...agent, contextPolicy: { mode: 'preceding', range: 'all' } }
+          : agent
+      ),
     }));
     useAppStore.getState().requestAnalysisRun();
     const noneEstimate = useAppStore.getState().pendingAnalysisRun?.estimate;
     expect(noneEstimate).toBeDefined();
 
     useAppStore.setState((state) => ({
-      analysisSettings: {
-        ...state.analysisSettings,
-        contextPolicy: { scope: 'document', limitMode: 'lastN', lastN: 1 },
-      },
+      agents: state.agents.map((agent) =>
+        agent.id === 'reader-quiet'
+          ? { ...agent, contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 1 } }
+          : agent
+      ),
       pendingAnalysisRun: null,
     }));
     useAppStore.getState().requestAnalysisRun();

@@ -1,6 +1,5 @@
 import crypto from 'node:crypto';
 import {
-  DEFAULT_ANALYSIS_CONTEXT_POLICY,
   ReadingAgentInputSchema,
   type AnalysisContextPolicy,
   type AnalysisResult,
@@ -21,7 +20,7 @@ export async function runAnalysis(
   resolvedProvider: ResolvedAnalysisProvider,
   agent: ReadingAgent,
   onProgress?: (result: AnalysisResult) => void,
-  contextPolicy: AnalysisContextPolicy = DEFAULT_ANALYSIS_CONTEXT_POLICY,
+  contextPolicy: AnalysisContextPolicy = agent.contextPolicy,
 ): Promise<AnalysisRunResult> {
   const execute = async (progressCallback?: (result: AnalysisResult) => void) => {
     const results: AnalysisResult[] = [];
@@ -62,9 +61,10 @@ export async function runAnalysis(
 export async function dryRunReadingAgent(
   input: ReadingAgentDryRunInput,
   resolvedProvider: ResolvedAnalysisProvider,
-  contextPolicy: AnalysisContextPolicy = DEFAULT_ANALYSIS_CONTEXT_POLICY,
+  contextPolicy?: AnalysisContextPolicy,
 ): Promise<AnalysisResult> {
   const agent = ReadingAgentInputSchema.parse(input.agent);
+  const resolvedContextPolicy = contextPolicy ?? agent.contextPolicy;
   return resolvedProvider.provider.analyzeParagraph({
     paragraphId: input.paragraph.paragraphId,
     text: input.paragraph.text,
@@ -72,6 +72,6 @@ export async function dryRunReadingAgent(
     promptVersion: input.promptVersion,
     model: resolveAgentModel(agent, resolvedProvider),
     temperature: agent.temperature,
-    contextTexts: buildContextTexts(input.documentParagraphs, input.paragraph.paragraphId, contextPolicy),
+    contextTexts: buildContextTexts(input.documentParagraphs, input.paragraph.paragraphId, resolvedContextPolicy),
   });
 }

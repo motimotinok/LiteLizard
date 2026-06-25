@@ -8,6 +8,7 @@ const validAgent = {
   systemPrompt: 'あなたは静かな読者として、段落の余韻を短く分析します。',
   model: null,
   temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+  contextPolicy: { mode: 'whole-document' },
   createdAt: '2026-05-02T00:00:00.000Z',
   updatedAt: '2026-05-02T00:00:00.000Z',
   builtIn: true,
@@ -25,12 +26,13 @@ describe('ReadingAgent schemas', () => {
       systemPrompt: 'あなたは担当編集として、読者がつまずく点を指摘します。',
       model: 'claude-haiku-4-5-20251001',
       temperature: 0.4,
+      contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 3 },
     };
 
     expect(ReadingAgentInputSchema.parse(input)).toEqual(input);
   });
 
-  it('normalizes legacy reading agents with model and temperature defaults', () => {
+  it('rejects legacy reading agents without contextPolicy', () => {
     const legacy = {
       id: 'reader-legacy',
       name: '旧読者',
@@ -41,10 +43,20 @@ describe('ReadingAgent schemas', () => {
       builtIn: false,
     };
 
-    expect(ReadingAgentSchema.parse(legacy)).toMatchObject({
+    expect(ReadingAgentSchema.safeParse(legacy).success).toBe(false);
+  });
+
+  it('rejects out-of-range preceding lastN', () => {
+    const result = ReadingAgentInputSchema.safeParse({
+      name: '短い読者',
+      role: '直前だけ読む',
+      systemPrompt: '直前だけ読んでください。',
       model: null,
-      temperature: DEFAULT_READING_AGENT_TEMPERATURE,
+      temperature: 0.7,
+      contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 0 },
     });
+
+    expect(result.success).toBe(false);
   });
 
   it('rejects out-of-range temperature', () => {
@@ -54,6 +66,7 @@ describe('ReadingAgent schemas', () => {
       systemPrompt: '揺らぎを読んでください。',
       model: null,
       temperature: 1.5,
+      contextPolicy: { mode: 'whole-document' },
     });
 
     expect(result.success).toBe(false);
@@ -64,6 +77,7 @@ describe('ReadingAgent schemas', () => {
       name: '',
       role: ' ',
       systemPrompt: '',
+      contextPolicy: { mode: 'whole-document' },
     });
 
     expect(result.success).toBe(false);

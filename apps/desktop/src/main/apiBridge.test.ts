@@ -21,6 +21,7 @@ const testAgent: ReadingAgent = {
   systemPrompt: '余韻を中心に読んでください。',
   model: null,
   temperature: 0.7,
+  contextPolicy: { mode: 'preceding', range: 'all' },
   createdAt: '2026-05-02T00:00:00.000Z',
   updatedAt: '2026-05-02T00:00:00.000Z',
   builtIn: true,
@@ -203,7 +204,7 @@ describe('createLocalLlmAnalysisProvider', () => {
       options: { temperature: 0.2 },
     });
     expect(requestBody.format).toEqual(ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA);
-    expect(requestBody.prompt).toContain('Context paragraphs');
+    expect(requestBody.prompt).toContain('Reference paragraphs');
     expect(requestBody.prompt).toContain('余韻を中心に読んでください。');
     expect(requestBody.prompt).toContain('旅立ちの朝');
     expect(result).toMatchObject({
@@ -506,17 +507,14 @@ describe('dryRunReadingAgent', () => {
 });
 
 describe('buildContextTexts', () => {
-  it('既定ポリシー (document/lastN=10) で最大10件まで前段落だけ返す', () => {
+  it('preceding lastN で最大N件まで前段落だけ返す', () => {
     const paragraphs = Array.from({ length: 12 }, (_, index) => ({
       paragraphId: `p${index + 1}`,
       order: index + 1,
       text: `text-${index + 1}`,
     }));
 
-    expect(buildContextTexts(paragraphs, 'p12')).toEqual([
-      'text-2',
-      'text-3',
-      'text-4',
+    expect(buildContextTexts(paragraphs, 'p12', { mode: 'preceding', range: 'lastN', lastN: 7 })).toEqual([
       'text-5',
       'text-6',
       'text-7',
@@ -527,7 +525,7 @@ describe('buildContextTexts', () => {
     ]);
   });
 
-  it('対象だけを解析しても文書全体順序から context を拾える', () => {
+  it('既定では対象以外の文書全体を context として返す', () => {
     const paragraphs = [
       { paragraphId: 'p1', order: 1, text: 'one' },
       { paragraphId: 'p2', order: 2, text: 'two' },
@@ -547,7 +545,7 @@ describe('buildContextTexts', () => {
     expect(buildContextTexts(paragraphs, 'missing')).toEqual([]);
   });
 
-  it('chapter scope では同じ chapter の前段落だけ返す', () => {
+  it('target-only は context を返さない', () => {
     const paragraphs = [
       { paragraphId: 'p1', order: 1, text: 'a1', chapterId: 'c1' },
       { paragraphId: 'p2', order: 2, text: 'a2', chapterId: 'c1' },
@@ -557,14 +555,12 @@ describe('buildContextTexts', () => {
 
     expect(
       buildContextTexts(paragraphs, 'p4', {
-        scope: 'chapter',
-        limitMode: 'none',
-        lastN: 10,
+        mode: 'target-only',
       }),
-    ).toEqual(['b1']);
+    ).toEqual([]);
   });
 
-  it('limitMode=none では件数制限なしで前段落を全件返す', () => {
+  it('preceding all では件数制限なしで前段落を全件返す', () => {
     const paragraphs = Array.from({ length: 15 }, (_, index) => ({
       paragraphId: `p${index + 1}`,
       order: index + 1,
@@ -572,9 +568,8 @@ describe('buildContextTexts', () => {
     }));
 
     const result = buildContextTexts(paragraphs, 'p15', {
-      scope: 'document',
-      limitMode: 'none',
-      lastN: 10,
+      mode: 'preceding',
+      range: 'all',
     });
 
     expect(result).toHaveLength(14);
@@ -582,7 +577,7 @@ describe('buildContextTexts', () => {
     expect(result[result.length - 1]).toBe('t14');
   });
 
-  it('limitMode=lastN は指定件数を超えない', () => {
+  it('preceding lastN は指定件数を超えない', () => {
     const paragraphs = Array.from({ length: 8 }, (_, index) => ({
       paragraphId: `p${index + 1}`,
       order: index + 1,
@@ -591,14 +586,14 @@ describe('buildContextTexts', () => {
 
     expect(
       buildContextTexts(paragraphs, 'p8', {
-        scope: 'document',
-        limitMode: 'lastN',
+        mode: 'preceding',
+        range: 'lastN',
         lastN: 3,
       }),
     ).toEqual(['t5', 't6', 't7']);
   });
 
-  it('chapter scope でも対象段落に chapterId が無ければ document scope と同等', () => {
+  it('whole-document は対象を重複させず、対象より後の段落も含める', () => {
     const paragraphs = [
       { paragraphId: 'p1', order: 1, text: 'one' },
       { paragraphId: 'p2', order: 2, text: 'two' },
@@ -606,11 +601,9 @@ describe('buildContextTexts', () => {
     ];
 
     expect(
-      buildContextTexts(paragraphs, 'p3', {
-        scope: 'chapter',
-        limitMode: 'none',
-        lastN: 10,
+      buildContextTexts(paragraphs, 'p2', {
+        mode: 'whole-document',
       }),
-    ).toEqual(['one', 'two']);
+    ).toEqual(['one', 'three']);
   });
 });

@@ -121,6 +121,7 @@ export function createReadingAgentStore(
           systemPrompt: parsed.systemPrompt,
           model: parsed.model,
           temperature: parsed.temperature,
+          contextPolicy: parsed.contextPolicy,
           createdAt: existing?.createdAt ?? timestamp,
           updatedAt: timestamp,
           builtIn: existing?.builtIn ?? false,

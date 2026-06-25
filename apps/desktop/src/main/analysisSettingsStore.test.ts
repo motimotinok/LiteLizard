@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_ANALYSIS_SETTINGS,
   DEFAULT_EDITOR_TWEAKS,
 } from '@litelizard/shared';
@@ -96,51 +95,19 @@ describe('mergeAnalysisSettings', () => {
     expect(merged.localLlm.configured).toBe(false);
   });
 
-  it('contextPolicy が未指定の場合は既定値で補完する', () => {
-    const merged = mergeAnalysisSettings(undefined, { openai: false, anthropic: false });
-
-    expect(merged.contextPolicy).toEqual(DEFAULT_ANALYSIS_CONTEXT_POLICY);
-  });
-
-  it('contextPolicy の有効な値はそのまま反映する', () => {
-    const merged = mergeAnalysisSettings(
-      {
-        defaultProvider: 'openai',
-        providers: {
-          openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
-        },
-        localLlm: { endpoint: 'http://x', defaultModel: 'm' },
-        contextPolicy: { scope: 'chapter', limitMode: 'lastN', lastN: 3 },
+  it('旧 contextPolicy は分析設定へ残さない', () => {
+    const legacySettings = {
+      defaultProvider: 'openai',
+      providers: {
+        openai: { defaultModel: 'gpt-4o-mini' },
+        anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
       },
-      { openai: false, anthropic: false },
-    );
+      localLlm: { endpoint: 'http://x', defaultModel: 'm' },
+      contextPolicy: { scope: 'chapter', limitMode: 'lastN', lastN: 3 },
+    } as never;
+    const merged = mergeAnalysisSettings(legacySettings, { openai: false, anthropic: false });
 
-    expect(merged.contextPolicy).toEqual({ scope: 'chapter', limitMode: 'lastN', lastN: 3 });
-  });
-
-  it('contextPolicy の不正値は既定値にフォールバックし lastN は範囲内にクランプする', () => {
-    const merged = mergeAnalysisSettings(
-      {
-        defaultProvider: 'openai',
-        providers: {
-          openai: { defaultModel: 'gpt-4o-mini' },
-          anthropic: { defaultModel: 'claude-haiku-4-5-20251001' },
-        },
-        localLlm: { endpoint: 'http://x', defaultModel: 'm' },
-        contextPolicy: {
-          // 不正値を意図的に渡す
-          scope: 'invalid' as unknown as 'document',
-          limitMode: 'invalid' as unknown as 'lastN',
-          lastN: 5_000,
-        },
-      },
-      { openai: false, anthropic: false },
-    );
-
-    expect(merged.contextPolicy.scope).toBe(DEFAULT_ANALYSIS_CONTEXT_POLICY.scope);
-    expect(merged.contextPolicy.limitMode).toBe(DEFAULT_ANALYSIS_CONTEXT_POLICY.limitMode);
-    expect(merged.contextPolicy.lastN).toBe(999);
+    expect('contextPolicy' in merged).toBe(false);
   });
 
   it('editorTweaks が未指定の場合は既定値で補完する', () => {

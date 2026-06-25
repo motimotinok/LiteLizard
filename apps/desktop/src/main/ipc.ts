@@ -620,7 +620,7 @@ export function registerIpcHandlers() {
           result,
         } satisfies AnalysisProgressEvent);
       },
-      analysisSettings.contextPolicy,
+      agent.contextPolicy,
     );
   });
 
@@ -791,7 +791,7 @@ export function registerIpcHandlers() {
         anthropic: Boolean(secrets.anthropic?.trim()),
       });
       const provider = resolveAnalysisProvider(analysisSettings, secrets);
-      return await dryRunReadingAgent(input, provider, analysisSettings.contextPolicy);
+      return await dryRunReadingAgent(input, provider);
     } catch (error) {
       console.error('[IPC agents:dryRun] failed', error);
       throw new Error(`DRY_RUN_READING_AGENT_FAILED: ${getErrorMessage(error)}`);
