@@ -223,11 +223,11 @@ export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
   providers: {
     openai: {
       apiKeyConfigured: false,
-      defaultModel: 'gpt-4o-mini',
+      defaultModel: 'gpt-5.4',
     },
     anthropic: {
       apiKeyConfigured: false,
-      defaultModel: 'claude-haiku-4-5-20251001',
+      defaultModel: 'claude-sonnet-4-6',
     },
   },
   localLlm: {

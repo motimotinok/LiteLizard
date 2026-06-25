@@ -106,7 +106,7 @@ AgentsScreen は `name` / `role` / `systemPrompt` / `contextPolicy` / `model` / 
 - `.lzl` v1 には `personaMode` を新規永続化しない。読み込み時の `general-reader` は既存型を満たすための互換値であり、active Reading Agent を上書きしない。
 - active agent は現時点ではプロジェクト別にしない。作品ごとに agent を固定する仕様は将来拡張とする。
 - dry-run は保存副作用を持たない。解析履歴、世代ファイル、段落カードの `lizard` 更新を発生させない。
-- AgentsScreen の model は Settings と同じ自由入力とし、provider ごとの model 候補管理や補完は含めない。
+- AgentsScreen の model override は、既定モデルを使う選択肢、OpenAI / Anthropic の provider 候補、カスタムモデルID入力を持つ。Local LLM の候補管理は環境依存のため含めない。
 - デフォルトAgentをテンプレートとして明示追加するUIや保存方式は #145 の領域とし、この仕様では扱わない。
 - prompt caching、`prompt_cache_key`、provider別キャッシュ最適化はこの仕様では実装しない。
 

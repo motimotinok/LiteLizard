@@ -4,3 +4,4 @@ export * from './bridge.js';
 export * from './lzl/index.js';
 export * from './analysisEstimate.js';
 export * from './readingAgentDefaults.js';
+export * from './providerModelCatalog.js';

@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppStore } from '../store/useAppStore.js';
 import { AnalysisPane } from './AnalysisPane.js';
-import { SettingsScreen } from './SettingsScreen.js';
+import { AgentModelSelector } from './AgentsScreen.js';
+import { ProviderModelSelector, SettingsScreen } from './SettingsScreen.js';
 
 const baseState = useAppStore.getState();
 
@@ -66,6 +67,49 @@ describe('analysis settings route', () => {
     const html = renderToStaticMarkup(<SettingsScreen />);
 
     expect(html).toContain('ローカル LLM 設定を保存');
+  });
+
+  it('SettingsScreen で provider モデル候補とカスタム入力メニューを表示する', () => {
+    const html = renderToStaticMarkup(<SettingsScreen />);
+
+    expect(html).toContain('GPT-5.4');
+    expect(html).toContain('Claude Sonnet 4.6');
+    expect(html).toContain('カスタムモデルIDを入力');
+    expect(html).not.toContain('Claude Fable');
+  });
+
+  it('候補外の provider モデル値はカスタム入力として表示する', () => {
+    const html = renderToStaticMarkup(
+      <ProviderModelSelector
+        providerId="openai"
+        value="gpt-future-preview"
+        customPlaceholder="gpt-5.4"
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('カスタムモデルIDを入力');
+    expect(html).toContain('gpt-future-preview');
+  });
+
+  it('Reading Agent の使用モデルでも provider 候補と既定モデル選択を表示する', () => {
+    const html = renderToStaticMarkup(
+      <AgentModelSelector value="" onChange={() => undefined} />,
+    );
+
+    expect(html).toContain('既定モデルを使う');
+    expect(html).toContain('GPT-5.4');
+    expect(html).toContain('Claude Sonnet 4.6');
+    expect(html).toContain('カスタムモデルIDを入力');
+    expect(html).not.toContain('Claude Fable');
+  });
+
+  it('候補外の Reading Agent 使用モデルはカスタム入力として表示する', () => {
+    const html = renderToStaticMarkup(
+      <AgentModelSelector value="custom-agent-model" onChange={() => undefined} />,
+    );
+
+    expect(html).toContain('custom-agent-model');
   });
 
   it('SettingsScreen のエディタタブで Tweaks 保存導線を表示する', () => {

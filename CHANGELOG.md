@@ -1,3 +1,6 @@
+[2026/06/25]#113 Providerモデル候補プルダウン
+Settings の OpenAI / Anthropic 既定モデルと、AgentsScreen の個別model overrideを、自由入力だけの欄から2026-06-25時点の公式モデル候補プルダウン + カスタムモデルID入力へ変更した。候補は shared の provider別静的カタログとして持ち、OpenAI は `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` / `gpt-5.4-nano`、Anthropic は `claude-opus-4-8` / `claude-sonnet-4-6` / `claude-haiku-4-5-20251001` を表示する。現在使用不可の `claude-fable-5` は候補から除外し、限定・候補外モデルはカスタム入力で保存できる。新規既定は OpenAI `gpt-5.4`、Anthropic `claude-sonnet-4-6`。Local LLM は従来どおり自由入力のまま維持した。検証: `pnpm --filter @litelizard/shared test`、`pnpm --filter @litelizard/desktop test`、`pnpm -w lint`、`pnpm -w build` 成功。
+
 [2026/06/25]#138 Reading Agent単位のコンテキストポリシー
 分析コンテキストをグローバル設定からReading Agentの必須フィールドへ移し、AgentsScreenで参照範囲を編集できるようにした。旧Agentはバックアップ退避後に現行デフォルトへ再生成し、通常分析・再分析・dry-run・見積もりがAgentごとの参照範囲を使うようにした。
 [2026/06/23]PRレビュー指摘: legacy API DB ignoreを復旧

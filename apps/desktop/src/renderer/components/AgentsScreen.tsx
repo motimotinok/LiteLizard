@@ -3,6 +3,8 @@ import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_READING_AGENT_TEMPERATURE,
   buildNewReadingAgentPrompt,
+  getProviderModelOptions,
+  isKnownProviderModel,
   type AnalysisResult,
   type AnalysisContextPolicy,
   type ReadingAgent,
@@ -26,6 +28,9 @@ interface AgentDraft {
   contextRange: 'all' | 'lastN';
   contextLastN: string;
 }
+
+const DEFAULT_AGENT_MODEL_OPTION = '__default_agent_model__';
+const CUSTOM_AGENT_MODEL_OPTION = '__custom_agent_model__';
 
 function createNewDraft(): AgentDraft {
   const name = '新しいエージェント';
@@ -538,14 +543,11 @@ export function AgentsScreen() {
           <div className="settings-row">
             <div>
               <div className="settings-row-label">使用モデル</div>
-              <div className="settings-row-hint">空欄なら既定</div>
+              <div className="settings-row-hint">既定 provider のモデルを上書きする場合だけ選択</div>
             </div>
-            <input
-              type="text"
-              className="settings-input"
+            <AgentModelSelector
               value={draft.model}
-              placeholder="gpt-4o-mini"
-              onChange={(event) => setDraft((current) => ({ ...current, model: event.target.value }))}
+              onChange={(model) => setDraft((current) => ({ ...current, model }))}
             />
           </div>
           <div className="settings-row">
@@ -581,5 +583,74 @@ export function AgentsScreen() {
         </section>
       </div>
     </AuxShell>
+  );
+}
+
+interface AgentModelSelectorProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export function AgentModelSelector({ value, onChange }: AgentModelSelectorProps) {
+  const trimmedValue = value.trim();
+  const openAiOptions = getProviderModelOptions('openai');
+  const anthropicOptions = getProviderModelOptions('anthropic');
+  const knownProvider = isKnownProviderModel('openai', trimmedValue)
+    ? 'openai'
+    : isKnownProviderModel('anthropic', trimmedValue)
+      ? 'anthropic'
+      : null;
+  const selectedValue = !trimmedValue
+    ? DEFAULT_AGENT_MODEL_OPTION
+    : knownProvider
+      ? `${knownProvider}:${trimmedValue}`
+      : CUSTOM_AGENT_MODEL_OPTION;
+
+  return (
+    <>
+      <select
+        className="settings-select"
+        value={selectedValue}
+        onChange={(event) => {
+          const nextValue = event.target.value;
+          if (nextValue === DEFAULT_AGENT_MODEL_OPTION) {
+            onChange('');
+            return;
+          }
+          if (nextValue === CUSTOM_AGENT_MODEL_OPTION) {
+            onChange(knownProvider ? '' : value);
+            return;
+          }
+          onChange(nextValue.slice(nextValue.indexOf(':') + 1));
+        }}
+      >
+        <option value={DEFAULT_AGENT_MODEL_OPTION}>既定モデルを使う</option>
+        <optgroup label="OpenAI">
+          {openAiOptions.map((option) => (
+            <option key={option.id} value={`openai:${option.id}`}>
+              {option.label}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="Anthropic">
+          {anthropicOptions.map((option) => (
+            <option key={option.id} value={`anthropic:${option.id}`}>
+              {option.label}
+            </option>
+          ))}
+        </optgroup>
+        <option value={CUSTOM_AGENT_MODEL_OPTION}>カスタムモデルIDを入力</option>
+      </select>
+      {selectedValue === CUSTOM_AGENT_MODEL_OPTION ? (
+        <input
+          type="text"
+          className="settings-input settings-input-mono"
+          value={value}
+          placeholder="provider のモデルID"
+          onChange={(event) => onChange(event.target.value)}
+          style={{ marginTop: 8 }}
+        />
+      ) : null}
+    </>
   );
 }

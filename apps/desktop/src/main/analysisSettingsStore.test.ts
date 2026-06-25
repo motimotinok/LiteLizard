@@ -36,7 +36,7 @@ describe('mergeAnalysisSettings', () => {
     expect(merged.localLlm.endpoint).toBe(DEFAULT_ANALYSIS_SETTINGS.localLlm.endpoint);
   });
 
-  it('旧 Anthropic 既定モデルは Claude Haiku 4.5 の API ID に移行する', () => {
+  it('旧 Anthropic 既定モデルは現在の既定モデルに移行する', () => {
     const merged = mergeAnalysisSettings(
       {
         defaultProvider: 'anthropic',
@@ -55,7 +55,7 @@ describe('mergeAnalysisSettings', () => {
     expect(merged.providers.anthropic.defaultModel).toBe(DEFAULT_ANALYSIS_SETTINGS.providers.anthropic.defaultModel);
   });
 
-  it('短い Anthropic placeholder 値は Claude Haiku 4.5 の API ID に移行する', () => {
+  it('短い Anthropic placeholder 値は現在の既定モデルに移行する', () => {
     const merged = mergeAnalysisSettings(
       {
         defaultProvider: 'anthropic',

@@ -74,7 +74,7 @@ describe('createMockPreloadApi', () => {
     expect(settings.localLlm.configured).toBe(true);
   });
 
-  it('旧 Anthropic 既定モデルは mock preload でも Claude Haiku 4.5 の API ID に移行する', async () => {
+  it('旧 Anthropic 既定モデルは mock preload でも現在の既定モデルに移行する', async () => {
     const api = createMockPreloadApi();
 
     await api.saveAnalysisSettings({

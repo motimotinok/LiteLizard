@@ -13,8 +13,8 @@ const repoRoot = path.resolve(import.meta.dirname, '../../..');
 const envPath = path.join(repoRoot, '.env');
 
 const defaultModels: Record<AnalysisProviderId, string> = {
-  openai: 'gpt-4.1-nano',
-  anthropic: 'claude-haiku-4-5-20251001',
+  openai: 'gpt-5.4',
+  anthropic: 'claude-sonnet-4-6',
   'local-llm': '',
 };
 

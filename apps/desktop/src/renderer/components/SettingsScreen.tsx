@@ -2,7 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type {
   AnalysisPanelMode,
   AnalysisProviderId,
+  CloudAnalysisProviderId,
   EditorTypeface,
+} from '@litelizard/shared';
+import {
+  getProviderModelOptions,
+  isKnownProviderModel,
 } from '@litelizard/shared';
 import { useAppStore } from '../store/useAppStore.js';
 import { AuxShell } from './ui/AuxShell.js';
@@ -30,6 +35,8 @@ const PROVIDER_OPTIONS: Array<{ value: AnalysisProviderId; label: string }> = [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'local-llm', label: 'Local LLM' },
 ];
+
+const CUSTOM_MODEL_OPTION = '__custom_model__';
 
 interface SettingsScreenProps {
   initialTab?: SettingsTab['id'];
@@ -292,29 +299,27 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
                 </select>
               </Row>
               <Row label="OpenAI モデル">
-                <input
-                  type="text"
-                  className="settings-input"
+                <ProviderModelSelector
+                  providerId="openai"
                   value={settingsDraft.openaiModel}
-                  placeholder="gpt-4o-mini"
-                  onChange={(event) =>
+                  customPlaceholder="gpt-5.4"
+                  onChange={(model) =>
                     setSettingsDraft((current) => ({
                       ...current,
-                      openaiModel: event.target.value,
+                      openaiModel: model,
                     }))
                   }
                 />
               </Row>
               <Row label="Anthropic モデル">
-                <input
-                  type="text"
-                  className="settings-input"
+                <ProviderModelSelector
+                  providerId="anthropic"
                   value={settingsDraft.anthropicModel}
-                  placeholder="claude-haiku-4-5-20251001"
-                  onChange={(event) =>
+                  customPlaceholder="claude-sonnet-4-6"
+                  onChange={(model) =>
                     setSettingsDraft((current) => ({
                       ...current,
-                      anthropicModel: event.target.value,
+                      anthropicModel: model,
                     }))
                   }
                 />
@@ -631,6 +636,63 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
         )}
       </div>
     </AuxShell>
+  );
+}
+
+interface ProviderModelSelectorProps {
+  providerId: CloudAnalysisProviderId;
+  value: string;
+  customPlaceholder: string;
+  onChange: (value: string) => void;
+}
+
+export function ProviderModelSelector({
+  providerId,
+  value,
+  customPlaceholder,
+  onChange,
+}: ProviderModelSelectorProps) {
+  const options = getProviderModelOptions(providerId);
+  const trimmedValue = value.trim();
+  const selectedValue =
+    trimmedValue && isKnownProviderModel(providerId, trimmedValue)
+      ? trimmedValue
+      : CUSTOM_MODEL_OPTION;
+  const selectedOption = options.find((option) => option.id === selectedValue);
+
+  return (
+    <>
+      <select
+        className="settings-select"
+        value={selectedValue}
+        onChange={(event) => {
+          if (event.target.value === CUSTOM_MODEL_OPTION) {
+            onChange(isKnownProviderModel(providerId, trimmedValue) ? '' : value);
+            return;
+          }
+          onChange(event.target.value);
+        }}
+      >
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+        <option value={CUSTOM_MODEL_OPTION}>カスタムモデルIDを入力</option>
+      </select>
+      {selectedValue === CUSTOM_MODEL_OPTION ? (
+        <input
+          type="text"
+          className="settings-input settings-input-mono"
+          value={value}
+          placeholder={customPlaceholder}
+          onChange={(event) => onChange(event.target.value)}
+          style={{ marginTop: 8 }}
+        />
+      ) : selectedOption ? (
+        <div className="settings-row-hint">{selectedOption.description}</div>
+      ) : null}
+    </>
   );
 }
 
