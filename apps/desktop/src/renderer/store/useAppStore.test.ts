@@ -119,6 +119,11 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+function silenceConsoleError() {
+  // 修正済み: 期待失敗経路の検証済みログでテストstderrを汚さないため、対象テスト内で明示的に抑制する。
+  return vi.spyOn(console, 'error').mockImplementation(() => undefined);
+}
+
 describe('useAppStore project startup flow', () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { window: Window }).window = {} as Window;
@@ -199,6 +204,7 @@ describe('useAppStore project startup flow', () => {
   });
 
   it('restoreLastProject は復元失敗時に needs-project へフォールバックする', async () => {
+    const consoleErrorSpy = silenceConsoleError();
     const setLastOpenedFolder = vi.fn().mockResolvedValue({ ok: true });
     window.litelizard = createBridge({
       getLastOpenedFolder: vi.fn().mockResolvedValue('/projects/missing'),
@@ -206,16 +212,22 @@ describe('useAppStore project startup flow', () => {
       listTree: vi.fn().mockRejectedValue(new Error('ENOENT')),
     });
 
-    await useAppStore.getState().restoreLastProject();
+    try {
+      await useAppStore.getState().restoreLastProject();
 
-    const state = useAppStore.getState();
-    expect(state.startupState).toBe('needs-project');
-    expect(state.rootPath).toBeNull();
-    expect(state.statusMessage).toContain('復元できませんでした');
-    expect(setLastOpenedFolder).not.toHaveBeenCalled();
+      const state = useAppStore.getState();
+      expect(state.startupState).toBe('needs-project');
+      expect(state.rootPath).toBeNull();
+      expect(state.statusMessage).toContain('復元できませんでした');
+      expect(setLastOpenedFolder).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[Renderer hydrateProject] failed', expect.any(Error));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('restoreLastProject は復元失敗時に対象パスを Recent / lastOpenedFolder から除外する', async () => {
+    const consoleErrorSpy = silenceConsoleError();
     const removeRecent = vi.fn().mockResolvedValue({ ok: true });
     const refreshed = [
       { path: '/projects/other', lastOpenedAt: '2026-05-06T09:00:00.000Z', exists: true },
@@ -228,12 +240,17 @@ describe('useAppStore project startup flow', () => {
       getRecentProjects,
     });
 
-    await useAppStore.getState().restoreLastProject();
+    try {
+      await useAppStore.getState().restoreLastProject();
 
-    expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
-    expect(getRecentProjects).toHaveBeenCalled();
-    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
-    expect(useAppStore.getState().startupState).toBe('needs-project');
+      expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
+      expect(getRecentProjects).toHaveBeenCalled();
+      expect(useAppStore.getState().recentProjects).toEqual(refreshed);
+      expect(useAppStore.getState().startupState).toBe('needs-project');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[Renderer hydrateProject] failed', expect.any(Error));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('restoreLastProject は needs-project になったときに recentProjects も読み込む', async () => {
@@ -253,6 +270,7 @@ describe('useAppStore project startup flow', () => {
   });
 
   it('openRecentProject は失敗時に対象を recent から削除し再読み込みする', async () => {
+    const consoleErrorSpy = silenceConsoleError();
     const removeRecent = vi.fn().mockResolvedValue({ ok: true });
     const refreshed = [
       { path: '/projects/keep', lastOpenedAt: '2026-05-06T09:00:00.000Z', exists: true },
@@ -264,12 +282,17 @@ describe('useAppStore project startup flow', () => {
       getRecentProjects,
     });
 
-    await useAppStore.getState().openRecentProject('/projects/missing');
+    try {
+      await useAppStore.getState().openRecentProject('/projects/missing');
 
-    expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
-    expect(useAppStore.getState().recentProjects).toEqual(refreshed);
-    expect(useAppStore.getState().startupState).toBe('needs-project');
-    expect(useAppStore.getState().statusMessage).toContain('最近リストから除外');
+      expect(removeRecent).toHaveBeenCalledWith('/projects/missing');
+      expect(useAppStore.getState().recentProjects).toEqual(refreshed);
+      expect(useAppStore.getState().startupState).toBe('needs-project');
+      expect(useAppStore.getState().statusMessage).toContain('最近リストから除外');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[Renderer hydrateProject] failed', expect.any(Error));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('removeRecentProject は IPC 呼び出し後にリストを再読み込みする', async () => {
@@ -349,6 +372,7 @@ describe('useAppStore project startup flow', () => {
   });
 
   it('openFolder は不適切なフォルダ選択の理由を日本語で表示する', async () => {
+    const consoleErrorSpy = silenceConsoleError();
     window.litelizard = createBridge({
       openFolder: vi.fn().mockRejectedValue(
         new Error(
@@ -357,13 +381,18 @@ describe('useAppStore project startup flow', () => {
       ),
     });
 
-    await useAppStore.getState().openFolder();
+    try {
+      await useAppStore.getState().openFolder();
 
-    const state = useAppStore.getState();
-    expect(state.startupState).toBe('needs-project');
-    expect(state.statusMessage).toContain('LiteLizard の作業フォルダとして安全ではありません');
-    expect(state.statusMessage).toContain('macOS のシステム領域やアプリ実行に必要な領域は選べません');
-    expect(state.statusMessage).not.toContain('ダイアログの起動に失敗');
+      const state = useAppStore.getState();
+      expect(state.startupState).toBe('needs-project');
+      expect(state.statusMessage).toContain('LiteLizard の作業フォルダとして安全ではありません');
+      expect(state.statusMessage).toContain('macOS のシステム領域やアプリ実行に必要な領域は選べません');
+      expect(state.statusMessage).not.toContain('ダイアログの起動に失敗');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[Renderer openFolder] failed', expect.any(Error));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('moveEntry は開いているファイルの保存先パスとツリーを更新する', async () => {

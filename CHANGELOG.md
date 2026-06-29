@@ -1,3 +1,6 @@
+[2026/06/29]分析・推敲統合UIプロトタイプとstderr整理
+`?prototype=analysis-flow` でA/B比較用の隔離プロトタイプを追加し、期待失敗・修復・拒否経路のテストログを明示的に抑制してstderrが残らないようにした。
+
 [2026/06/25]#113 Providerモデル候補プルダウン
 Settings の OpenAI / Anthropic 既定モデルと、AgentsScreen の個別model overrideを、自由入力だけの欄から2026-06-25時点の公式モデル候補プルダウン + カスタムモデルID入力へ変更した。候補は shared の provider別静的カタログとして持ち、OpenAI は `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` / `gpt-5.4-nano`、Anthropic は `claude-opus-4-8` / `claude-sonnet-4-6` / `claude-haiku-4-5-20251001` を表示する。現在使用不可の `claude-fable-5` は候補から除外し、限定・候補外モデルはカスタム入力で保存できる。新規既定は OpenAI `gpt-5.4`、Anthropic `claude-sonnet-4-6`。Local LLM は従来どおり自由入力のまま維持した。検証: `pnpm --filter @litelizard/shared test`、`pnpm --filter @litelizard/desktop test`、`pnpm -w lint`、`pnpm -w build` 成功。
 

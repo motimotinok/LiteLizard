@@ -139,6 +139,11 @@ async function withTempProject(run: (paths: { projectRoot: string; outsidePath: 
   }
 }
 
+function silenceConsoleError() {
+  // 修正済み: 期待拒否経路の検証済みログでテストstderrを汚さないため、対象テスト内で明示的に抑制する。
+  return vi.spyOn(console, 'error').mockImplementation(() => undefined);
+}
+
 describe('registerIpcHandlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -395,19 +400,25 @@ describe('registerIpcHandlers', () => {
   });
 
   it('listTree は既存プロジェクト root でも安全でない場所を拒否する', async () => {
-    await withTempProject(async ({ projectRoot }) => {
-      vi.mocked(assertProjectLocationSafe).mockRejectedValueOnce(
-        new Error(
-          'PROJECT_LOCATION_UNSAFE: /Applications/LiteLizard は LiteLizard の作業フォルダとして安全ではありません。',
-        ),
-      );
+    const consoleErrorSpy = silenceConsoleError();
+    try {
+      await withTempProject(async ({ projectRoot }) => {
+        vi.mocked(assertProjectLocationSafe).mockRejectedValueOnce(
+          new Error(
+            'PROJECT_LOCATION_UNSAFE: /Applications/LiteLizard は LiteLizard の作業フォルダとして安全ではありません。',
+          ),
+        );
 
-      registerIpcHandlers();
+        registerIpcHandlers();
 
-      await expect(getRequiredHandler(IPC_CHANNELS.listTree)(undefined as never, projectRoot as never))
-        .rejects.toThrow(/LIST_TREE_FAILED: PROJECT_LOCATION_UNSAFE/);
-      expect(fileServiceMock.listTree).not.toHaveBeenCalled();
-    });
+        await expect(getRequiredHandler(IPC_CHANNELS.listTree)(undefined as never, projectRoot as never))
+          .rejects.toThrow(/LIST_TREE_FAILED: PROJECT_LOCATION_UNSAFE/);
+        expect(fileServiceMock.listTree).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:listTree] failed', expect.any(Error));
+      });
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('listTree は通常の既存プロジェクト root ではファイル一覧へ進む', async () => {
@@ -506,24 +517,30 @@ describe('registerIpcHandlers', () => {
   });
 
   it('rejects move when the destination file already exists', async () => {
-    await withTempProject(async ({ projectRoot }) => {
-      const sourcePath = path.join(projectRoot, 'draft.lzl');
-      const targetFolder = path.join(projectRoot, 'archive');
-      const nextPath = path.join(targetFolder, 'draft.lzl');
+    const consoleErrorSpy = silenceConsoleError();
+    try {
+      await withTempProject(async ({ projectRoot }) => {
+        const sourcePath = path.join(projectRoot, 'draft.lzl');
+        const targetFolder = path.join(projectRoot, 'archive');
+        const nextPath = path.join(targetFolder, 'draft.lzl');
 
-      await fs.mkdir(targetFolder);
-      await fs.writeFile(sourcePath, 'documentId: d_abcdefghij', 'utf8');
-      await fs.writeFile(nextPath, 'documentId: d_existing01', 'utf8');
+        await fs.mkdir(targetFolder);
+        await fs.writeFile(sourcePath, 'documentId: d_abcdefghij', 'utf8');
+        await fs.writeFile(nextPath, 'documentId: d_existing01', 'utf8');
 
-      registerIpcHandlers();
+        registerIpcHandlers();
 
-      await expect(
-        getRequiredHandler(IPC_CHANNELS.moveEntry)(undefined as never, sourcePath as never, targetFolder as never),
-      ).rejects.toThrow('MOVE_ENTRY_FAILED: Target already exists');
+        await expect(
+          getRequiredHandler(IPC_CHANNELS.moveEntry)(undefined as never, sourcePath as never, targetFolder as never),
+        ).rejects.toThrow('MOVE_ENTRY_FAILED: Target already exists');
 
-      await expect(fs.readFile(sourcePath, 'utf8')).resolves.toContain('d_abcdefghij');
-      await expect(fs.readFile(nextPath, 'utf8')).resolves.toContain('d_existing01');
-    });
+        await expect(fs.readFile(sourcePath, 'utf8')).resolves.toContain('d_abcdefghij');
+        await expect(fs.readFile(nextPath, 'utf8')).resolves.toContain('d_existing01');
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:move] failed', expect.any(Error));
+      });
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('deleting a folder removes analysis generations for documents below it', async () => {
@@ -554,6 +571,7 @@ describe('registerIpcHandlers', () => {
   });
 
   it('rejects delete, rename, move, load, and save calls outside a project before filesystem work runs', async () => {
+    const consoleErrorSpy = silenceConsoleError();
     await withTempProject(async ({ outsidePath }) => {
       const renameSpy = vi.spyOn(fs, 'rename');
       const rmSpy = vi.spyOn(fs, 'rm');
@@ -582,27 +600,38 @@ describe('registerIpcHandlers', () => {
         expect(renameSpy).not.toHaveBeenCalled();
         expect(fileServiceMock.load).not.toHaveBeenCalled();
         expect(fileServiceMock.save).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:delete] failed', expect.any(Error));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:rename] failed', expect.any(Error));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:move] failed', expect.any(Error));
       } finally {
         renameSpy.mockRestore();
         rmSpy.mockRestore();
+        consoleErrorSpy.mockRestore();
       }
     });
   });
 
   it('rejects create and import calls when the parent path is not inside a project', async () => {
-    await withTempProject(async ({ outsidePath }) => {
-      registerIpcHandlers();
+    const consoleErrorSpy = silenceConsoleError();
+    try {
+      await withTempProject(async ({ outsidePath }) => {
+        registerIpcHandlers();
 
-      await expect(getRequiredHandler(IPC_CHANNELS.createEntry)(undefined as never, outsidePath as never, 'file' as never, 'draft' as never))
-        .rejects.toThrow('CREATE_ENTRY_FAILED: Project root was not found');
-      await expect(getRequiredHandler(IPC_CHANNELS.createDocument)(undefined as never, outsidePath as never, 'draft' as never))
-        .rejects.toThrow('Project root was not found');
-      await expect(getRequiredHandler(IPC_CHANNELS.importTextFile)(undefined as never, outsidePath as never))
-        .rejects.toThrow('IMPORT_TEXT_FAILED: Project root was not found');
+        await expect(getRequiredHandler(IPC_CHANNELS.createEntry)(undefined as never, outsidePath as never, 'file' as never, 'draft' as never))
+          .rejects.toThrow('CREATE_ENTRY_FAILED: Project root was not found');
+        await expect(getRequiredHandler(IPC_CHANNELS.createDocument)(undefined as never, outsidePath as never, 'draft' as never))
+          .rejects.toThrow('Project root was not found');
+        await expect(getRequiredHandler(IPC_CHANNELS.importTextFile)(undefined as never, outsidePath as never))
+          .rejects.toThrow('IMPORT_TEXT_FAILED: Project root was not found');
 
-      expect(fileServiceMock.createDocument).not.toHaveBeenCalled();
-      expect(electronMock.showOpenDialog).not.toHaveBeenCalled();
-    });
+        expect(fileServiceMock.createDocument).not.toHaveBeenCalled();
+        expect(electronMock.showOpenDialog).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC fs:create] failed', expect.any(Error));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC doc:importText] failed', expect.any(Error));
+      });
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('rejects project-local symlinks that resolve outside the project', async () => {
@@ -620,28 +649,36 @@ describe('registerIpcHandlers', () => {
   });
 
   it('rejects analysis IPC calls with an invalid project root or generated filename ids', async () => {
-    await withTempProject(async ({ projectRoot, outsidePath }) => {
-      registerIpcHandlers();
+    const consoleErrorSpy = silenceConsoleError();
+    try {
+      await withTempProject(async ({ projectRoot, outsidePath }) => {
+        registerIpcHandlers();
 
-      await expect(getRequiredHandler(IPC_CHANNELS.loadAnalysis)(undefined as never, outsidePath as never, 'd_abcdefghij' as never))
-        .rejects.toThrow('LOAD_ANALYSIS_FAILED: Project root is invalid');
-      await expect(getRequiredHandler(IPC_CHANNELS.loadAnalysis)(undefined as never, projectRoot as never, '../escape' as never))
-        .rejects.toThrow('LOAD_ANALYSIS_FAILED: Invalid documentId');
-      await expect(
-        getRequiredHandler(IPC_CHANNELS.saveAnalysisResult)(
-          undefined as never,
-          projectRoot as never,
-          'd_abcdefghij' as never,
-          '../escape' as never,
-          {} as never,
-        ),
-      ).rejects.toThrow('SAVE_ANALYSIS_FAILED: Invalid paragraphId');
-      await expect(getRequiredHandler(IPC_CHANNELS.createAnalysisGeneration)(undefined as never, projectRoot as never, '../escape' as never))
-        .rejects.toThrow('CREATE_GENERATION_FAILED: Invalid documentId');
+        await expect(getRequiredHandler(IPC_CHANNELS.loadAnalysis)(undefined as never, outsidePath as never, 'd_abcdefghij' as never))
+          .rejects.toThrow('LOAD_ANALYSIS_FAILED: Project root is invalid');
+        await expect(getRequiredHandler(IPC_CHANNELS.loadAnalysis)(undefined as never, projectRoot as never, '../escape' as never))
+          .rejects.toThrow('LOAD_ANALYSIS_FAILED: Invalid documentId');
+        await expect(
+          getRequiredHandler(IPC_CHANNELS.saveAnalysisResult)(
+            undefined as never,
+            projectRoot as never,
+            'd_abcdefghij' as never,
+            '../escape' as never,
+            {} as never,
+          ),
+        ).rejects.toThrow('SAVE_ANALYSIS_FAILED: Invalid paragraphId');
+        await expect(getRequiredHandler(IPC_CHANNELS.createAnalysisGeneration)(undefined as never, projectRoot as never, '../escape' as never))
+          .rejects.toThrow('CREATE_GENERATION_FAILED: Invalid documentId');
 
-      expect(analysisStoreMock.loadLatestAnalysis).not.toHaveBeenCalled();
-      expect(analysisStoreMock.appendParagraphPattern).not.toHaveBeenCalled();
-      expect(analysisStoreMock.createGeneration).not.toHaveBeenCalled();
-    });
+        expect(analysisStoreMock.loadLatestAnalysis).not.toHaveBeenCalled();
+        expect(analysisStoreMock.appendParagraphPattern).not.toHaveBeenCalled();
+        expect(analysisStoreMock.createGeneration).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC analysis:load] failed', expect.any(Error));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC analysis:save] failed', expect.any(Error));
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[IPC analysis:newGeneration] failed', expect.any(Error));
+      });
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
