@@ -18,6 +18,30 @@
 
 ---
 
+## [2026-07-01] 一文ごとの超ミクロ分析は現行公開版では実装しない (#118)
+
+- **決定**: LiteLizard は現行公開版では段落内の一文を `sentence` スコープとして AI 分析対象にする機能を実装しない。段落分析、今回だけの追加指示、段落ごとの追加質問を現行の掘り下げ手段として維持する
+- **理由**: 一文分析は文分割、文と結果の対応、句点が少ない文章や会話文の扱い、段落編集後の sentence index / fingerprint 再対応、履歴保存、UI状態を新たに設計する必要がある。保守停止前提では、段落 keyed の安定した分析経路を優先する
+- **仕様**: [`docs/specs/analysis-scope-boundaries.md`](specs/analysis-scope-boundaries.md)
+- **却下した案**:
+  - 句点分割だけで sentence スコープを保存する: 会話文、改行、三点リーダ、句点なし文で対応が不安定になりやすい
+  - 一文結果を段落履歴の中へ混ぜる: 段落全体の結果と文ごとの結果が同じ履歴単位に混在する
+  - UIだけ先に作る: 保存、stale判定、再起動復元が伴わず分析履歴として信用できない
+
+---
+
+## [2026-07-01] 文書全体スコープAI分析は現行公開版では実装しない (#134)
+
+- **決定**: LiteLizard は現行公開版では文書全体を `document` スコープとして AI 分析対象にする機能を実装しない。段落分析の対象本文と、Reading Agent の `whole-document` contextPolicy による全文参照を現行の全体文脈の扱いとして維持する
+- **理由**: 文書全体分析は保存先の追加だけでなく、provider 上限、長文分割/要約、全文 fingerprint、本文変更後の要再分析判定、段落/章結果と混同しない表示が必要になる。現行の段落単位履歴を維持する方が、公開版としての互換性と説明可能性が高い
+- **仕様**: [`docs/specs/analysis-scope-boundaries.md`](specs/analysis-scope-boundaries.md), [`docs/specs/analysis-api.md`](specs/analysis-api.md)
+- **却下した案**:
+  - 全文をそのまま1回で provider に送る: 長文で上限超過しやすく、失敗時の再実行単位も大きすぎる
+  - 段落分析の全結果を文書全体結果として扱う: `document` スコープの単一結果と段落別結果の意味が混同される
+  - #134 単体で document 専用保存欄を足す: 将来の `chapter` / `sentence` スコープと一貫しない
+
+---
+
 ## [2026-07-01] Gemini provider は現行公開版では追加しない (#94)
 
 - **決定**: LiteLizard の現行公開版でサポートする分析 provider は OpenAI、Anthropic、Local LLM（Ollama 互換 endpoint）の3系統に限定し、Gemini provider は追加しない
