@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="LiteLizard - 小説やエッセイを、想定読者や編集者の視点から段落ごとに観測し、書きたかった表現へ近づくためのmacOS執筆環境"
+    />
+    <meta name="theme-color" content="#f4efe5" />
+    <link rel="canonical" href="https://motimotinok.github.io/LiteLizard/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="LiteLizard" />
+    <meta
+      property="og:title"
+      content="LiteLizard — 読者の視点から、書きたかったものへ近づく"
+    />
+    <meta
+      property="og:description"
+      content="小説やエッセイを、想定読者や編集者の視点から段落ごとに観測するmacOS執筆環境。"
+    />
+    <meta property="og:url" content="https://motimotinok.github.io/LiteLizard/" />
+    <meta
+      property="og:image"
+      content="https://motimotinok.github.io/LiteLizard/og-lite-lizard.jpg"
+    />
+    <meta
+      property="og:image:secure_url"
+      content="https://motimotinok.github.io/LiteLizard/og-lite-lizard.jpg"
+    />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="LiteLizard。読者の視点から、書きたかったものへ近づく。"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="LiteLizard — 読者の視点から、書きたかったものへ近づく"
+    />
+    <meta
+      name="twitter:description"
+      content="小説やエッセイを、想定読者や編集者の視点から段落ごとに観測するmacOS執筆環境。"
+    />
+    <meta
+      name="twitter:image"
+      content="https://motimotinok.github.io/LiteLizard/og-lite-lizard.jpg"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="LiteLizard。読者の視点から、書きたかったものへ近づく。"
+    />
+    <title>LiteLizard — 読者の視点から、書きたかったものへ近づく</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="wordmark" href="#top" aria-label="LiteLizard トップ">LiteLizard</a>
+      <nav aria-label="ページ内ナビゲーション">
+        <a href="#features">特徴</a>
+        <a href="#use-cases">利用例</a>
+        <a href="#how-to-use">使い方</a>
+        <a href="https://github.com/motimotinok/LiteLizard/blob/main/articles/getting-started.md">初回ガイド</a>
+        <a href="#faq">Q&amp;A</a>
+      </nav>
+      <a
+        class="header-download"
+        href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+      >
+        ダウンロード
+      </a>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow hero-status">macOS向け MVP / β版</p>
+          <h1 id="hero-title">LiteLizard</h1>
+          <p class="hero-lead">
+            書きたかったものへ、<br />
+            読者の視点から近づいていく。
+          </p>
+          <p class="hero-description">
+            小説やエッセイを、想定読者や編集者の視点から段落ごとに観測し、意図と伝わり方のずれを確かめながら書くためのデスクトップ執筆環境です。
+          </p>
+          <a
+            class="hero-download-button"
+            href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+          >
+            macOS版MVPをダウンロード
+            <span aria-hidden="true">↓</span>
+          </a>
+          <div class="hero-requirements" aria-label="動作条件">
+            <span>Apple Silicon Mac向け</span>
+            <span>macOS Tahoe 26.5.1で確認済み</span>
+            <span>未署名のMVP / β版</span>
+          </div>
+        </div>
+
+        <div class="product-preview" aria-label="本文と複数の読み手による分析を並べた画面イメージ">
+          <div class="preview-manuscript">
+            <p class="preview-label">Manuscript</p>
+            <button
+              class="manuscript-passage is-active"
+              type="button"
+              data-preview-index="0"
+              aria-label="1つ目の段落と対応する読みを表示"
+              aria-pressed="true"
+            >
+              彼女は返事の代わりに、冷めたカップへ指を添えた。
+            </button>
+            <button
+              class="manuscript-passage"
+              type="button"
+              data-preview-index="1"
+              aria-label="2つ目の段落と対応する読みを表示"
+              aria-pressed="false"
+            >
+              窓の外では、雨がまだ降り始める場所を探していた。言葉にしなかった返事だけが、二人のあいだに残っている。
+            </button>
+            <button
+              class="manuscript-passage"
+              type="button"
+              data-preview-index="2"
+              aria-label="3つ目の段落と対応する読みを表示"
+              aria-pressed="false"
+            >
+              彼はしばらく待ってから、空いた椅子へ視線を戻した。
+            </button>
+          </div>
+
+          <div class="preview-readings">
+            <p class="preview-label">Readings</p>
+            <button
+              class="reading-result is-active"
+              type="button"
+              data-preview-index="0"
+              aria-label="初めて読む人の読みを選択"
+              aria-pressed="true"
+            >
+              <span class="reader-name">初めて読む人</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>返事の保留</span>
+                <span>別れの予感</span>
+                <span>次の一言</span>
+              </span>
+              <span class="reading-description">
+                彼女は返事を避けているように見えます。このあと別れを告げるのか、彼が沈黙を破るのかが気になります。
+              </span>
+            </button>
+            <button
+              class="reading-result"
+              type="button"
+              data-preview-index="1"
+              aria-label="物語を読む人の読みを選択"
+              aria-pressed="false"
+            >
+              <span class="reader-name">物語を読む人</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>前場面との接続</span>
+                <span>雨のモチーフ</span>
+                <span>関係の停滞</span>
+              </span>
+              <span class="reading-description">
+                前の場面から繰り返される「待つ」という感覚と雨がつながり、言葉にできない関係が作品の核として浮かびます。
+              </span>
+            </button>
+            <button
+              class="reading-result"
+              type="button"
+              data-preview-index="2"
+              aria-label="編集者の視点を選択"
+              aria-pressed="false"
+            >
+              <span class="reader-name">編集者の視点</span>
+              <span class="reading-tags" aria-label="読みのキーワード">
+                <span>情報不足</span>
+                <span>転換の弱さ</span>
+                <span>伏線の配置</span>
+              </span>
+              <span class="reading-description">
+                空いた椅子の意味が前段で準備されておらず、視線の転換が弱く見えます。椅子に結びつく情報を先に一つ置くと構造が締まります。
+              </span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section features" aria-labelledby="features-title">
+        <div class="section-intro">
+          <p class="eyebrow">Features</p>
+          <h2 id="features-title">答えではなく、<br />判断するための材料を。</h2>
+          <p>
+            チャットで文章全体を評価してもらうと、返答が大きすぎたり、褒めすぎたり、問題点が増えすぎたりすることがあります。LiteLizardは、書く場所を離れずに、必要な粒度と視点で読みを確かめます。
+          </p>
+        </div>
+
+        <div class="feature-list">
+          <article>
+            <p class="feature-number">01</p>
+            <h3>段落ごとに観測する</h3>
+            <p>
+              文章全体への大まかな評価ではなく、感情、テーマ、解釈、引っかかりを本文の横で段落単位に確認できます。
+            </p>
+          </article>
+          <article>
+            <p class="feature-number">02</p>
+            <h3>読む視点を切り替える</h3>
+            <p>
+              想定読者、編集者、批判的な読者。Reading Agentを作り、同じ文章を異なる視点から読み直せます。
+            </p>
+          </article>
+          <article>
+            <p class="feature-number">03</p>
+            <h3>書く主導権を渡さない</h3>
+            <p>
+              AIの読みは最終評価ではありません。直すか、意図を残すかを決めるのは、いつでも書き手です。
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="use-cases" class="section use-cases" aria-labelledby="use-cases-title">
+        <div class="use-cases-heading">
+          <p class="eyebrow">Use cases</p>
+          <h2 id="use-cases-title">読み手を変えると、<br />見えてくるものが変わる。</h2>
+          <p>
+            自分の文章を別の視点から読み直すことで、意図と伝わり方のずれを見つけ、書きたかった表現へ近づけます。
+          </p>
+        </div>
+
+        <div class="use-case-details">
+          <div class="use-case-list">
+            <article>
+              <p class="use-case-label">Reader</p>
+              <h3>届けたい読者として読む</h3>
+              <p>
+                年齢、経験、関心、作品への距離感など、想定する読者像をReading Agentに設定します。
+              </p>
+              <ul>
+                <li>どこで引っかかるか</li>
+                <li>どこが響かず、読み飛ばされそうか</li>
+                <li>どのような感情の動きが生まれるか</li>
+              </ul>
+            </article>
+            <article>
+              <p class="use-case-label">Editor</p>
+              <h3>編集者として読む</h3>
+              <p>
+                表現と構成を点検する役割を設定し、段落ごとの推敲材料を受け取ります。
+              </p>
+              <ul>
+                <li>表現の粗さや説明の重複</li>
+                <li>情緒や構成上、足りていない情報</li>
+                <li>意図はあるのに書き切れていない部分</li>
+              </ul>
+            </article>
+          </div>
+          <p class="use-case-note">
+            どちらの結果も正解ではなく、推敲するか、意図を残すかを自分で決めるための仮説です。
+          </p>
+        </div>
+      </section>
+
+      <section id="how-to-use" class="section how-to-use" aria-labelledby="how-to-use-title">
+        <div class="section-heading">
+          <p class="eyebrow">How to use</p>
+          <h2 id="how-to-use-title">書く。読ませる。<br />自分で決める。</h2>
+        </div>
+
+        <ol class="steps">
+          <li>
+            <span class="step-number">1</span>
+            <div>
+              <h3>小説やエッセイを書く</h3>
+              <p>静かなエディターで段落ごとに書きます。原稿は選択したローカルフォルダへ自動保存されます。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">2</span>
+            <div>
+              <h3>読み手を作る・選ぶ</h3>
+              <p>想定読者や編集者の人物像、役割、読み方をReading Agentとして設定します。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-number">3</span>
+            <div>
+              <h3>段落を読ませて判断する</h3>
+              <p>確認したい段落の読みと自分の意図を比較し、修正するか、そのまま残すかを決めます。</p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section id="get-started" class="section get-started" aria-labelledby="get-started-title">
+        <div class="get-started-heading">
+          <p class="eyebrow">Available now</p>
+          <h2 id="get-started-title">macOS版MVP</h2>
+          <a
+            class="download-link"
+            href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+          >
+            DMGをダウンロード
+            <span aria-hidden="true">↓</span>
+          </a>
+        </div>
+
+        <div class="availability-details">
+          <div class="available-features">
+            <h3>現在できること</h3>
+            <ul>
+              <li>ローカルフォルダでの執筆と自動保存</li>
+              <li>Reading Agentの作成と選択</li>
+              <li>OpenAI、Anthropic、Local LLMによる段落分析</li>
+            </ul>
+          </div>
+
+          <div class="install-guide">
+            <h3>3ステップでインストール</h3>
+            <ol>
+              <li><span>1</span>ダウンロードしたDMGを開く</li>
+              <li><span>2</span>LiteLizard.appをApplicationsへ移動</li>
+              <li><span>3</span>Applicationsで右クリックまたはControlクリックし、「開く」を選ぶ</li>
+            </ol>
+            <p>
+              現在は未署名アプリのため、初回起動時にmacOSのGatekeeper警告が表示される場合があります。
+              インストール後の最初の段落分析までの流れは
+              <a href="https://github.com/motimotinok/LiteLizard/blob/main/articles/getting-started.md">初回ガイド</a>
+              にまとめています。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="privacy" class="section trust" aria-labelledby="trust-title">
+        <div class="trust-heading">
+          <p class="eyebrow">Local first</p>
+          <h2 id="trust-title">原稿を手元に置いたまま、<br />必要なときだけ分析。</h2>
+        </div>
+
+        <div class="trust-list">
+          <article>
+            <p class="trust-number">01</p>
+            <h3>原稿と結果はローカルへ</h3>
+            <p>原稿と分析結果は、選択したプロジェクトフォルダ内へ保存されます。</p>
+          </article>
+          <article>
+            <p class="trust-number">02</p>
+            <h3>分析時だけ送信</h3>
+            <p>
+              対象段落、設定した範囲の前文脈、Reading Agentの設定を、選択したプロバイダーへ分析時だけ送信します。
+            </p>
+          </article>
+          <article>
+            <p class="trust-number">03</p>
+            <h3>自分の接続先を選べる</h3>
+            <p>
+              OpenAI・Anthropicは自分のAPIキーを使うBYOK方式です。Ollama等のlocalhost endpointを指定すれば、外部AIプロバイダーへ本文を送らずに分析できます。
+            </p>
+          </article>
+          <p class="trust-detail">
+            APIキーはMac内に保存され、利用可能な環境ではOSの保護機能で暗号化されます。保存と送信の詳細は
+            <a href="https://github.com/motimotinok/LiteLizard/blob/main/PRIVACY.md">Privacy</a>
+            を確認してください。
+          </p>
+        </div>
+      </section>
+
+      <section id="story" class="section story" aria-labelledby="story-title">
+        <div class="story-statement">
+          <p class="eyebrow">Why I built it</p>
+          <h2 id="story-title">書く場所と、<br />見直す場所を、<br />ひとつにしたかった。</h2>
+        </div>
+        <div class="story-copy">
+          <p>
+            小説やエッセイを書いていると、自分では意図して書いたつもりでも、「読者にはどう見えるんだろう」と分からなくなる瞬間があります。
+          </p>
+          <p>
+            フィードバックがほしいたびに文章をコピーし、チャットへ貼り、返答を読んで、また執筆画面へ戻る。その往復は書くリズムを壊し、段落ごとの流れを見失わせます。
+          </p>
+          <p>
+            複数の読みを正解として受け取るのではなく、自分の意図と照らし合わせ、書きたかったものへ近づくために。自分の文章に眠っている魅力を、別の視点から見つけてみませんか。
+          </p>
+        </div>
+      </section>
+
+      <section id="faq" class="section faq" aria-labelledby="faq-title">
+        <div class="faq-heading">
+          <p class="eyebrow">Q&amp;A</p>
+          <h2 id="faq-title">試す前に、<br />知っておきたいこと。</h2>
+        </div>
+
+        <div class="faq-list">
+          <details>
+            <summary>どんな文章に向いていますか？</summary>
+            <p>
+              小説やエッセイなど、表現したいものがあり、読者にどう届くかを確かめながら推敲したい文章を主な対象にしています。技術記事やあらゆる長文に最適化済みという意味ではありません。
+            </p>
+          </details>
+          <details>
+            <summary>ChatGPTへ文章を貼るのと何が違いますか？</summary>
+            <p>
+              執筆画面を離れず、本文と読みを段落単位で並べて確認できます。想定読者や編集者などのReading Agentを切り替え、必要な箇所だけを繰り返し読み直せる点が中心です。
+            </p>
+          </details>
+          <details>
+            <summary>AIの分析は正しいのですか？</summary>
+            <p>
+              正解や作品の品質保証ではありません。設定した読み手ならどう受け取りそうかという仮説として、書き手が修正するか、意図を残すかを判断する材料に使います。
+            </p>
+          </details>
+          <details>
+            <summary>原稿やAPIキーはどこへ保存されますか？ Local LLMも使えますか？</summary>
+            <p>
+              原稿と分析結果はプロジェクトフォルダへ、設定とAPIキーはMac内へ保存されます。APIキーは利用可能な環境ではOSの保護機能で暗号化されますが、利用できない環境では平文保存へフォールバックします。Ollama等のLocal LLM endpointも指定できます。
+            </p>
+          </details>
+          <details>
+            <summary>どのMacで使えますか？ なぜ起動時に警告が出ますか？</summary>
+            <p>
+              配布対象はApple Silicon Macです。現在の実機確認環境はmacOS Tahoe 26.5.1のみで、その他のバージョンは未検証です。MVP版はDeveloper ID署名とnotarizationを行っていないため、初回起動時にGatekeeper警告が表示される場合があります。
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section id="download" class="download-section" aria-labelledby="download-title">
+        <p class="eyebrow">Download</p>
+        <h2 id="download-title">書きたかったものへ、<br />もう一歩近づく。</h2>
+        <a
+          class="download-button"
+          href="https://github.com/motimotinok/LiteLizard/releases/download/mvp-latest/LiteLizard-latest-arm64.dmg"
+        >
+          LiteLizard for macOS
+          <span aria-hidden="true">↓</span>
+        </a>
+        <div class="requirements">
+          <p>Apple Silicon Mac（arm64）向け</p>
+          <p>macOS Tahoe 26.5.1で動作確認済み</p>
+          <p>未署名のMVP / β版です</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>LiteLizard</p>
+      <div>
+        <a href="https://github.com/motimotinok/LiteLizard">GitHub</a>
+        <a href="https://github.com/motimotinok/LiteLizard/blob/main/PRIVACY.md">Privacy</a>
+      </div>
+    </footer>
+  </body>
+</html>

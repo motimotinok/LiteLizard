@@ -6,8 +6,8 @@ const now = '2026-02-21T00:00:00.000Z';
 
 export const initialMockTree: FileNode[] = [
   {
-    path: `${mockRootPath}/welcome.md`,
-    name: 'welcome.md',
+    path: `${mockRootPath}/pakira.md`,
+    name: 'pakira.md',
     type: 'file',
   },
   {
@@ -16,8 +16,8 @@ export const initialMockTree: FileNode[] = [
     type: 'directory',
     children: [
       {
-        path: `${mockRootPath}/notes/ideas.md`,
-        name: 'ideas.md',
+        path: `${mockRootPath}/notes/memo.md`,
+        name: 'memo.md',
         type: 'file',
       },
     ],
@@ -25,84 +25,287 @@ export const initialMockTree: FileNode[] = [
 ];
 
 export const initialMockDocuments: Record<string, LiteLizardDocument> = {
-  [`${mockRootPath}/welcome.md`]: {
+  [`${mockRootPath}/pakira.md`]: {
     version: 2,
-    documentId: 'doc_mock_welcome',
-    title: 'welcome',
+    documentId: 'doc_mock_pakira',
+    title: 'pakira',
     personaMode: 'general-reader',
     createdAt: now,
     updatedAt: now,
     source: {
       format: 'litelizard-json',
-      originPath: `${mockRootPath}/welcome.md`,
+      originPath: `${mockRootPath}/pakira.md`,
     },
     chapters: [
       {
-        id: 'c_welcome1',
+        id: 'c_p1',
         order: 1,
-        title: '章1',
+        title: '緑の衝動',
+      },
+      {
+        id: 'c_p2',
+        order: 2,
+        title: '愛情という名の過剰',
+      },
+      {
+        id: 'c_p3',
+        order: 3,
+        title: '解体と再生',
+      },
+    ],
+    paragraphs: [
+      // ── 章1: 緑の衝動 ──
+      {
+        id: 'p_p01',
+        chapterId: 'c_p1',
+        order: 1,
+        light: {
+          text: '朝、ベランダに出ると、パキラの葉がいくつか床に散らばっていた。前の晩に水をやって、室外機の上に置いたままにしていた。夏の盛りで、夜も気温が下がらない頃だった。緑だった葉が半透明に近い黄色になり、乾燥した紙みたいにくたびれていた。',
+          charCount: 101,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['不安', '焦り'],
+          theme: ['喪失', '予兆'],
+          deepMeaning: 'うまくいかなかった話だとわかる。夏の夜の気温、半透明になった葉——それだけの描写なのに、胸のあたりに静かなざわつきがある。冒頭でほぼ結末を示唆しているのに、読む気を失わないのが不思議だった。おそらくこれは、「何が起きたか」ではなく「どんな経緯だったのか」を知りたいという欲求に、読者を自然と切り替えさせているから。感情を直接書かずに温度と色で表現しているため、読者が自分の感覚で補完する余地が生まれている。感傷的になりすぎない節制が、かえって感情を呼び起こす。この冒頭の設計として、書き手が意図したかどうかはわからないが、読者を物語に縛り付ける力は確かにある。',
+          confidence: 0.86,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p01',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p02',
+        chapterId: 'c_p1',
+        order: 2,
+        light: {
+          text: '買ったのは大学に入る直前のことで、近所の百均に三店舗入っているコンプレックスビルの植物コーナーで見つけた。パキラ、三百円。育てやすいとネットで読んで選んだ。なぜ育てようと思ったかは今でも曖昧で、孤独だけでも手持ち無沙汰だけでもなかった気がする。ただ、長年育てれば自分の背丈を追い越すと書いてあって、暗い部屋の中に背の高い植物が立っている光景を想像して、なんとなく胸が弾んだ。',
+          charCount: 165,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['期待', '孤独'],
+          theme: ['始まり', '衝動'],
+          deepMeaning: '「なんとなく胸が弾んだ」という一文が、妙に正直で好きだった。理由なんて後からでいい、という軽さ。百均で三百円のパキラを選ぶ場面なのに、その想像の真剣さが少し羨ましかった。「孤独だけでも手持ち無沙汰だけでもなかった」という言い方も引っかかる。断定を避けながら、でも自分の動機に誠実に向き合おうとしている。読み手はここで、語り手のことを信頼し始める。動機が曖昧なまま始まる物語は破綻しやすいが、この段落では「曖昧さに正直であること」自体が誠実さの証明になっていて、それが全編への信頼感の土台を作っている。',
+          confidence: 0.88,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p02',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p03',
+        chapterId: 'c_p1',
+        order: 3,
+        light: {
+          text: '思えば最初に欲しいと思ったのは、高校の頃に担任の先生の部屋で見た巨大なウンベラータのせいかもしれない。天井に届くほどの高さで、教卓の横に鎮座していて、授業中ずっとそれが目に入った。先生に育て方を聞いたことがある。「水と光だけでいい」と言われた。それを信じすぎた。',
+          charCount: 119,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['期待', '孤独'],
+          theme: ['憧れ', '原点'],
+          deepMeaning: '「それを信じすぎた」という一文で、いったん止まった。信じた側に非があるわけではないのに、なぜか苦しい。似たような経験が、自分にもあった気がする。この段落は回想として機能しながら、同時に「なぜパキラを欲しいと思ったのか」という謎の答えを静かに提示している。先生の言葉を「信じすぎた」という反省が最後の一文に置かれることで、読者はこれから起きる失敗をすでに予感させられている。短い段落なのに、物語全体を貫く「信じることの危うさ」というテーマを先回りして設置している。書き手がこれを意図していたとしたら、かなり計算された配置だ。',
+          confidence: 0.83,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p03',
+          analyzedAt: now,
+        },
+      },
+      // ── 章2: 愛情という名の過剰 ──
+      {
+        id: 'p_p04',
+        chapterId: 'c_p2',
+        order: 4,
+        light: {
+          text: '育て始めたのは七月で、窓から差し込む日差しが滝のように強く降り注いでいた。毎朝水をたっぷり注いで、日当たりの良い窓際に置いて、カーテンを全開にした。天気の特に良い日はベランダの室外機の上に出して、夕方には土が完全に乾くようにした。熱心に植物を育てる人間がいるだろうかと、ひそかにほくそ笑んでいた。',
+          charCount: 142,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['集中', '期待'],
+          theme: ['過信', '熱量'],
+          deepMeaning: '「ひそかにほくそ笑んでいた」という一文が引っかかる。この自信が少し痛くて、止めてあげたくなるが、もちろんそれはできない。誠実さと無知が、外からは区別できないことの苦さがある。行動描写も精密で、「毎朝」「たっぷり」「全開」「完全に」という言葉が積み重なるほど、熱心さが過剰さに近づいていく感覚が読者に伝わってくる。語り手は善意を疑っていないのに、読者だけがそれを心配している。この非対称が段落全体に緊張感をもたらしている。書き手がこの構造を意識していたとすれば、読者をわざと不安にさせる配置として非常に効果的に機能している。',
+          confidence: 0.81,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p04',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p05',
+        chapterId: 'c_p2',
+        order: 5,
+        light: {
+          text: 'ある日、葉の縁が鬱血したような赤みがかった黄色になっているのに気づいた。一部だけだったし、成長の過程で起きる一種の変化だろうと考えた。喉に小骨が刺さったような感覚があって、それを意識的に無視した。',
+          charCount: 87,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['焦り', '内省'],
+          theme: ['異変', '否認'],
+          deepMeaning: '「喉に小骨が刺さったような感覚」という表現が妙に正確で、少し止まった。何かがおかしいと感じながら、おかしくないと決めてしまうときの感覚——自分にも覚えがある。この段落は短いが、物語の転換点として重要な役割を担っている。「意識的に無視した」という言葉の正直さが際立つ。語り手は自分を庇っていないし、記憶を美化してもいない。この自己観察の精度が、全編を通じた文章の信頼感を支えている。「小骨」の比喩は非常に身体的で、読者の喉の奥に同じ感覚を引き起こす力がある。こういう比喩は説明しようとして出てくるものではなく、体験の記憶から直接引き出された言葉だとわかる。',
+          confidence: 0.89,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p05',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p06',
+        chapterId: 'c_p2',
+        order: 6,
+        light: {
+          text: '三枚ほどが完全に変色してから、異常だと認めざるを得なくなった。栄養不足だと判断して、丸い石ころみたいな肥料を土の表面にばら撒き、液体の栄養剤も注いだ。三日に一回は継ぎ足した。水の量を増やし、一時間おきに霧吹きで葉に水をかけた。早く元に戻るように、と祈り続けながら。',
+          charCount: 124,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['焦り', '必死'],
+          theme: ['過剰', '誤解'],
+          deepMeaning: '読んでいて、じわじわ苦しくなってくる段落。「祈り続けながら」という言葉が特に頭に残る。やるべきことを全力でやっているのに、何も報われないという感覚の重さ。語り手の行動量がここで最大になっているが、読者にはそれが逆効果だということがすでにわかっている。その情報の非対称が、独特の緊張感と哀しさを生んでいる。「肥料をばら撒き」「液体の栄養剤も注いだ」「三日に一回は継ぎ足した」という行動の列挙は、説明なしに焦りの感触を伝えてくる。こうした具体的な行動の積み重ねが感情の代わりをしていて、感情語を一切使わずに読者を追い詰める書き方になっている。',
+          confidence: 0.87,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p06',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p07',
+        chapterId: 'c_p2',
+        order: 7,
+        light: {
+          text: '葉の大多数が変色した頃、最初に黄色くなった葉が床に落ちているのを発見した。インターネットで調べると、葉焼けというのが出てきた。日照過多による葉緑素の破壊。「葉焼けした葉は二度と元には戻らない」という一文を読んで、冷たいものがせり上がった。私がやっていたことは、全部逆効果だった。',
+          charCount: 127,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['後悔', '焦り'],
+          theme: ['失敗', '誤認'],
+          deepMeaning: '「全部逆効果だった」という一文を読んで、少し息が詰まった。愛情のつもりだったことが、すべて反対方向に働いていた。この感覚、どこかで覚えがある気がして、しばらく本文から目が離せなかった。「冷たいものがせり上がった」という表現の精度も高い。発見の瞬間を外側から描写するのではなく、身体感覚として書いているため、読者もその場に立ち会ったような感覚になる。全編のなかでも感情的な密度が最も高い段落で、ここで読者が受けた衝撃が、後半の「捨てる」という決断への納得感を用意している。この段落がなければ、次の行動はただ冷たく見えてしまうはずだ。',
+          confidence: 0.91,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p07',
+          analyzedAt: now,
+        },
+      },
+      // ── 章3: 解体と再生 ──
+      {
+        id: 'p_p08',
+        chapterId: 'c_p3',
+        order: 8,
+        light: {
+          text: '捨てることにした。カーテンを閉め切って新聞紙を床に敷き、筆箱から小さなハサミを引っ張り出した。鉢植えを新聞紙の上に置き、枝にハサミを当てて力を込めた。粗末なハサミで刃が通らなかったので、強引に押したり引いたりして枝をむしり取った。断面から緑色の液体が滲み出ていた。幹は刃が立たず、浅い傷を残したまま引き抜いた。新聞紙に包んでゴミ袋に入れ、誰にも見られないように家を出て、誰にも見られないように捨てた。',
+          charCount: 182,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['罪悪感', '内省'],
+          theme: ['決断', '解体'],
+          deepMeaning: '「誰にも見られないように」という言葉が二度出てくる。正しい判断のはずなのに、後ろめたい行為として描かれている。その違和感が、読み終えてもしばらく残る。この段落の描写の密度は全編中で最も高く、ハサミが通らない、断面から緑の液体が滲む、という細部が、捨てることを「処分」ではなく「何かを終わらせる行為」として読者に体験させている。語り手が感情を直接書かないほど、読者の側に感情が積み重なっていく構造になっている。「誰にも見られないように」の反復は、他者の目を避けているというより、自分自身に見られたくないような後ろめたさを示している。その気づきが、読後もじわじわと効いてくる。',
+          confidence: 0.92,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p08',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p09',
+        chapterId: 'c_p3',
+        order: 9,
+        light: {
+          text: '部屋に戻った時、肩の荷が降りたような感覚があった。同時に、自分の立ち位置が何か変わったような気がした。それまで私は「傷つく側」にいると思っていた。けれどあの時まだ生気のあるパキラの枝をむしり取ったのは、他でもない自分だった。あれは単なる植物だったのだという理屈を何度も心に投げかけたが、一度も返事は返ってこなかった。',
+          charCount: 143,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['内省', '罪悪感'],
+          theme: ['加害', 'アイデンティティの揺らぎ'],
+          deepMeaning: '「一度も返事は返ってこなかった」という最後の一文を、しばらく眺めていた。植物には謝れない。理屈ではわかっていても、それだけが部屋のどこかに残り続けるような感じがした。この段落では、語り手の自己認識が静かに反転している。「傷つく側にいると思っていた」という告白は、多くの読者にとって馴染みのある自己像の崩れ方をしている。植物という相手を通じてそれが起きることで、その崩れ方がより静かで、より逃げ場がないものになっている。感情的な告白をしているのに抑制が効いていて、その落差が、この段落を全編の核心にしている。',
+          confidence: 0.94,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p09',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p10',
+        chapterId: 'c_p3',
+        order: 10,
+        light: {
+          text: 'あれからしばらく経って、また観葉植物を育てている。今度はミリオンバンブーにした。水差しに入れて水耕栽培で育てていて、直射日光は当てず、遮光カーテン越しの光だけ当てている。水の交換は週一回と決めた。それで十分だということを、今度はちゃんと知っている。',
+          charCount: 112,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['安心', '納得'],
+          theme: ['再生', '学習'],
+          deepMeaning: 'ここで、ようやく息ができた。「それで十分だということを、今度はちゃんと知っている」——過剰さが抜けて、静かな自信だけが残っている。この段落の語り口は、章2の焦りと対照的に落ち着いている。「水の交換は週一回と決めた」という一文の穏やかさは、以前の「一時間おきに霧吹き」という行動と並べたとき、語り手がどれほど変化したかを無言で示している。読者はここで、物語全体の緊張からようやく解放される。「直射日光は当てず」という選択の慎重さも、植物の知識ではなく、過去の失敗から蒸留された態度として読める。学んだことが行動に静かに宿っている。',
+          confidence: 0.85,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p10',
+          analyzedAt: now,
+        },
+      },
+      {
+        id: 'p_p11',
+        chapterId: 'c_p3',
+        order: 11,
+        light: {
+          text: '夏になったら、今度こそ鉢植えに植え替えてやろうと思っている。去年の経験から学んだことが役に立つかどうかは、まだわからない。ただ少なくとも今度は、葉が黄色くなっても正しい原因をすぐに調べると思う。それだけは、あのパキラが教えてくれた。',
+          charCount: 107,
+        },
+        lizard: {
+          status: 'complete',
+          emotion: ['期待', '納得'],
+          theme: ['希望', '継承'],
+          deepMeaning: '断言しないまま終わる結び方が好きだった。「役立つかどうかはまだわからない」と留保しながら、それでも前を向いている。「あのパキラが教えてくれた」という最後の一文が、静かに決まっている。この結び方は、「学んだから次はうまくいく」という楽観を意図的に避けている。「まだわからない」という誠実な留保があるからこそ、「それでも植え替えてやろう」という意志が軽くならない。全編を通じて語り手が「正直であること」を手放さなかったことが、ここで最も効いている。読者は教訓を押しつけられることなく、静かな余韻の中で物語を閉じることができる。締め方の設計として、非常に誠実だ。',
+          confidence: 0.88,
+          model: 'mock-model-v1',
+          requestId: 'req_mock_p11',
+          analyzedAt: now,
+        },
+      },
+    ],
+  },
+  [`${mockRootPath}/notes/memo.md`]: {
+    version: 2,
+    documentId: 'doc_mock_memo',
+    title: 'memo',
+    personaMode: 'general-reader',
+    createdAt: now,
+    updatedAt: now,
+    source: {
+      format: 'litelizard-json',
+      originPath: `${mockRootPath}/notes/memo.md`,
+    },
+    chapters: [
+      {
+        id: 'c_m1',
+        order: 1,
+        title: '書き直し案',
       },
     ],
     paragraphs: [
       {
-        id: 'p_welcome1',
-        chapterId: 'c_welcome1',
+        id: 'p_m01',
+        chapterId: 'c_m1',
         order: 1,
         light: {
-          text: 'LiteLizardのモック環境です。ここでUI操作を確認できます。',
-          charCount: 31,
+          text: 'パキラのエッセイ、もう少し書き直したい。買った理由をもっと具体的に。先生のウンベラータのくだりは残す。',
+          charCount: 48,
         },
         lizard: {
           status: 'stale',
         },
       },
       {
-        id: 'p_welcome2',
-        chapterId: 'c_welcome1',
+        id: 'p_m02',
+        chapterId: 'c_m1',
         order: 2,
         light: {
-          text: 'このデータはpreload内メモリに保持され、再起動で初期化されます。',
-          charCount: 34,
-        },
-        lizard: {
-          status: 'complete',
-          emotion: ['安心'],
-          theme: ['案内', '開発効率'],
-          deepMeaning: '検証を素早く回すため、制約を明示したモック運用を選択している。',
-          confidence: 0.82,
-          model: 'mock-model-v1',
-          requestId: 'req_mock_bootstrap',
-          analyzedAt: now,
-        },
-      },
-    ],
-  },
-  [`${mockRootPath}/notes/ideas.md`]: {
-    version: 2,
-    documentId: 'doc_mock_ideas',
-    title: 'ideas',
-    personaMode: 'general-reader',
-    createdAt: now,
-    updatedAt: now,
-    source: {
-      format: 'litelizard-json',
-      originPath: `${mockRootPath}/notes/ideas.md`,
-    },
-    chapters: [
-      {
-        id: 'c_ideas01',
-        order: 1,
-        title: '章1',
-      },
-    ],
-    paragraphs: [
-      {
-        id: 'p_ideas01',
-        chapterId: 'c_ideas01',
-        order: 1,
-        light: {
-          text: '次の改善案を箇条書きで追記する。',
-          charCount: 16,
+          text: '締めをどうするか。「学んだ」で終わると説教っぽくなる気がする。もう少し余韻を残せないか。',
+          charCount: 42,
         },
         lizard: {
           status: 'stale',

@@ -1,123 +1,150 @@
 import crypto from 'node:crypto';
-import OpenAI from 'openai';
-import type { AnalysisResult, AnalysisRunInput, AnalysisRunResult, PersonaMode } from '@litelizard/shared';
+import {
+  ReadingAgentInputSchema,
+  buildAnalysisDocumentTexts,
+  isKnownProviderModel,
+  type AnalysisContextPolicy,
+  type AnalysisResult,
+  type AnalysisRunInput,
+  type AnalysisRunResult,
+  type ReadingAgent,
+  type ReadingAgentDryRunInput,
+} from '@litelizard/shared';
+import { buildContextTexts } from './analysisProvider.js';
+import type { ResolvedAnalysisProvider } from './analysisProvider.js';
 
-const MODEL = process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
+function buildPromptCacheKey(input: {
+  documentId: string;
+  promptVersion: string;
+  model: string;
+  agent: ReadingAgent | ReadingAgentDryRunInput['agent'];
+  documentTexts: string[];
+  contextPolicy: AnalysisContextPolicy;
+}) {
+  const hash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify({
+      documentId: input.documentId,
+      promptVersion: input.promptVersion,
+      model: input.model,
+      agentName: input.agent.name,
+      agentRole: input.agent.role,
+      agentPrompt: input.agent.systemPrompt,
+      contextPolicy: input.contextPolicy,
+      documentTexts: input.documentTexts,
+    }))
+    .digest('hex')
+    .slice(0, 48);
 
-function normalizeArray(input: unknown): string[] {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
-  return input
-    .map((item) => String(item).trim())
-    .filter(Boolean)
-    .slice(0, 8);
+  return `llz:${hash}`;
 }
 
-function normalizeConfidence(input: unknown): number {
-  if (typeof input !== 'number' || Number.isNaN(input)) {
-    return 0;
+function resolveAgentModel(agent: ReadingAgent | ReadingAgentDryRunInput['agent'], resolvedProvider: ResolvedAnalysisProvider) {
+  const override = agent.model?.trim();
+  if (!override) {
+    return resolvedProvider.model;
   }
-  if (input < 0) {
-    return 0;
+
+  if (resolvedProvider.id === 'openai' && isKnownProviderModel('anthropic', override)) {
+    throw new Error(
+      `Reading Agent のモデル override「${override}」は Anthropic 用です。既定 provider を Anthropic に切り替えるか、OpenAI 用モデルを選択してください。`,
+    );
   }
-  if (input > 1) {
-    return 1;
+
+  if (resolvedProvider.id === 'anthropic' && isKnownProviderModel('openai', override)) {
+    throw new Error(
+      `Reading Agent のモデル override「${override}」は OpenAI 用です。既定 provider を OpenAI に切り替えるか、Anthropic 用モデルを選択してください。`,
+    );
   }
-  return input;
+
+  return override;
 }
 
-async function analyzeParagraph(
-  client: OpenAI,
-  paragraphId: string,
-  text: string,
-  promptVersion: string,
-  personaMode: PersonaMode
-): Promise<AnalysisResult> {
-  const system = `You are LiteLizard analysis model. Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1). Persona mode: ${personaMode}.`;
-  const completion = await client.responses.create({
-    model: MODEL,
-    input: [
-      { role: 'system', content: system },
-      { role: 'user', content: text },
-    ],
-    text: {
-      format: {
-        type: 'json_schema',
-        name: 'litelizard_analysis',
-        schema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
-          properties: {
-            emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-            theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-            deepMeaning: { type: 'string', maxLength: 1000 },
-            confidence: { type: 'number', minimum: 0, maximum: 1 },
-          },
-        },
-      },
-    },
-  });
+export async function runAnalysis(
+  input: AnalysisRunInput,
+  resolvedProvider: ResolvedAnalysisProvider,
+  agent: ReadingAgent,
+  onProgress?: (result: AnalysisResult) => void,
+  contextPolicy: AnalysisContextPolicy = agent.contextPolicy,
+): Promise<AnalysisRunResult> {
+  const results: AnalysisResult[] = [];
+  const model = resolveAgentModel(agent, resolvedProvider);
+  const documentTexts = buildAnalysisDocumentTexts(input.documentParagraphs);
+  const promptCacheKey =
+    resolvedProvider.id === 'openai'
+      ? buildPromptCacheKey({
+          documentId: input.documentId,
+          promptVersion: input.promptVersion,
+          model,
+          agent,
+          documentTexts,
+          contextPolicy,
+        })
+      : undefined;
 
-  const parsed = JSON.parse(completion.output_text) as {
-    emotion?: unknown;
-    theme?: unknown;
-    deepMeaning?: unknown;
-    confidence?: unknown;
-  };
+  for (const paragraph of input.paragraphs) {
+    const analyze = () =>
+      resolvedProvider.provider.analyzeParagraph({
+        paragraphId: paragraph.paragraphId,
+        text: paragraph.text,
+        agent,
+        promptVersion: input.promptVersion,
+        model,
+        contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId, contextPolicy),
+        documentTexts,
+        promptCacheKey,
+        additionalInstruction: input.additionalInstruction,
+      });
 
-  return {
-    paragraphId,
-    emotion: normalizeArray(parsed.emotion),
-    theme: normalizeArray(parsed.theme),
-    deepMeaning:
-      typeof parsed.deepMeaning === 'string' ? parsed.deepMeaning.slice(0, 1000) : 'No deep meaning provided.',
-    confidence: normalizeConfidence(parsed.confidence),
-    model: MODEL,
-    analyzedAt: new Date().toISOString(),
-    promptVersion,
-  };
-}
-
-export async function runAnalysis(input: AnalysisRunInput, apiKey: string): Promise<AnalysisRunResult> {
-  const trimmedKey = apiKey.trim();
-  if (!trimmedKey) {
-    throw new Error('API key is not configured. Open Settings and save your API key.');
-  }
-
-  const execute = async () => {
-    const client = new OpenAI({ apiKey: trimmedKey });
-    const results: AnalysisResult[] = [];
-
-    for (const paragraph of input.paragraphs) {
-      if (paragraph.text.includes('[[FAIL]]')) {
-        throw new Error('Forced failure for testing');
-      }
-      // all-or-nothing: fail the whole analysis when one paragraph fails.
-      const analyzed = await analyzeParagraph(
-        client,
-        paragraph.paragraphId,
-        paragraph.text,
-        input.promptVersion,
-        input.personaMode
-      );
-      results.push(analyzed);
+    let analyzed: AnalysisResult;
+    try {
+      analyzed = await analyze();
+    } catch {
+      // 失敗した段落だけを一度リトライする。成功済み段落は再送しない。
+      analyzed = await analyze();
     }
 
-    return {
-      requestId: `req_${crypto.randomUUID()}`,
-      documentId: input.documentId,
-      personaMode: input.personaMode,
-      promptVersion: input.promptVersion,
-      results,
-    } satisfies AnalysisRunResult;
-  };
-
-  try {
-    return await execute();
-  } catch {
-    return execute();
+    onProgress?.(analyzed);
+    results.push(analyzed);
   }
+
+  return {
+    requestId: `req_${crypto.randomUUID()}`,
+    documentId: input.documentId,
+    agentId: input.agentId,
+    personaMode: input.personaMode,
+    promptVersion: input.promptVersion,
+    results,
+  } satisfies AnalysisRunResult;
+}
+
+export async function dryRunReadingAgent(
+  input: ReadingAgentDryRunInput,
+  resolvedProvider: ResolvedAnalysisProvider,
+  contextPolicy?: AnalysisContextPolicy,
+): Promise<AnalysisResult> {
+  const agent = ReadingAgentInputSchema.parse(input.agent);
+  const resolvedContextPolicy = contextPolicy ?? agent.contextPolicy;
+  const documentTexts = buildAnalysisDocumentTexts(input.documentParagraphs);
+  const model = resolveAgentModel(agent, resolvedProvider);
+  return resolvedProvider.provider.analyzeParagraph({
+    paragraphId: input.paragraph.paragraphId,
+    text: input.paragraph.text,
+    agent,
+    promptVersion: input.promptVersion,
+    model,
+    contextTexts: buildContextTexts(input.documentParagraphs, input.paragraph.paragraphId, resolvedContextPolicy),
+    documentTexts,
+    promptCacheKey:
+      resolvedProvider.id === 'openai'
+        ? buildPromptCacheKey({
+            documentId: 'dry-run',
+            promptVersion: input.promptVersion,
+            model,
+            agent,
+            documentTexts,
+            contextPolicy: resolvedContextPolicy,
+          })
+        : undefined,
+  });
 }

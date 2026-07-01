@@ -4,6 +4,24 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "default": "./dist/schema.js"
+    },
+    "./lzl": {
+      "types": "./dist/lzl/index.d.ts",
+      "default": "./dist/lzl/index.js"
+    },
+    "./lzl/ids": {
+      "types": "./dist/lzl/ids.d.ts",
+      "default": "./dist/lzl/ids.js"
+    }
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",

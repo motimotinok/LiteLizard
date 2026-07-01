@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { Chapter, FileNode, LiteLizardAnalysisFile, LiteLizardDocument, Paragraph } from '@litelizard/shared';
+import { createChapterId, createDocumentId, createParagraphId, parseLzl, serializeLzl, validateAndRepairLzl, toLiteLizardDocument, type Chapter, type FileNode, type LiteLizardAnalysisFile, type LiteLizardDocument, type Paragraph } from '@litelizard/shared';
 import type { Dirent } from 'node:fs';
 
 interface ParsedParagraph {
@@ -12,18 +12,6 @@ interface ParsedParagraph {
 interface ParsedMarkdown {
   chapters: Chapter[];
   paragraphs: ParsedParagraph[];
-}
-
-function createDocumentId() {
-  return `doc_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function createParagraphId() {
-  return `p_${Math.random().toString(36).slice(2, 12)}`;
-}
-
-function createChapterId() {
-  return `c_${Math.random().toString(36).slice(2, 12)}`;
 }
 
 function toAnalysisPath(markdownPath: string) {
@@ -320,6 +308,71 @@ async function readAnalysisFile(markdownPath: string): Promise<LiteLizardAnalysi
   }
 }
 
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findProjectRoot(filePath: string): Promise<string | null> {
+  let current = path.dirname(filePath);
+  const root = path.parse(current).root;
+  while (current !== root) {
+    if (await pathExists(path.join(current, '.litelizard', 'config.json'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return null;
+}
+
+async function extractLzlDocumentMetadata(filePath: string): Promise<{ documentId: string; paragraphIds: string[] } | null> {
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const match = raw.match(/^documentId:\s*(\S+)/m);
+    const documentId = match?.[1];
+    if (!documentId) return null;
+    const paragraphIds = [...raw.matchAll(/^<!--:: p (p_[a-z0-9]{10}) ::-->/gm)].map((entry) => entry[1]);
+    return { documentId, paragraphIds };
+  } catch {
+    return null;
+  }
+}
+
+async function loadAnalysisParagraphIds(projectRoot: string, documentId: string): Promise<Set<string>> {
+  const analysisDir = path.join(projectRoot, '.litelizard', 'analysis');
+  let entries: string[];
+  try {
+    entries = await fs.readdir(analysisDir);
+  } catch {
+    return new Set();
+  }
+
+  const pattern = new RegExp(`^${escapeRegExp(documentId)}_\\d{3}\\.json$`);
+  const paragraphIds = new Set<string>();
+  for (const entry of entries) {
+    if (!pattern.test(entry)) continue;
+    try {
+      const raw = await fs.readFile(path.join(analysisDir, entry), 'utf8');
+      const parsed = JSON.parse(raw) as { paragraphs?: unknown };
+      if (!parsed.paragraphs || typeof parsed.paragraphs !== 'object' || Array.isArray(parsed.paragraphs)) {
+        continue;
+      }
+      Object.keys(parsed.paragraphs).forEach((paragraphId) => paragraphIds.add(paragraphId));
+    } catch {
+      // Ignore malformed analysis generations when choosing an owner.
+    }
+  }
+  return paragraphIds;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function writeDocumentFiles(markdownPath: string, rawDocument: LiteLizardDocument) {
   const document = ensureDocumentChapters(rawDocument);
   const markdown = markdownFromDocument(document);
@@ -328,6 +381,17 @@ async function writeDocumentFiles(markdownPath: string, rawDocument: LiteLizardD
 
   await fs.writeFile(markdownPath, markdown, 'utf8');
   await fs.writeFile(analysisPath, JSON.stringify(analysis, null, 2), 'utf8');
+}
+
+async function writeInitialDocument(filePath: string, rawDocument: LiteLizardDocument) {
+  const document = ensureDocumentChapters(rawDocument);
+
+  if (path.extname(filePath).toLowerCase() === '.lzl') {
+    await fs.writeFile(filePath, serializeLzl(document), 'utf8');
+    return;
+  }
+
+  await writeDocumentFiles(filePath, document);
 }
 
 async function walk(root: string, isRoot = false): Promise<FileNode[]> {
@@ -347,6 +411,7 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
     const absolutePath = path.join(root, entry.name);
 
     if (entry.isDirectory()) {
+      if (entry.name === '.litelizard') continue;
       const children = await walk(absolutePath);
       nodes.push({
         path: absolutePath,
@@ -357,7 +422,7 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
       continue;
     }
 
-    if (entry.isFile() && /\.md$/i.test(entry.name)) {
+    if (entry.isFile() && /\.(md|lzl)$/i.test(entry.name)) {
       nodes.push({
         path: absolutePath,
         name: entry.name,
@@ -376,6 +441,212 @@ async function walk(root: string, isRoot = false): Promise<FileNode[]> {
 
 export function createFileService() {
   const revisionMap = new Map<string, number>();
+  const documentOwnersByRoot = new Map<string, Map<string, string>>();
+  const documentIdsByPathByRoot = new Map<string, Map<string, string>>();
+  const seededRoots = new Set<string>();
+
+  function getDocumentOwners(root: string): Map<string, string> {
+    let owners = documentOwnersByRoot.get(root);
+    if (!owners) {
+      owners = new Map();
+      documentOwnersByRoot.set(root, owners);
+    }
+    return owners;
+  }
+
+  function getDocumentIdsByPath(root: string): Map<string, string> {
+    let idsByPath = documentIdsByPathByRoot.get(root);
+    if (!idsByPath) {
+      idsByPath = new Map();
+      documentIdsByPathByRoot.set(root, idsByPath);
+    }
+    return idsByPath;
+  }
+
+  function registerDocumentOwner(root: string, filePath: string, documentId: string) {
+    const normalizedPath = path.resolve(filePath);
+    const owners = getDocumentOwners(root);
+    const idsByPath = getDocumentIdsByPath(root);
+    const previousDocumentId = idsByPath.get(normalizedPath);
+    if (previousDocumentId && owners.get(previousDocumentId) === normalizedPath) {
+      owners.delete(previousDocumentId);
+    }
+
+    idsByPath.set(normalizedPath, documentId);
+    owners.set(documentId, normalizedPath);
+  }
+
+  async function collectLzlOwners(
+    root: string,
+    projectRoot: string,
+    analysisParagraphIdsByDocumentId: Map<string, Set<string>>,
+  ): Promise<Array<{ filePath: string; documentId: string; analysisMatchCount: number }>> {
+    let entries: Dirent[];
+    try {
+      entries = (await fs.readdir(root, { withFileTypes: true })) as Dirent[];
+    } catch {
+      return [];
+    }
+
+    const owners: Array<{ filePath: string; documentId: string; analysisMatchCount: number }> = [];
+    for (const entry of entries) {
+      const absolutePath = path.join(root, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === '.litelizard') continue;
+        const childOwners = await collectLzlOwners(absolutePath, projectRoot, analysisParagraphIdsByDocumentId);
+        owners.push(...childOwners);
+        continue;
+      }
+
+      if (!entry.isFile() || !/\.lzl$/i.test(entry.name)) continue;
+      const metadata = await extractLzlDocumentMetadata(absolutePath);
+      if (!metadata) continue;
+      let analysisParagraphIds = analysisParagraphIdsByDocumentId.get(metadata.documentId);
+      if (!analysisParagraphIds) {
+        analysisParagraphIds = await loadAnalysisParagraphIds(projectRoot, metadata.documentId);
+        analysisParagraphIdsByDocumentId.set(metadata.documentId, analysisParagraphIds);
+      }
+      const analysisMatchCount = metadata.paragraphIds.filter((paragraphId) => analysisParagraphIds.has(paragraphId)).length;
+      owners.push({
+        filePath: path.resolve(absolutePath),
+        documentId: metadata.documentId,
+        analysisMatchCount,
+      });
+    }
+    return owners;
+  }
+
+  async function seedDocumentOwners(filePath: string) {
+    const root = path.resolve(await findProjectRoot(filePath) ?? path.dirname(filePath));
+    if (seededRoots.has(root)) return root;
+
+    const owners = await collectLzlOwners(root, root, new Map());
+    owners.sort((left, right) => {
+      if (left.documentId !== right.documentId) {
+        return left.documentId.localeCompare(right.documentId);
+      }
+      if (left.analysisMatchCount !== right.analysisMatchCount) {
+        return right.analysisMatchCount - left.analysisMatchCount;
+      }
+      return left.filePath.localeCompare(right.filePath);
+    });
+
+    for (const owner of owners) {
+      const rootOwners = getDocumentOwners(root);
+      if (!rootOwners.has(owner.documentId)) {
+        registerDocumentOwner(root, owner.filePath, owner.documentId);
+      }
+    }
+    seededRoots.add(root);
+    return root;
+  }
+
+  async function ensureUniqueLzlDocumentId(filePath: string, document: LiteLizardDocument): Promise<LiteLizardDocument> {
+    const normalizedPath = path.resolve(filePath);
+    const root = await seedDocumentOwners(normalizedPath);
+    const rootOwners = getDocumentOwners(root);
+    const ownerPath = rootOwners.get(document.documentId);
+    if (!ownerPath || ownerPath === normalizedPath) {
+      registerDocumentOwner(root, normalizedPath, document.documentId);
+      return document;
+    }
+
+    if (!(await pathExists(ownerPath))) {
+      registerDocumentOwner(root, normalizedPath, document.documentId);
+      return document;
+    }
+
+    let nextDocumentId = createDocumentId();
+    while (rootOwners.has(nextDocumentId)) {
+      nextDocumentId = createDocumentId();
+    }
+
+    const repairedDocument = {
+      ...document,
+      documentId: nextDocumentId,
+      updatedAt: new Date().toISOString(),
+    };
+    await fs.writeFile(normalizedPath, serializeLzl(repairedDocument), 'utf8');
+    registerDocumentOwner(root, normalizedPath, repairedDocument.documentId);
+    console.warn(
+      `[fileService] duplicate documentId repaired: ${document.documentId} (${ownerPath}) -> ${repairedDocument.documentId} (${normalizedPath})`,
+    );
+    return repairedDocument;
+  }
+
+  async function loadMarkdown(filePath: string): Promise<LiteLizardDocument> {
+    const markdownRaw = await fs.readFile(filePath, 'utf8');
+    const parsedMarkdown = parseMarkdownStructure(markdownRaw);
+    const analysis = await readAnalysisFile(filePath);
+    const now = new Date().toISOString();
+
+    const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
+    const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
+    const chapters = (parsedMarkdown.chapters.length > 0
+      ? parsedMarkdown.chapters
+      : [{ id: defaultChapterId, order: 1, title: '章1' }]
+    )
+      .map((chapter, index) => ({
+        ...chapter,
+        title: chapter.title.trim() || `章${index + 1}`,
+        order: index + 1,
+      }));
+
+    const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
+
+    const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
+
+    const document: LiteLizardDocument = {
+      version: 2,
+      documentId: analysis?.documentId ?? createDocumentId(),
+      title: analysis?.title ?? toDocumentTitle(filePath),
+      personaMode: analysis?.personaMode ?? 'general-reader',
+      createdAt: analysis?.createdAt ?? now,
+      updatedAt: analysis?.updatedAt ?? now,
+      source: {
+        format: 'markdown-md',
+        originPath: filePath,
+      },
+      chapters: chapters.length > 0 ? chapters : [{ id: fallbackChapterId, order: 1, title: '章1' }],
+      paragraphs: paragraphs.map((paragraph, index) => ({
+        ...paragraph,
+        chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
+        order: index + 1,
+      })),
+    };
+
+    if (!revisionMap.has(filePath)) {
+      revisionMap.set(filePath, 0);
+    }
+
+    return document;
+  }
+
+  async function loadLzl(filePath: string): Promise<LiteLizardDocument> {
+    const content = await fs.readFile(filePath, 'utf8');
+    const parsed = parseLzl(content);
+    const { issues, document: repairedDoc } = validateAndRepairLzl(parsed);
+    if (issues.length > 0) {
+      console.warn('[fileService] lzl validation issues:', issues.map((i) => i.message));
+    }
+    const doc = toLiteLizardDocument(repairedDoc);
+    const result: LiteLizardDocument = {
+      ...doc,
+      source: {
+        format: 'lzl-v1',
+        originPath: filePath,
+      },
+      paragraphs: doc.paragraphs.map((paragraph, index) => ({
+        ...paragraph,
+        order: index + 1,
+      })),
+    };
+    const uniqueResult = await ensureUniqueLzlDocumentId(filePath, result);
+    if (!revisionMap.has(filePath)) {
+      revisionMap.set(filePath, 0);
+    }
+    return uniqueResult;
+  }
 
   return {
     async listTree(root: string) {
@@ -383,51 +654,14 @@ export function createFileService() {
     },
 
     async load(filePath: string): Promise<LiteLizardDocument> {
-      const markdownRaw = await fs.readFile(filePath, 'utf8');
-      const parsedMarkdown = parseMarkdownStructure(markdownRaw);
-      const analysis = await readAnalysisFile(filePath);
-      const now = new Date().toISOString();
-
-      const defaultChapterId = parsedMarkdown.chapters[0]?.id ?? createChapterId();
-      const paragraphs = toParagraphs(parsedMarkdown.paragraphs, analysis, defaultChapterId);
-      const chapters = (parsedMarkdown.chapters.length > 0
-        ? parsedMarkdown.chapters
-        : [{ id: defaultChapterId, order: 1, title: '章1' }]
-      )
-        .map((chapter, index) => ({
-          ...chapter,
-          title: chapter.title.trim() || `章${index + 1}`,
-          order: index + 1,
-        }));
-
-      const chapterIdSet = new Set(chapters.map((chapter) => chapter.id));
-
-      const fallbackChapterId = chapters[0]?.id ?? defaultChapterId;
-
-      const document: LiteLizardDocument = {
-        version: 2,
-        documentId: analysis?.documentId ?? createDocumentId(),
-        title: analysis?.title ?? toDocumentTitle(filePath),
-        personaMode: analysis?.personaMode ?? 'general-reader',
-        createdAt: analysis?.createdAt ?? now,
-        updatedAt: analysis?.updatedAt ?? now,
-        source: {
-          format: 'markdown-md',
-          originPath: filePath,
-        },
-        chapters: chapters.length > 0 ? chapters : [{ id: fallbackChapterId, order: 1, title: '章1' }],
-        paragraphs: paragraphs.map((paragraph, index) => ({
-          ...paragraph,
-          chapterId: chapterIdSet.has(paragraph.chapterId) ? paragraph.chapterId : fallbackChapterId,
-          order: index + 1,
-        })),
-      };
-
-      if (!revisionMap.has(filePath)) {
-        revisionMap.set(filePath, 0);
+      const ext = path.extname(filePath).toLowerCase();
+      if (ext === '.lzl') {
+        return loadLzl(filePath);
       }
-
-      return document;
+      if (ext === '.md') {
+        return loadMarkdown(filePath);
+      }
+      throw new Error(`UNSUPPORTED_FORMAT: ${ext}`);
     },
 
     async save(filePath: string, document: LiteLizardDocument, expectedRevision: number) {
@@ -441,7 +675,18 @@ export function createFileService() {
       }
 
       const normalized = ensureDocumentChapters(document);
-      await writeDocumentFiles(filePath, normalized);
+
+      if (path.extname(filePath).toLowerCase() === '.lzl') {
+        const content = serializeLzl(normalized);
+        const tmpPath = `${filePath}.tmp`;
+        await fs.writeFile(tmpPath, content, 'utf8');
+        await fs.rename(tmpPath, filePath);
+        const root = await seedDocumentOwners(filePath);
+        registerDocumentOwner(root, filePath, normalized.documentId);
+      } else {
+        await writeDocumentFiles(filePath, normalized);
+      }
+
       const next = current + 1;
       revisionMap.set(filePath, next);
 
@@ -452,11 +697,15 @@ export function createFileService() {
     },
 
     async createDocument(filePath: string, document: LiteLizardDocument) {
-      const normalized = ensureDocumentChapters(document);
-      await writeDocumentFiles(filePath, normalized);
+      await writeInitialDocument(filePath, document);
+      if (path.extname(filePath).toLowerCase() === '.lzl') {
+        const root = await seedDocumentOwners(filePath);
+        registerDocumentOwner(root, filePath, document.documentId);
+      }
       revisionMap.set(filePath, 0);
     },
 
     toAnalysisPath,
+    readSidecarAnalysis: readAnalysisFile,
   };
 }

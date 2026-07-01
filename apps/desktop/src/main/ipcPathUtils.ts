@@ -29,6 +29,21 @@ export function ensureMarkdownFileName(name: string) {
   return `${name}.md`;
 }
 
+export function ensureLzlFileName(name: string) {
+  if (/\.lzl$/i.test(name)) {
+    return `${name.slice(0, -4)}.lzl`;
+  }
+  return `${name}.lzl`;
+}
+
+export function ensureFileName(name: string, originalExt: string): string {
+  const ext = originalExt.toLowerCase();
+  if (ext === '.lzl') {
+    return ensureLzlFileName(name);
+  }
+  return ensureMarkdownFileName(name);
+}
+
 export function toTitleFromFileName(fileName: string) {
-  return fileName.replace(/\.md$/i, '');
+  return fileName.replace(/\.(md|lzl)$/i, '');
 }

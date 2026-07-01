@@ -1,0 +1,126 @@
+name: MVP Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: mvp-latest
+  RELEASE_TITLE_BASE: LiteLizard MVP latest
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare release app version
+        id: app-version
+        run: node apps/desktop/scripts/prepare-release-version.mjs "$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build shared package
+        run: pnpm --filter @litelizard/shared build
+
+      - name: Lint workspace
+        run: pnpm -w lint
+
+      - name: Run tests
+        run: pnpm -w test
+
+      - name: Build workspace
+        run: pnpm -w build
+
+      - name: Package macOS DMG (arm64)
+        run: pnpm --filter @litelizard/desktop package:mac:dmg
+
+      - name: Verify packaged app version
+        env:
+          APP_VERSION: ${{ steps.app-version.outputs.version }}
+        run: |
+          BUNDLED_VERSION=$(/usr/libexec/PlistBuddy \
+            -c 'Print :CFBundleShortVersionString' \
+            apps/desktop/release/mac-arm64/LiteLizard.app/Contents/Info.plist)
+          if [ "$BUNDLED_VERSION" != "$APP_VERSION" ]; then
+            echo "Packaged app version mismatch: expected $APP_VERSION, got $BUNDLED_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Locate DMG artifact
+        id: artifact
+        run: |
+          DMG="apps/desktop/release/LiteLizard-latest-arm64.dmg"
+          if [ ! -f "$DMG" ]; then
+            echo "DMG not found at $DMG" >&2
+            ls -la apps/desktop/release || true
+            exit 1
+          fi
+          echo "path=$DMG" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$DMG")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ env.RELEASE_TAG }}
+          TITLE_BASE: ${{ env.RELEASE_TITLE_BASE }}
+          DMG_PATH: ${{ steps.artifact.outputs.path }}
+          APP_VERSION: ${{ steps.app-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TITLE="${TITLE_BASE} v${APP_VERSION}"
+
+          NOTES=$(cat <<EOF
+          LiteLizard MVP の最新ビルドです (v${APP_VERSION}, commit ${GITHUB_SHA::7})。
+
+          - 対象: Apple Silicon Mac (arm64) のみ
+          - 動作確認済み: macOS Tahoe 26.5.1
+          - その他の macOS バージョン: 未検証のため動作保証外です
+          - 形式: 未署名の \`.dmg\` です。初回起動時は Finder で右クリック → 「開く」で承認してください
+          - 更新: アプリ内自動更新には未対応です。最新版は本ページから \`.dmg\` を再ダウンロード・再インストールしてください
+          - インストール手順: リポジトリ README の "macOS インストール" 節を参照
+
+          このリリースは \`main\` 更新時に自動で上書き更新されます。
+          EOF
+          )
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG"
+            EXISTING_ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name' || true)
+            if [ -n "$EXISTING_ASSETS" ]; then
+              while IFS= read -r asset; do
+                [ -z "$asset" ] && continue
+                echo "Removing existing asset: $asset"
+                gh release delete-asset "$TAG" "$asset" --yes || true
+              done <<< "$EXISTING_ASSETS"
+            fi
+            gh release edit "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --prerelease=false \
+              --draft=false
+          else
+            echo "Creating release $TAG"
+            gh release create "$TAG" \
+              --title "$TITLE" \
+              --notes "$NOTES" \
+              --target "$GITHUB_SHA"
+          fi
+
+          gh release upload "$TAG" "$DMG_PATH" --clobber

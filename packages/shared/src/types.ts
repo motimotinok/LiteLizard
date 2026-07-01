@@ -1,4 +1,5 @@
 export type PersonaMode = 'friendly' | 'editor' | 'general-reader';
+export type AnalysisProviderId = 'openai' | 'anthropic' | 'local-llm';
 
 export type LizardStatus = 'pending' | 'complete' | 'failed' | 'stale';
 
@@ -9,6 +10,12 @@ export interface LizardError {
 
 export interface LizardData {
   status: LizardStatus;
+  response?: string;
+  tags?: Record<string, string[]>;
+  resultContractVersion?: string;
+  /**
+   * 旧分析契約との表示互換用。新規結果では response/tags を優先する。
+   */
   emotion?: string[];
   theme?: string[];
   deepMeaning?: string;
@@ -44,7 +51,7 @@ export interface LiteLizardDocument {
   createdAt: string;
   updatedAt: string;
   source?: {
-    format: 'litelizard-json' | 'markdown-md';
+    format: 'litelizard-json' | 'markdown-md' | 'lzl-v1';
     originPath?: string;
   };
   chapters: Chapter[];
@@ -70,6 +77,102 @@ export interface LiteLizardAnalysisFile {
   paragraphs: LiteLizardAnalysisParagraph[];
 }
 
+// 新形式 .litelizard/analysis/{documentId}_NNN.json のルート構造
+export interface GenerationalAnalysisFile {
+  version: 1;
+  documentId: string;
+  generation: number;
+  createdAt: string;
+  updatedAt: string;
+  paragraphs: Record<string, ParagraphAnalysisHistory>;
+}
+
+export interface ParagraphAnalysisHistory {
+  // patterns[length - 1] が最新（デフォルト表示）
+  patterns: ParagraphAnalysisPattern[];
+}
+
+/**
+ * 段落分析結果の標準フィールド。
+ * - 既存の保存済みデータとの互換のため、すべてのフィールドを optional にしている。
+ * - `sourceText` は表示時に段落本文と一致するかを判定するために使う。
+ * - 拡張フィールドは、想定外キーに気付きやすくするため index signature を持たせない。
+ *   将来的に標準フィールドが増えた場合はこの interface に追記する。
+ */
+export interface ParagraphAnalysisResult {
+  response?: string;
+  tags?: Record<string, string[]>;
+  resultContractVersion?: string;
+  /**
+   * 旧分析契約との読み込み互換用。新規結果では response/tags を保存する。
+   */
+  emotion?: string[];
+  theme?: string[];
+  deepMeaning?: string;
+  confidence?: number;
+  model?: string;
+  targetTextFingerprint?: string;
+  sourceText?: string;
+}
+
+export interface ParagraphAnalysisProvenance {
+  agentId: string;
+  agentName: string;
+  agentPromptVersion: string;
+  contextPolicy: AnalysisContextPolicy;
+  referencedParagraphCount: number;
+  hasAdditionalInstruction: boolean;
+  targetScope: 'paragraph';
+  model: string;
+  resultContractVersion: string;
+}
+
+export interface ParagraphAnalysisPattern {
+  analyzedAt: string;
+  userPrompt?: string;
+  provenance?: ParagraphAnalysisProvenance;
+  result: ParagraphAnalysisResult;
+}
+
+export interface ReadingAgentTagValueDefinition {
+  id: string;
+  label: string;
+  color?: string;
+}
+
+export interface ReadingAgentTagDefinition {
+  id: string;
+  label: string;
+  values: ReadingAgentTagValueDefinition[];
+  system?: boolean;
+}
+
+export interface ReadingAgent {
+  id: string;
+  name: string;
+  role: string;
+  systemPrompt: string;
+  model: string | null;
+  contextPolicy: AnalysisContextPolicy;
+  tagDefinitions: ReadingAgentTagDefinition[];
+  createdAt: string;
+  updatedAt: string;
+  builtIn: boolean;
+}
+
+export interface ReadingAgentInput {
+  name: string;
+  role: string;
+  systemPrompt: string;
+  model: string | null;
+  contextPolicy: AnalysisContextPolicy;
+  tagDefinitions?: ReadingAgentTagDefinition[];
+}
+
+export interface ReadingAgentTemplate extends ReadingAgentInput {
+  id: string;
+}
+
 export interface FileNode {
   path: string;
   name: string;
@@ -77,29 +180,107 @@ export interface FileNode {
   children?: FileNode[];
 }
 
-export interface Session {
-  accessToken: string;
-  userId: string;
-  email: string;
-  expiresAt: string;
+export interface RecentProjectEntry {
+  path: string;
+  lastOpenedAt: string;
+  exists?: boolean;
 }
 
-export interface UsageResponse {
-  today: {
-    requestCount: number;
-    inputTokens: number;
-    outputTokens: number;
-    estimatedCost: number;
-  };
-  month: {
-    requestCount: number;
-    inputTokens: number;
-    outputTokens: number;
-    estimatedCost: number;
-  };
+export interface CloudProviderSettings {
+  apiKeyConfigured: boolean;
+  defaultModel: string;
 }
 
-export interface RevisionMismatchError {
-  code: 'REVISION_MISMATCH';
-  message: string;
+export interface LocalLlmSettings {
+  endpoint: string;
+  defaultModel: string;
+  configured: boolean;
 }
+
+/**
+ * Reading Agent ごとの分析コンテキストポリシー。
+ * - `target-only`: 対象本文だけを送る。
+ * - `preceding/all`: 対象より前の全文を参照する。
+ * - `preceding/lastN`: 対象より前の直近 `lastN` 段落だけを参照する。
+ * - `whole-document`: 後続を含む文書全体を参照する。
+ */
+export type AnalysisContextPolicy =
+  | { mode: 'target-only' }
+  | { mode: 'preceding'; range: 'all' }
+  | { mode: 'preceding'; range: 'lastN'; lastN: number }
+  | { mode: 'whole-document' };
+
+export const DEFAULT_ANALYSIS_CONTEXT_POLICY: AnalysisContextPolicy = {
+  mode: 'whole-document',
+};
+
+export type EditorTypeface = 'serif' | 'sans';
+export type AnalysisPanelMode = 'side' | 'overlay';
+
+export interface EditorTweaks {
+  typeface: EditorTypeface;
+  bodyFontSize: number;
+  lineHeight: number;
+  paperWarmth: number;
+  analysisPanelMode: AnalysisPanelMode;
+}
+
+export const DEFAULT_EDITOR_TWEAKS: EditorTweaks = {
+  typeface: 'serif',
+  bodyFontSize: 17,
+  lineHeight: 1.95,
+  paperWarmth: 50,
+  analysisPanelMode: 'side',
+};
+
+export interface AnalysisSettings {
+  defaultProvider: AnalysisProviderId;
+  analysisRunConfirmationEnabled: boolean;
+  providers: {
+    openai: CloudProviderSettings;
+    anthropic: CloudProviderSettings;
+  };
+  localLlm: LocalLlmSettings;
+  editorTweaks: EditorTweaks;
+}
+
+export interface AnalysisSettingsInput {
+  defaultProvider: AnalysisProviderId;
+  // 旧クライアント互換のため optional。未指定時は true が使われる。
+  analysisRunConfirmationEnabled?: boolean;
+  providers: {
+    openai: {
+      defaultModel: string;
+    };
+    anthropic: {
+      defaultModel: string;
+    };
+  };
+  localLlm: {
+    endpoint: string;
+    defaultModel: string;
+  };
+  // 旧クライアント互換のため optional。未指定時は DEFAULT_EDITOR_TWEAKS が使われる。
+  editorTweaks?: EditorTweaks;
+}
+
+export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
+  defaultProvider: 'openai',
+  analysisRunConfirmationEnabled: true,
+  providers: {
+    openai: {
+      apiKeyConfigured: false,
+      defaultModel: 'gpt-5.4',
+    },
+    anthropic: {
+      apiKeyConfigured: false,
+      defaultModel: 'claude-sonnet-4-6',
+    },
+  },
+  localLlm: {
+    endpoint: 'http://127.0.0.1:11434',
+    defaultModel: 'llama3.1:8b',
+    configured: false,
+  },
+  editorTweaks: { ...DEFAULT_EDITOR_TWEAKS },
+};

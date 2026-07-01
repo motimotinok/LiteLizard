@@ -1,10 +1,22 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
+import { IPC_CHANNELS } from '@litelizard/shared';
 import { registerIpcHandlers } from './ipc.js';
+import { loadWindowBounds, saveWindowBounds } from './windowState.js';
+import { buildAppMenu } from './menu.js';
 
 let mainWindow: BrowserWindow | null = null;
+
+type PackagedSmokeResult = {
+  hasRoot: boolean;
+  hasPreloadBridge: boolean;
+  rootText: string;
+  url: string;
+};
+
+const packagedSmokeEnabled = process.env.LITELIZARD_PACKAGED_SMOKE === '1';
 
 function resolvePreloadPath() {
   const currentFile = fileURLToPath(import.meta.url);
@@ -30,9 +42,12 @@ function createMainWindow() {
   const preloadPath = resolvePreloadPath();
   console.log('[Main] preload path:', preloadPath);
 
+  const bounds = loadWindowBounds();
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    ...bounds,
+    backgroundColor: '#f6f1e7',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 14, y: 14 } : undefined,
     webPreferences: {
       contextIsolation: true,
       // Keep sandbox on by default. Only disable explicitly for local debugging.
@@ -40,6 +55,12 @@ function createMainWindow() {
       preload: preloadPath,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.on('close', () => {
+    if (mainWindow) {
+      saveWindowBounds(mainWindow);
+    }
   });
 
   const devUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
@@ -52,24 +73,95 @@ function createMainWindow() {
 
   mainWindow.webContents.on('did-finish-load', () => {
     console.log('[Main] did-finish-load url:', mainWindow?.webContents.getURL());
+    if (packagedSmokeEnabled) {
+      void runPackagedSmoke(mainWindow);
+    }
   });
 
-  mainWindow.webContents.on('console-message', (_event, _level, message, line, sourceId) => {
-    console.log('[Renderer console]', message, sourceId ? `(${sourceId}:${line})` : '');
+  mainWindow.webContents.on('console-message', ({ message, lineNumber, sourceId }) => {
+    console.log('[Renderer console]', message, sourceId ? `(${sourceId}:${lineNumber})` : '');
   });
 
   mainWindow.webContents.on('preload-error', (_event, preloadPathWithError, error) => {
     console.error('[Main] preload-error', preloadPathWithError, error);
   });
+
+  mainWindow.on('closed', () => {
+    if (mainWindow?.isDestroyed()) {
+      mainWindow = null;
+    }
+  });
+
+  return mainWindow;
+}
+
+async function runPackagedSmoke(window: BrowserWindow | null) {
+  if (!window || window.isDestroyed()) {
+    console.error('[Smoke] failed: main window is not available');
+    app.exit(1);
+    return;
+  }
+
+  try {
+    const result = (await window.webContents.executeJavaScript(
+      `(() => ({
+        hasRoot: Boolean(document.getElementById('root')?.childElementCount),
+        hasPreloadBridge:
+          window.__litelizardPreloadSmoke === 'ipc' &&
+          Boolean(window.litelizard) &&
+          typeof window.litelizard.openFolder === 'function',
+        rootText: document.body.innerText.slice(0, 200),
+        url: window.location.href
+      }))()`,
+      true
+    )) as PackagedSmokeResult;
+
+    if (!result.hasRoot || !result.hasPreloadBridge) {
+      console.error('[Smoke] failed:', JSON.stringify(result));
+      app.exit(1);
+      return;
+    }
+
+    console.log('[Smoke] packaged app ready:', JSON.stringify(result));
+    app.exit(0);
+  } catch (error) {
+    console.error('[Smoke] failed:', error);
+    app.exit(1);
+  }
+}
+
+function getUsableMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindow;
+  }
+
+  const fallback = BrowserWindow.getAllWindows().find((win) => !win.isDestroyed()) ?? null;
+  mainWindow = fallback;
+  return fallback;
+}
+
+function requestOpenFolderFromMenu() {
+  const target = getUsableMainWindow() ?? createMainWindow();
+
+  if (target.webContents.isLoading()) {
+    target.webContents.once('did-finish-load', () => {
+      target.webContents.send(IPC_CHANNELS.requestOpenFolder);
+    });
+    return;
+  }
+
+  target.webContents.send(IPC_CHANNELS.requestOpenFolder);
 }
 
 app.whenReady().then(() => {
   registerIpcHandlers();
   createMainWindow();
+  Menu.setApplicationMenu(buildAppMenu(requestOpenFolderFromMenu));
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+      Menu.setApplicationMenu(buildAppMenu(requestOpenFolderFromMenu));
     }
   });
 });
