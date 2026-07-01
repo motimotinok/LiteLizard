@@ -39,6 +39,7 @@ PROJECTMEMORY/
 .claude/worktrees/
 .claude/scheduled_tasks.lock
 .playwright-mcp
+.playwright-cli/
 開発コマンド.md
 knowledge.md
 docs/note-release-article-draft.md

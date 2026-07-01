@@ -1,3 +1,6 @@
+[2026/07/01]分析パネル縮小挙動とdev favicon 404を修正
+UIチェックとコード精査で、右上の分析パネルボタンが選択段落の詳細インスペクターだけでなく本文横の読みレーンまで同時に閉じてしまう挙動を確認した。詳細表示中の操作は選択段落だけを解除して読みレーンへ戻し、俯瞰状態でもう一度押したときだけ読みレーン自体を閉じるように修正した。あわせて desktop renderer に favicon を追加し、dev UI確認時の `/favicon.ico` 404 console error を解消した。検証: Playwright CLIでmock UIの段落選択、縮小、レーン非表示を確認、`corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
+
 [2026/07/01]#121 分析インスペクターに静かな履歴参照導線を追加
 段落詳細インスペクターに「履歴」入口を追加し、開いたときだけ前後移動、現在位置、保存日時、実行時のReading Agent名を確認できるようにした。通常時は表示中結果のAgent名だけを控えめに示し、旧形式でAgent情報がない履歴は「旧形式の履歴」として表示する。検証: `corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
 
