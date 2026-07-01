@@ -1,3 +1,6 @@
+[2026/07/01]#104 GitHub Release 運用手順書を追加
+MVP 公開の運用手順として `docs/release-runbook.md` を追加し、`MVP Release` workflow が使う `mvp-latest` tag、`LiteLizard-latest-arm64.dmg` asset、Release title/body、APP_VERSION と packaged app version の一致確認、失敗時の確認入口を整理した。README と公開前チェックリストから runbook へ辿れるようにし、自動検証と人間が残す GUI 確認の境界も明示した。
+
 [2026/07/01]#103 左ツールバーのフォルダアイコンでサイドバーを折りたためるようにした
 Workspace画面でフォルダアイコンを押すと、表示中のエクスプローラーサイドバーを折りたたみ、もう一度押すと再表示できるようにした。折りたたみ中はメイン領域を rail の隣まで広げ、現在文書やファイル一覧のデータは store 側に残るため、再表示しても状態を失わない。フォルダアイコンの aria-label / title / aria-expanded も開閉状態に合わせて切り替えるようにした。
 

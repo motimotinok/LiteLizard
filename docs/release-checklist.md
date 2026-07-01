@@ -2,7 +2,7 @@
 
 LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確認する項目を 1 か所にまとめたもの。LLM が CLI で自動実行できる項目と、人間が macOS GUI 上で目視確認する項目、そして公開判断として人間に残っている未決事項を分けて並べる。
 
-ここで触れている個別仕様の根拠は `docs/decisions.md`、過去の実装は `CHANGELOG.md` と `docs/tickets/done/`、配布手順そのものは `README.md` の「macOS へのインストール」「Packaging」セクションを参照する。
+ここで触れている個別仕様の根拠は `docs/decisions.md`、過去の実装は `CHANGELOG.md` と `docs/tickets/done/`、配布手順そのものは `README.md` の「macOS へのインストール」「Packaging」セクション、GitHub Release の運用手順は `docs/release-runbook.md` を参照する。
 
 ## 自動検証（LLM / CI が CLI で確認できる）
 
@@ -96,4 +96,4 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 1. 自動検証セクションを最初から最後まで成功させる。
 2. 生成された `.dmg` を手動 GUI 確認の手順で触る。
 3. 公開判断の未決事項を確認し、現状で公開可能か判断する。
-4. 公開可能と判断したら、`apps/desktop/release/LiteLizard-latest-<arch>.dmg` を GitHub Releases に添付し、`CHANGELOG.md` の最新エントリと README を必要に応じて更新する。
+4. 公開可能と判断したら、`docs/release-runbook.md` に沿って `MVP Release` workflow の結果と `mvp-latest` Release を確認し、`CHANGELOG.md` の最新エントリと README を必要に応じて更新する。

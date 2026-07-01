@@ -94,7 +94,7 @@ Node.js 24（`.nvmrc` は `24.13.0`）と pnpm 9.12.3 を使用します。Elect
 
 MVP 公開では未署名の `.dmg` を GitHub Releases に置く方針です。Developer ID 署名、notarization、自動更新は MVP 後の対応です。未署名配布のため初回起動時に macOS Gatekeeper の警告が出る前提です。
 
-公開前に確認する自動検証コマンド・手動 GUI 手順・公開判断の未決事項は [`docs/release-checklist.md`](./docs/release-checklist.md) にまとめています。
+GitHub Release の作成・更新フローは [`docs/release-runbook.md`](./docs/release-runbook.md) に、公開前に確認する自動検証コマンド・手動 GUI 手順・公開判断の未決事項は [`docs/release-checklist.md`](./docs/release-checklist.md) にまとめています。
 
 ## プライバシー
 
