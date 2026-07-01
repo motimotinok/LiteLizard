@@ -20,3 +20,4 @@
 | [local-llm-runtime.md](local-llm-runtime.md) | Local LLM ランタイム管理方針 | #72 | decision（LiteLizard 管理ランタイムは非採用） |
 | [custom-workflows.md](custom-workflows.md) | カスタムワークフロー検討メモ | #74 | decision（当面は実装しない） |
 | [reading-environment-preview.md](reading-environment-preview.md) | 抽象化した読書環境プレビュー方針 | #115 | decision（当面は実装しない） |
+| [theme-customization.md](theme-customization.md) | 表示カスタマイズ方針 | #114 | decision（自由テーマは非採用、Editor Tweaksを維持） |
