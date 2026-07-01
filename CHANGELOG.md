@@ -1,3 +1,6 @@
+[2026/07/01]#74 カスタムワークフロー自作ボタンを当面非採用として記録
+ユーザー自作ボタンとしてのカスタムワークフローは、現時点では実装しない判断を `docs/specs/custom-workflows.md` と `docs/decisions.md` に記録した。将来再検討する場合も任意コード実行ではなく、対象・処理・出力先を限定した宣言型ワークフローに限り、既定非表示・確認後反映・Undo対象を前提にする。
+
 [2026/07/01]#72 LiteLizard 管理のLocal LLMランタイムを非採用として記録
 Local LLM はユーザーが管理する Ollama 互換 endpoint とモデル名へ接続する方式に限定し、LiteLizard 自身はモデルのインストール、起動、停止、削除、更新、保存先管理を担わない方針を `docs/specs/local-llm-runtime.md` と `docs/decisions.md` に記録した。`docs/specs/analysis-api.md` からもこの方針へリンクし、現行の endpoint 接続方式を正とした。
 

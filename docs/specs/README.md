@@ -18,3 +18,4 @@
 | [reading-agent.md](reading-agent.md) | Reading Agent 永続化・編集・解析適用 | R-18 | stable |
 | [update-data-retention.md](update-data-retention.md) | アプリ更新時の userData・APIキー・Reading Agent 保持 | #124 | stable |
 | [local-llm-runtime.md](local-llm-runtime.md) | Local LLM ランタイム管理方針 | #72 | decision（LiteLizard 管理ランタイムは非採用） |
+| [custom-workflows.md](custom-workflows.md) | カスタムワークフロー検討メモ | #74 | decision（当面は実装しない） |
