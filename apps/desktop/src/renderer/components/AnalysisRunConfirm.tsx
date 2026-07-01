@@ -52,7 +52,7 @@ export function AnalysisRunConfirm({ estimate, onCancel, onConfirm }: Props) {
           </div>
         </dl>
         <p className="analysis-run-confirm-note">
-          実際の課金額やトークン数とは一致しない、文字数ベースの概算値です。
+          実際の課金額やトークン数とは一致しない、文字数ベースの概算値です。{estimate.approximationNote}
         </p>
         <div className="analysis-run-confirm-actions">
           <button

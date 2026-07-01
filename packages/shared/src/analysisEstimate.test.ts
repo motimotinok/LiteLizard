@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAnalysisContextTexts,
+  buildAnalysisDocumentTexts,
+  buildAnalysisSystemPrompt,
+  buildAnalysisTargetPrompt,
   estimateAnalysisCost,
   OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT,
-  SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS,
 } from './analysisEstimate.js';
 import type { AnalysisEstimateAgent, AnalysisEstimateParagraph } from './analysisEstimate.js';
 import type { AnalysisContextPolicy } from './types.js';
@@ -12,7 +15,6 @@ const agent: AnalysisEstimateAgent = {
   role: 'role!',
   systemPrompt: 'PROMPT_____',
 };
-const AGENT_CHARS = agent.name.length + agent.role.length + agent.systemPrompt.length;
 
 function makeParagraphs(): AnalysisEstimateParagraph[] {
   return [
@@ -98,7 +100,8 @@ describe('estimateAnalysisCost', () => {
 
     expect(estimate.contextTextChars).toBe(0);
     expect(estimate.totalInputChars).toBe(
-      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS + AGENT_CHARS + target.text.length,
+      buildAnalysisSystemPrompt(agent, [], buildAnalysisDocumentTexts(paragraphs)).length +
+        buildAnalysisTargetPrompt(target.paragraphId, target.text).length,
     );
   });
 
@@ -121,7 +124,7 @@ describe('estimateAnalysisCost', () => {
     expect(estimate.contextTextChars).toBe(expectedContextChars);
   });
 
-  it('totalInputChars には system prompt + agent + context + target 本文が含まれる', () => {
+  it('totalInputChars には実行時と同じ system prompt + target prompt が含まれる', () => {
     const paragraphs = makeParagraphs();
     const target = paragraphs[1]; // 直前に p1 が 1 件
     const policy: AnalysisContextPolicy = { mode: 'preceding', range: 'all' };
@@ -134,8 +137,10 @@ describe('estimateAnalysisCost', () => {
 
     const expectedContextChars = paragraphs[0].text.length + /* decoration */ 5;
     expect(estimate.contextTextChars).toBe(expectedContextChars);
+    const contextTexts = buildAnalysisContextTexts(paragraphs, target.paragraphId, policy);
     expect(estimate.totalInputChars).toBe(
-      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS + AGENT_CHARS + expectedContextChars + target.text.length,
+      buildAnalysisSystemPrompt(agent, contextTexts, buildAnalysisDocumentTexts(paragraphs)).length +
+        buildAnalysisTargetPrompt(target.paragraphId, target.text).length,
     );
   });
 
@@ -152,7 +157,8 @@ describe('estimateAnalysisCost', () => {
 
     expect(estimate.contextTextChars).toBe(0);
     expect(estimate.totalInputChars).toBe(
-      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS + AGENT_CHARS + target.text.length,
+      buildAnalysisSystemPrompt(agent, [], buildAnalysisDocumentTexts(paragraphs)).length +
+        buildAnalysisTargetPrompt(target.paragraphId, target.text).length,
     );
   });
 
@@ -165,8 +171,47 @@ describe('estimateAnalysisCost', () => {
       contextPolicy: { mode: 'target-only' },
     });
 
-    expect(estimate.totalInputChars).toBe(
-      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS + paragraphs[0].text.length,
-    );
+    expect(estimate.totalInputChars).toBe(paragraphs[0].text.length);
+  });
+
+  it('OpenAI は全文prefixを含み、Local LLM は選択contextだけを含める', () => {
+    const paragraphs = makeParagraphs();
+    const target = paragraphs[1];
+    const policy: AnalysisContextPolicy = { mode: 'preceding', range: 'all' };
+    const openAiEstimate = estimateAnalysisCost({
+      providerId: 'openai',
+      targetParagraphs: [target],
+      documentParagraphs: paragraphs,
+      agent,
+      contextPolicy: policy,
+    });
+    const localEstimate = estimateAnalysisCost({
+      providerId: 'local-llm',
+      targetParagraphs: [target],
+      documentParagraphs: paragraphs,
+      agent,
+      contextPolicy: policy,
+    });
+
+    expect(openAiEstimate.totalInputChars).toBeGreaterThan(localEstimate.totalInputChars);
+    expect(openAiEstimate.approximationNote).toContain('概算');
+  });
+
+  it('Agent prompt が変わると送信量見積もりも変わる', () => {
+    const paragraphs = makeParagraphs();
+    const target = paragraphs[0];
+
+    const shortEstimate = estimateAnalysisCost({
+      targetParagraphs: [target],
+      documentParagraphs: paragraphs,
+      agent,
+    });
+    const longEstimate = estimateAnalysisCost({
+      targetParagraphs: [target],
+      documentParagraphs: paragraphs,
+      agent: { ...agent, systemPrompt: `${agent.systemPrompt}追加の観点を長く書く。` },
+    });
+
+    expect(longEstimate.totalInputChars).toBeGreaterThan(shortEstimate.totalInputChars);
   });
 });

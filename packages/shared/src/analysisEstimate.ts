@@ -1,5 +1,6 @@
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
+  type AnalysisProviderId,
   type AnalysisContextPolicy,
 } from './types.js';
 
@@ -20,6 +21,10 @@ export interface AnalysisCostEstimate {
    * target ごとに system prompt と context が乗算される点に注意。
    */
   totalInputChars: number;
+  /**
+   * Provider固有のHTTPフィールドやJSON schema指定など、文字列prompt外の概算外要素。
+   */
+  approximationNote: string;
   /**
    * 概算 output 文字数。1 段落あたり {@link OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT}（または指定値）。
    */
@@ -48,6 +53,8 @@ export interface AnalysisEstimateInput {
   contextPolicy?: AnalysisContextPolicy;
   /** 現在選択中の Reading Agent。未選択時は null を渡す。 */
   agent: AnalysisEstimateAgent | null;
+  /** 既定 provider。OpenAI は prompt cache 向けに全文を共通prefixへ含める。 */
+  providerId?: AnalysisProviderId;
   /** 1 段落あたりの概算 output 文字数。指定しない場合は {@link OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT}。 */
   outputCharsPerParagraph?: number;
 }
@@ -79,7 +86,7 @@ export const SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS = 220;
  */
 const CONTEXT_ITEM_DECORATION_CHARS = 5;
 
-function selectContextTexts(
+export function buildAnalysisContextTexts(
   documentParagraphs: AnalysisEstimateParagraph[],
   targetParagraphId: string,
   policy: AnalysisContextPolicy,
@@ -112,11 +119,49 @@ function selectContextTexts(
     .filter((text) => text.trim().length > 0);
 }
 
-function agentPromptChars(agent: AnalysisEstimateAgent | null): number {
-  if (!agent) {
-    return 0;
-  }
-  return agent.name.length + agent.role.length + agent.systemPrompt.length;
+export function buildAnalysisDocumentTexts(documentParagraphs: AnalysisEstimateParagraph[]): string[] {
+  return documentParagraphs
+    .slice()
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((paragraph) => paragraph.text)
+    .filter((text) => text.trim().length > 0);
+}
+
+export function buildAnalysisSystemPrompt(
+  agent: AnalysisEstimateAgent,
+  contextTexts: string[],
+  documentTexts: string[] = contextTexts,
+): string {
+  const documentBlock =
+    documentTexts.length > 0
+      ? `Full document (document order):\n${documentTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+      : 'Full document: none';
+  const contextBlock =
+    contextTexts.length > 0
+      ? `Reference paragraphs (document order):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+      : 'Reference paragraphs: none';
+
+  return [
+    'You are LiteLizard analysis model.',
+    `Reading agent name: ${agent.name}.`,
+    `Reading agent role: ${agent.role}.`,
+    'Reading agent system prompt:',
+    agent.systemPrompt,
+    documentBlock,
+    'Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1).',
+    contextBlock,
+    'Analyze only the target paragraph provided by the user. Use the reference paragraphs only as reading context.',
+  ].join('\n\n');
+}
+
+export function buildAnalysisTargetPrompt(paragraphId: string, text: string): string {
+  return [
+    'Target paragraph:',
+    `ID: ${paragraphId}`,
+    'Text:',
+    text,
+    'Analyze this target paragraph only. Return JSON only.',
+  ].join('\n\n');
 }
 
 export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCostEstimate {
@@ -125,7 +170,8 @@ export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCost
     0,
     Math.trunc(input.outputCharsPerParagraph ?? OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT),
   );
-  const agentChars = agentPromptChars(input.agent);
+  const providerId = input.providerId ?? 'openai';
+  const documentTexts = buildAnalysisDocumentTexts(input.documentParagraphs);
 
   let targetTextChars = 0;
   let contextTextChars = 0;
@@ -134,17 +180,22 @@ export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCost
   for (const target of input.targetParagraphs) {
     targetTextChars += target.text.length;
 
-    const contextTexts = selectContextTexts(input.documentParagraphs, target.paragraphId, policy);
+    const contextTexts = buildAnalysisContextTexts(input.documentParagraphs, target.paragraphId, policy);
     const perTargetContextChars =
       contextTexts.reduce((sum, text) => sum + text.length, 0) +
       contextTexts.length * CONTEXT_ITEM_DECORATION_CHARS;
     contextTextChars += perTargetContextChars;
 
-    totalInputChars +=
-      SYSTEM_PROMPT_FIXED_OVERHEAD_CHARS +
-      agentChars +
-      perTargetContextChars +
-      target.text.length;
+    if (input.agent) {
+      const systemPrompt = buildAnalysisSystemPrompt(
+        input.agent,
+        contextTexts,
+        providerId === 'openai' ? documentTexts : contextTexts,
+      );
+      totalInputChars += systemPrompt.length + buildAnalysisTargetPrompt(target.paragraphId, target.text).length;
+    } else {
+      totalInputChars += target.text.length;
+    }
   }
 
   return {
@@ -153,5 +204,7 @@ export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCost
     contextTextChars,
     totalInputChars,
     estimatedOutputChars: input.targetParagraphs.length * outputCharsPerParagraph,
+    approximationNote:
+      '概算です。HTTP headers、Responses API の JSON schema 指定、provider SDK が付与する非promptフィールドは含めません。',
   };
 }

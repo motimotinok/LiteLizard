@@ -726,6 +726,24 @@ export function registerIpcHandlers() {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.listReadingAgentTemplates, async () => {
+    try {
+      return readingAgentStore.listTemplates();
+    } catch (error) {
+      console.error('[IPC agents:templates:list] failed', error);
+      throw new Error(`LIST_READING_AGENT_TEMPLATES_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.addReadingAgentFromTemplate, async (_, templateId: string) => {
+    try {
+      return await readingAgentStore.addFromTemplate(templateId);
+    } catch (error) {
+      console.error('[IPC agents:templates:add] failed', error);
+      throw new Error(`ADD_READING_AGENT_FROM_TEMPLATE_FAILED: ${getErrorMessage(error)}`);
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.getReadingAgent, async (_, id: string) => {
     try {
       return await readingAgentStore.get(id);

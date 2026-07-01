@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import {
   ReadingAgentInputSchema,
+  buildAnalysisDocumentTexts,
+  isKnownProviderModel,
   type AnalysisContextPolicy,
   type AnalysisResult,
   type AnalysisRunInput,
@@ -11,8 +13,51 @@ import {
 import { buildContextTexts } from './analysisProvider.js';
 import type { ResolvedAnalysisProvider } from './analysisProvider.js';
 
+function buildPromptCacheKey(input: {
+  documentId: string;
+  promptVersion: string;
+  model: string;
+  agent: ReadingAgent | ReadingAgentDryRunInput['agent'];
+  documentTexts: string[];
+  contextPolicy: AnalysisContextPolicy;
+}) {
+  const hash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify({
+      documentId: input.documentId,
+      promptVersion: input.promptVersion,
+      model: input.model,
+      agentName: input.agent.name,
+      agentRole: input.agent.role,
+      agentPrompt: input.agent.systemPrompt,
+      contextPolicy: input.contextPolicy,
+      documentTexts: input.documentTexts,
+    }))
+    .digest('hex')
+    .slice(0, 48);
+
+  return `llz:${hash}`;
+}
+
 function resolveAgentModel(agent: ReadingAgent | ReadingAgentDryRunInput['agent'], resolvedProvider: ResolvedAnalysisProvider) {
-  return agent.model?.trim() || resolvedProvider.model;
+  const override = agent.model?.trim();
+  if (!override) {
+    return resolvedProvider.model;
+  }
+
+  if (resolvedProvider.id === 'openai' && isKnownProviderModel('anthropic', override)) {
+    throw new Error(
+      `Reading Agent のモデル override「${override}」は Anthropic 用です。既定 provider を Anthropic に切り替えるか、OpenAI 用モデルを選択してください。`,
+    );
+  }
+
+  if (resolvedProvider.id === 'anthropic' && isKnownProviderModel('openai', override)) {
+    throw new Error(
+      `Reading Agent のモデル override「${override}」は OpenAI 用です。既定 provider を OpenAI に切り替えるか、Anthropic 用モデルを選択してください。`,
+    );
+  }
+
+  return override;
 }
 
 export async function runAnalysis(
@@ -22,12 +67,24 @@ export async function runAnalysis(
   onProgress?: (result: AnalysisResult) => void,
   contextPolicy: AnalysisContextPolicy = agent.contextPolicy,
 ): Promise<AnalysisRunResult> {
-  const execute = async (progressCallback?: (result: AnalysisResult) => void) => {
-    const results: AnalysisResult[] = [];
-    const model = resolveAgentModel(agent, resolvedProvider);
+  const results: AnalysisResult[] = [];
+  const model = resolveAgentModel(agent, resolvedProvider);
+  const documentTexts = buildAnalysisDocumentTexts(input.documentParagraphs);
+  const promptCacheKey =
+    resolvedProvider.id === 'openai'
+      ? buildPromptCacheKey({
+          documentId: input.documentId,
+          promptVersion: input.promptVersion,
+          model,
+          agent,
+          documentTexts,
+          contextPolicy,
+        })
+      : undefined;
 
-    for (const paragraph of input.paragraphs) {
-      const analyzed = await resolvedProvider.provider.analyzeParagraph({
+  for (const paragraph of input.paragraphs) {
+    const analyze = () =>
+      resolvedProvider.provider.analyzeParagraph({
         paragraphId: paragraph.paragraphId,
         text: paragraph.text,
         agent,
@@ -35,27 +92,30 @@ export async function runAnalysis(
         model,
         temperature: agent.temperature,
         contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId, contextPolicy),
+        documentTexts,
+        promptCacheKey,
       });
-      progressCallback?.(analyzed);
-      results.push(analyzed);
+
+    let analyzed: AnalysisResult;
+    try {
+      analyzed = await analyze();
+    } catch {
+      // 失敗した段落だけを一度リトライする。成功済み段落は再送しない。
+      analyzed = await analyze();
     }
 
-    return {
-      requestId: `req_${crypto.randomUUID()}`,
-      documentId: input.documentId,
-      agentId: input.agentId,
-      personaMode: input.personaMode,
-      promptVersion: input.promptVersion,
-      results,
-    } satisfies AnalysisRunResult;
-  };
-
-  try {
-    return await execute(onProgress);
-  } catch {
-    // リトライ時は onProgress を渡さない（重複発火・重複保存を防ぐ）
-    return execute();
+    onProgress?.(analyzed);
+    results.push(analyzed);
   }
+
+  return {
+    requestId: `req_${crypto.randomUUID()}`,
+    documentId: input.documentId,
+    agentId: input.agentId,
+    personaMode: input.personaMode,
+    promptVersion: input.promptVersion,
+    results,
+  } satisfies AnalysisRunResult;
 }
 
 export async function dryRunReadingAgent(
@@ -65,13 +125,27 @@ export async function dryRunReadingAgent(
 ): Promise<AnalysisResult> {
   const agent = ReadingAgentInputSchema.parse(input.agent);
   const resolvedContextPolicy = contextPolicy ?? agent.contextPolicy;
+  const documentTexts = buildAnalysisDocumentTexts(input.documentParagraphs);
+  const model = resolveAgentModel(agent, resolvedProvider);
   return resolvedProvider.provider.analyzeParagraph({
     paragraphId: input.paragraph.paragraphId,
     text: input.paragraph.text,
     agent,
     promptVersion: input.promptVersion,
-    model: resolveAgentModel(agent, resolvedProvider),
+    model,
     temperature: agent.temperature,
     contextTexts: buildContextTexts(input.documentParagraphs, input.paragraph.paragraphId, resolvedContextPolicy),
+    documentTexts,
+    promptCacheKey:
+      resolvedProvider.id === 'openai'
+        ? buildPromptCacheKey({
+            documentId: 'dry-run',
+            promptVersion: input.promptVersion,
+            model,
+            agent,
+            documentTexts,
+            contextPolicy: resolvedContextPolicy,
+          })
+        : undefined,
   });
 }

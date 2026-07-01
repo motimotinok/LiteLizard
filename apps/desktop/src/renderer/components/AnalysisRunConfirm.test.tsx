@@ -10,6 +10,7 @@ function createEstimate(overrides: Partial<AnalysisCostEstimate> = {}): Analysis
     contextTextChars: 5678,
     totalInputChars: 9012,
     estimatedOutputChars: 1500,
+    approximationNote: '概算です。',
     ...overrides,
   };
 }

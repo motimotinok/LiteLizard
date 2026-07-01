@@ -1,5 +1,5 @@
 import { DEFAULT_READING_AGENT_TEMPERATURE } from './api.js';
-import type { ReadingAgent, ReadingAgentInput } from './types.js';
+import type { ReadingAgent, ReadingAgentInput, ReadingAgentTemplate } from './types.js';
 
 export interface DefaultReadingAgentPreset extends ReadingAgentInput {
   id: string;
@@ -115,6 +115,10 @@ export function createDefaultReadingAgentsFromPresets(now: string): ReadingAgent
     updatedAt: now,
     builtIn: true,
   }));
+}
+
+export function listDefaultReadingAgentTemplates(): ReadingAgentTemplate[] {
+  return DEFAULT_READING_AGENT_PRESETS.map((preset) => ({ ...preset }));
 }
 
 export function buildNewReadingAgentPrompt(name: string, role: string): string {

@@ -1,6 +1,7 @@
 import type { LiteLizardDocument, ParagraphAnalysisPattern } from '@litelizard/shared';
 import { describe, expect, it } from 'vitest';
 import {
+  appendPatternToHistories,
   getVisiblePatternIndices,
   projectAnalysisHistoriesToDocument,
   resolveDisplayedPatternIndex,
@@ -72,5 +73,19 @@ describe('analysisHistory helpers', () => {
 
     expect(projected.paragraphs[0].lizard.deepMeaning).toBe('first');
     expect(projected.paragraphs[0].lizard.analyzedAt).toBe('2026-04-11T00:00:00.000Z');
+  });
+
+  it('同一 pattern は履歴へ二重追加しない', () => {
+    const pattern = makePattern('2026-04-12T00:00:00.000Z', '本文A', 'same');
+    const first = appendPatternToHistories({}, 'p1', pattern);
+    const second = appendPatternToHistories(first, 'p1', pattern);
+    const explicitRerun = appendPatternToHistories(
+      second,
+      'p1',
+      makePattern('2026-04-12T00:01:00.000Z', '本文A', 'same'),
+    );
+
+    expect(second.p1).toHaveLength(1);
+    expect(explicitRerun.p1).toHaveLength(2);
   });
 });

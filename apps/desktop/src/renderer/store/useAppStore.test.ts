@@ -622,7 +622,15 @@ describe('useAppStore L-06 analysis state', () => {
     await useAppStore.getState().runAnalysis();
 
     const state = useAppStore.getState();
-    expect(saveAnalysisResult).toHaveBeenCalledTimes(1);
+    expect(saveAnalysisResult).toHaveBeenCalledTimes(2);
+    expect(saveAnalysisResult).toHaveBeenCalledWith(
+      '/projects/novel',
+      document.documentId,
+      'p2',
+      expect.objectContaining({
+        result: expect.objectContaining({ deepMeaning: 'final only' }),
+      }),
+    );
     expect(state.analysisHistoriesByParagraphId.p1).toHaveLength(1);
     expect(state.analysisHistoriesByParagraphId.p2).toHaveLength(1);
     expect(state.document?.paragraphs[0].lizard.deepMeaning).toBe('progress result');

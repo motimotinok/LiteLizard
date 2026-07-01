@@ -7,6 +7,7 @@ import type {
   ParagraphAnalysisPattern,
   ReadingAgent,
   ReadingAgentInput,
+  ReadingAgentTemplate,
   RecentProjectEntry,
 } from './types.js';
 import type { AnalysisParagraph, AnalysisResult, AnalysisRunInput, AnalysisRunResult } from './api.js';
@@ -93,6 +94,8 @@ export interface BridgeApi {
   getActiveReadingAgentId(): Promise<string | null>;
   setActiveReadingAgentId(id: string): Promise<{ ok: true }>;
   listReadingAgents(): Promise<ReadingAgent[]>;
+  listReadingAgentTemplates(): Promise<ReadingAgentTemplate[]>;
+  addReadingAgentFromTemplate(templateId: string): Promise<ReadingAgent>;
   getReadingAgent(id: string): Promise<ReadingAgent | null>;
   saveReadingAgent(input: ReadingAgentInput & { id?: string }): Promise<ReadingAgent>;
   deleteReadingAgent(id: string): Promise<{ ok: true }>;
@@ -138,6 +141,8 @@ export const IPC_CHANNELS = {
   getActiveReadingAgentId: 'agents:getActive',
   setActiveReadingAgentId: 'agents:setActive',
   listReadingAgents: 'agents:list',
+  listReadingAgentTemplates: 'agents:templates:list',
+  addReadingAgentFromTemplate: 'agents:templates:add',
   getReadingAgent: 'agents:get',
   saveReadingAgent: 'agents:save',
   deleteReadingAgent: 'agents:delete',

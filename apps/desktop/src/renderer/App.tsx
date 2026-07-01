@@ -1,4 +1,4 @@
-import React, { type CSSProperties, useCallback, useEffect, useState } from 'react';
+import React, { type CSSProperties, useEffect, useState } from 'react';
 import type { EditorTweaks } from '@litelizard/shared';
 import { ExplorerPane } from './components/ExplorerPane.js';
 import { AnalysisPane } from './components/AnalysisPane.js';
@@ -66,13 +66,6 @@ function WorkspaceShell() {
   const [linkedHighlightParagraphId, setLinkedHighlightParagraphId] = useState<string | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(true);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
-  const [analysisScrollRequest, setAnalysisScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(
-    null,
-  );
-
-  const requestScrollToAnalysis = useCallback((paragraphId: string) => {
-    setAnalysisScrollRequest({ paragraphId, nonce: Date.now() });
-  }, []);
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -95,11 +88,8 @@ function WorkspaceShell() {
       return;
     }
 
-    if (
-      !activeParagraphId ||
-      !currentDocument.paragraphs.some((paragraph) => paragraph.id === activeParagraphId)
-    ) {
-      setActiveParagraphId(currentDocument.paragraphs[0].id);
+    if (activeParagraphId && !currentDocument.paragraphs.some((paragraph) => paragraph.id === activeParagraphId)) {
+      setActiveParagraphId(null);
     }
 
     if (
@@ -166,7 +156,8 @@ function WorkspaceShell() {
 
   const titleText = currentDocument?.title ?? null;
   const statusLabel = currentDocument ? (dirty ? '下書き' : '保存済み') : null;
-  const showAnalysisPanel = analysisPanelOpen && Boolean(currentDocument);
+  const showAnalysisRail = analysisPanelOpen && Boolean(currentDocument) && viewScale === 'micro';
+  const showAnalysisPanel = analysisPanelOpen && Boolean(currentDocument && activeParagraphId);
   const analysisPanelMode = analysisSettings.editorTweaks.analysisPanelMode;
   const workspaceMainClass = [
     showAnalysisPanel ? 'workspace-main with-panel' : 'workspace-main',
@@ -252,8 +243,12 @@ function WorkspaceShell() {
           linkedHighlightParagraphId={linkedHighlightParagraphId}
           scrollRequest={scrollRequest}
           setActiveParagraphId={setActiveParagraphId}
-          onRequestScrollToAnalysis={requestScrollToAnalysis}
           onPreviewParagraphLink={setLinkedHighlightParagraphId}
+          analysisRailVisible={showAnalysisRail}
+          onSelectAnalysisRailParagraph={(paragraphId) => {
+            setActiveParagraphId(paragraphId);
+            setScrollRequest({ paragraphId, nonce: Date.now() });
+          }}
           viewScale={viewScale}
           onSetViewScale={setViewScale}
           onSyncStructure={(input) => syncDocumentStructure(input)}
@@ -274,11 +269,7 @@ function WorkspaceShell() {
           <AnalysisPane
             document={currentDocument}
             activeParagraphId={activeParagraphId}
-            linkedHighlightParagraphId={linkedHighlightParagraphId}
-            scrollRequest={analysisScrollRequest}
             onSetActiveParagraphId={setActiveParagraphId}
-            onPreviewParagraphLink={setLinkedHighlightParagraphId}
-            onReorderParagraphs={(orderedIds) => reorderParagraphs(orderedIds)}
             onRequestScrollToParagraph={(paragraphId) => {
               setScrollRequest({ paragraphId, nonce: Date.now() });
             }}

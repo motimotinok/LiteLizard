@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { createDefaultReadingAgents, createReadingAgentStore } from './agentStore.js';
+import { createReadingAgentStore, listReadingAgentTemplates } from './agentStore.js';
 
 async function withTempUserData(run: (userDataPath: string) => Promise<void>) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'litelizard-agents-'));
@@ -27,26 +27,33 @@ async function readAgentsFile(userDataPath: string) {
 }
 
 describe('createReadingAgentStore', () => {
-  it('初回 list で built-in agent 4件を seed する', async () => {
+  it('初回 list では built-in agent を自動 seed しない', async () => {
     await withTempUserData(async (userDataPath) => {
       const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
 
       const agents = await store.list();
 
-      expect(agents.map((agent) => agent.id)).toEqual([
-        'reader-first-impression',
-        'reader-sensory',
-        'reader-structure-editor',
-        'reader-writing-companion',
-      ]);
-      expect(agents.map((agent) => agent.name)).toEqual([
-        '初見の読者',
-        '感覚を読む読者',
-        '構造編集者',
-        '書き続ける伴走者',
-      ]);
-      expect(agents.every((agent) => agent.builtIn)).toBe(true);
-      expect(await readAgentsFile(userDataPath)).toHaveLength(4);
+      expect(agents).toEqual([]);
+      await expect(fs.readFile(path.join(userDataPath, 'agents.json'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+    });
+  });
+
+  it('テンプレート一覧から明示的に通常 Agent として追加できる', async () => {
+    await withTempUserData(async (userDataPath) => {
+      const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
+      const templates = store.listTemplates();
+
+      expect(templates.map((template) => template.id)).toEqual(listReadingAgentTemplates().map((template) => template.id));
+
+      const added = await store.addFromTemplate('reader-first-impression');
+
+      expect(added).toMatchObject({
+        id: 'reader-first-impression',
+        name: '初見の読者',
+        builtIn: false,
+        createdAt: '2026-05-02T00:00:00.000Z',
+      });
+      expect(await readAgentsFile(userDataPath)).toHaveLength(1);
     });
   });
 
@@ -75,7 +82,7 @@ describe('createReadingAgentStore', () => {
     });
   });
 
-  it('旧形式 agents.json は backup に退避して defaults を再生成する', async () => {
+  it('旧形式 agents.json は backup に退避して空リストへ復旧する', async () => {
     await withTempUserData(async (userDataPath) => {
       const legacy = [
         {
@@ -96,7 +103,7 @@ describe('createReadingAgentStore', () => {
       const agents = await store.list();
       const backup = JSON.parse(await fs.readFile(path.join(userDataPath, 'agents.json.bak'), 'utf8')) as unknown[];
 
-      expect(agents).toEqual(createDefaultReadingAgents('2026-05-02T00:00:00.000Z'));
+      expect(agents).toEqual([]);
       expect(backup).toEqual(legacy);
     });
   });
@@ -134,7 +141,7 @@ describe('createReadingAgentStore', () => {
         model: 'gpt-4.1-mini',
         temperature: 0.3,
         contextPolicy: { mode: 'target-only' },
-        createdAt: '2026-05-02T00:00:02.000Z',
+        createdAt: '2026-05-02T00:00:01.000Z',
         builtIn: false,
       });
       expect(updated).toMatchObject({
@@ -143,8 +150,8 @@ describe('createReadingAgentStore', () => {
         model: null,
         temperature: 0.8,
         contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 4 },
-        createdAt: '2026-05-02T00:00:02.000Z',
-        updatedAt: '2026-05-02T00:00:03.000Z',
+        createdAt: '2026-05-02T00:00:01.000Z',
+        updatedAt: '2026-05-02T00:00:02.000Z',
         builtIn: false,
       });
     });
@@ -171,7 +178,7 @@ describe('createReadingAgentStore', () => {
     });
   });
 
-  it('resetToDefaults は built-in 4件に戻す', async () => {
+  it('resetToDefaults は agent を空に戻す', async () => {
     await withTempUserData(async (userDataPath) => {
       const now = '2026-05-02T00:00:00.000Z';
       const store = createReadingAgentStore(userDataPath, {
@@ -189,12 +196,12 @@ describe('createReadingAgentStore', () => {
       });
       const reset = await store.resetToDefaults();
 
-      expect(reset).toEqual(createDefaultReadingAgents(now));
+      expect(reset).toEqual([]);
       await expect(store.get('reader-custom')).resolves.toBeNull();
     });
   });
 
-  it('不正 JSON は backup に退避して defaults を再生成する', async () => {
+  it('不正 JSON は backup に退避して空リストへ復旧する', async () => {
     await withTempUserData(async (userDataPath) => {
       await fs.writeFile(path.join(userDataPath, 'agents.json'), '{broken', 'utf8');
       const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
@@ -202,7 +209,7 @@ describe('createReadingAgentStore', () => {
       const agents = await store.list();
       const backup = await fs.readFile(path.join(userDataPath, 'agents.json.bak'), 'utf8');
 
-      expect(agents).toHaveLength(4);
+      expect(agents).toEqual([]);
       expect(backup).toBe('{broken');
     });
   });

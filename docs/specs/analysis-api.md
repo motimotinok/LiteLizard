@@ -2,7 +2,7 @@
 
 関連タスク: S-06, S-09
 決定経緯: `docs/decisions.md` [2026-03-28] S-06, [2026-03-30] S-09
-改訂: 2026-06-25 contextPolicy を Reading Agent 所有の設定へ移行 / provider 既定モデルを候補選択化
+改訂: 2026-06-30 contextPolicy を Reading Agent 所有の設定へ移行 / provider 既定モデルを候補選択化 / OpenAI prompt cache prefix を安定化
 
 ---
 
@@ -74,8 +74,8 @@ type AnalysisContextPolicy =
 - `lastN` は schema validation で 1〜999 に制限する。
 - 既定値は `{ mode: 'whole-document' }`。新規作成Agentもこの既定値を使う。
 - 既存の `analysis-settings.json` に残る `contextPolicy` は読み込み時に無視し、保存契約からも外す。
-- `contextPolicy` を持たない旧 `agents.json` は互換補完せず、`agents.json.bak` へ退避して現在のデフォルトAgentを再生成する。
-- provider prompt は、固定指示、Reading Agent prompt、参照本文、対象本文の順に組み立てる。prompt caching、`prompt_cache_key`、provider別キャッシュ最適化は後続タスクで扱う。
+- `contextPolicy` を持たない旧 `agents.json` は互換補完せず、`agents.json.bak` へ退避して空の Agent 一覧へ復旧する。デフォルトAgentはテンプレートから明示追加する。
+- OpenAI provider prompt は、固定指示、Reading Agent prompt、全文、参照本文を共通prefixに置き、対象本文だけを可変promptとして送る。`prompt_cache_key` は同一文書・同一Agent・同一本文で安定し、本文またはAgent promptが変わると変わる。
 
 例:
 

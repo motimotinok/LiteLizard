@@ -153,10 +153,11 @@ describe('createMockPreloadApi', () => {
 
   it('runAnalysis は documentParagraphs 付き payload を受け取れる', async () => {
     const api = createMockPreloadApi();
+    await api.addReadingAgentFromTemplate('reader-first-impression');
 
     const result = await api.runAnalysis({
       documentId: 'doc-1',
-      agentId: 'reader-quiet',
+      agentId: 'reader-first-impression',
       personaMode: 'general-reader',
       promptVersion: 'v1.0.0',
       paragraphs: [{ paragraphId: 'p2', order: 2, text: 'second' }],
@@ -199,6 +200,22 @@ describe('createMockPreloadApi', () => {
         'seq-1',
       ]);
       expect(file?.paragraphs.p2?.patterns).toHaveLength(1);
+    });
+
+    it('saveAnalysisResult は同一 pattern を二重保存しない', async () => {
+      const api = createMockPreloadApi();
+      const pattern = makePattern(0);
+
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', pattern);
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', pattern);
+      await api.saveAnalysisResult(mockRootPath, 'doc-1', 'p1', {
+        ...pattern,
+        analyzedAt: '2026-04-11T00:01:00.000Z',
+      });
+
+      const file = await api.loadAnalysis(mockRootPath, 'doc-1');
+      expect(file?.paragraphs.p1?.patterns).toHaveLength(2);
+      expect(file?.paragraphs.p1?.patterns[1].analyzedAt).toBe('2026-04-11T00:01:00.000Z');
     });
 
     it('loadAnalysis は documentId ごとに独立した結果を返す', async () => {
@@ -256,23 +273,23 @@ describe('createMockPreloadApi', () => {
     });
   });
 
-  it('Reading Agent mock は built-in 4件を返す', async () => {
+  it('Reading Agent mock は初期0件でテンプレートから追加できる', async () => {
     const api = createMockPreloadApi();
 
     const agents = await api.listReadingAgents();
+    const templates = await api.listReadingAgentTemplates();
 
-    expect(agents.map((agent) => agent.id)).toEqual([
+    expect(agents).toEqual([]);
+    expect(templates.map((template) => template.id)).toEqual([
       'reader-first-impression',
       'reader-sensory',
       'reader-structure-editor',
       'reader-writing-companion',
     ]);
-    expect(agents.map((agent) => agent.name)).toEqual([
-      '初見の読者',
-      '感覚を読む読者',
-      '構造編集者',
-      '書き続ける伴走者',
-    ]);
-    expect(agents.every((agent) => agent.builtIn)).toBe(true);
+
+    const added = await api.addReadingAgentFromTemplate('reader-first-impression');
+    expect(added).toMatchObject({ id: 'reader-first-impression', name: '初見の読者', builtIn: false });
+    expect(await api.getActiveReadingAgentId()).toBe('reader-first-impression');
+    expect(await api.listReadingAgents()).toHaveLength(1);
   });
 });

@@ -126,6 +126,40 @@ function validateDraft(draft: AgentDraft): string | null {
   return null;
 }
 
+export function AgentTemplateList({
+  agents,
+  agentsLoaded,
+  agentTemplates,
+  onAddTemplate,
+}: {
+  agents: ReadingAgent[];
+  agentsLoaded: boolean;
+  agentTemplates: Array<Pick<ReadingAgent, 'id' | 'name' | 'role'>>;
+  onAddTemplate: (templateId: string) => void;
+}) {
+  return (
+    <>
+      {agentsLoaded && agents.length === 0 ? <div className="agents-sidebar-empty">未追加</div> : null}
+      {agentTemplates.length > 0 ? (
+        <div className="agents-template-list">
+          <div className="agents-template-label">Templates</div>
+          {agentTemplates.map((template) => (
+            <button
+              key={template.id}
+              type="button"
+              className="agents-template-item"
+              onClick={() => onAddTemplate(template.id)}
+            >
+              <span>{template.name}</span>
+              <small>{template.role}</small>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 function sameDraft(a: AgentDraft, b: AgentDraft) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -136,10 +170,12 @@ export function AgentsScreen() {
   const openSettingsPanel = useAppStore((s) => s.openSettingsPanel);
   const openSearchPanel = useAppStore((s) => s.openSearchPanel);
   const agents = useAppStore((s) => s.agents);
+  const agentTemplates = useAppStore((s) => s.agentTemplates);
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
   const document = useAppStore((s) => s.document);
   const setActiveAgent = useAppStore((s) => s.setActiveAgent);
+  const addAgentFromTemplate = useAppStore((s) => s.addAgentFromTemplate);
   const saveAgent = useAppStore((s) => s.saveAgent);
   const deleteAgent = useAppStore((s) => s.deleteAgent);
   const resetAgents = useAppStore((s) => s.resetAgents);
@@ -272,6 +308,17 @@ export function AgentsScreen() {
     setSelectedAgentId(id);
   };
 
+  const handleAddTemplate = async (templateId: string) => {
+    try {
+      const saved = await addAgentFromTemplate(templateId);
+      setIsCreatingNew(false);
+      setSelectedAgentId(saved.id);
+      setFormError(null);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'テンプレートの追加に失敗しました。');
+    }
+  };
+
   const handleDryRun = async () => {
     const validation = validateDraft(draft);
     if (validation) {
@@ -334,6 +381,12 @@ export function AgentsScreen() {
             <div className="agents-sidebar-desc">{entry.role}</div>
           </button>
         ))}
+        <AgentTemplateList
+          agents={agents}
+          agentsLoaded={agentsLoaded}
+          agentTemplates={agentTemplates}
+          onAddTemplate={(templateId) => void handleAddTemplate(templateId)}
+        />
       </div>
     </>
   );
@@ -402,7 +455,7 @@ export function AgentsScreen() {
               <button type="button" className="button-small" onClick={handleDuplicate}>
                 複製
               </button>
-              <button type="button" className="button-small" onClick={handleDelete} disabled={!draft.id || agents.length <= 1}>
+              <button type="button" className="button-small" onClick={handleDelete} disabled={!draft.id}>
                 削除
               </button>
               <button type="button" className="button-small button-small-primary" onClick={() => void handleSave()} disabled={!dirty}>

@@ -178,6 +178,22 @@ describe('appendParagraphPattern', () => {
     });
   });
 
+  it('同一 pattern は保存ファイルへ二重追記しない', async () => {
+    await withTempProject(async (projectRoot) => {
+      await appendParagraphPattern(projectRoot, DOC_ID, 'p_para1', pattern);
+      await appendParagraphPattern(projectRoot, DOC_ID, 'p_para1', pattern);
+      await appendParagraphPattern(projectRoot, DOC_ID, 'p_para1', {
+        ...pattern,
+        analyzedAt: '2026-04-11T00:01:00.000Z',
+      });
+
+      const result = await loadLatestAnalysis(projectRoot, DOC_ID);
+      expect(result?.paragraphs['p_para1'].patterns).toHaveLength(2);
+      expect(result?.paragraphs['p_para1'].patterns[0]).toEqual(pattern);
+      expect(result?.paragraphs['p_para1'].patterns[1].analyzedAt).toBe('2026-04-11T00:01:00.000Z');
+    });
+  });
+
   it('段落が既存ファイルにない場合は新規パターンで追加する', async () => {
     await withTempProject(async (projectRoot) => {
       const existing = makeFile(1);

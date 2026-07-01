@@ -5,8 +5,10 @@ import {
   ReadingAgentInputSchema,
   ReadingAgentSchema,
   createDefaultReadingAgentsFromPresets,
+  listDefaultReadingAgentTemplates,
   type ReadingAgent,
   type ReadingAgentInput,
+  type ReadingAgentTemplate,
 } from '@litelizard/shared';
 
 const AGENTS_FILE_NAME = 'agents.json';
@@ -22,6 +24,10 @@ export interface ReadingAgentStoreOptions {
 
 export function createDefaultReadingAgents(now: string): ReadingAgent[] {
   return createDefaultReadingAgentsFromPresets(now);
+}
+
+export function listReadingAgentTemplates(): ReadingAgentTemplate[] {
+  return listDefaultReadingAgentTemplates();
 }
 
 function isMissingFileError(error: unknown) {
@@ -55,9 +61,7 @@ export function createReadingAgentStore(
       return ReadingAgentSchema.array().parse(JSON.parse(raw));
     } catch (error) {
       if (isMissingFileError(error)) {
-        const defaults = createDefaultReadingAgents(now());
-        await writeAgents(defaults);
-        return defaults;
+        return [];
       }
 
       await fs.mkdir(userDataPath, { recursive: true });
@@ -69,9 +73,8 @@ export function createReadingAgentStore(
         }
       }
 
-      const defaults = createDefaultReadingAgents(now());
-      await writeAgents(defaults);
-      return defaults;
+      await writeAgents([]);
+      return [];
     }
   }
 
@@ -85,6 +88,10 @@ export function createReadingAgentStore(
   }
 
   return {
+    listTemplates(): ReadingAgentTemplate[] {
+      return listReadingAgentTemplates();
+    },
+
     async list(): Promise<ReadingAgent[]> {
       return runSerialized(async () => cloneAgents(await loadOrInitialize()));
     },
@@ -138,6 +145,37 @@ export function createReadingAgentStore(
       });
     },
 
+    async addFromTemplate(templateId: string): Promise<ReadingAgent> {
+      return runSerialized(async () => {
+        const template = listReadingAgentTemplates().find((entry) => entry.id === templateId.trim());
+        if (!template) {
+          throw new Error(`Reading agent template not found: ${templateId}`);
+        }
+
+        const agents = await loadOrInitialize();
+        const timestamp = now();
+        const baseId = template.id;
+        let id = baseId;
+        let suffix = 2;
+        const existingIds = new Set(agents.map((agent) => agent.id));
+        while (existingIds.has(id)) {
+          id = `${baseId}-${suffix}`;
+          suffix += 1;
+        }
+
+        const agent: ReadingAgent = {
+          ...template,
+          id,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          builtIn: false,
+        };
+        agents.push(agent);
+        await writeAgents(agents);
+        return { ...agent };
+      });
+    },
+
     async delete(id: string): Promise<void> {
       return runSerialized(async () => {
         const normalizedId = id.trim();
@@ -148,9 +186,8 @@ export function createReadingAgentStore(
 
     async resetToDefaults(): Promise<ReadingAgent[]> {
       return runSerialized(async () => {
-        const defaults = createDefaultReadingAgents(now());
-        await writeAgents(defaults);
-        return cloneAgents(defaults);
+        await writeAgents([]);
+        return [];
       });
     },
   };

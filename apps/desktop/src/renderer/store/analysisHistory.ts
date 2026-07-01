@@ -108,6 +108,10 @@ export function appendPatternToHistories(
   pattern: ParagraphAnalysisPattern,
 ): AnalysisHistoriesByParagraphId {
   const history = analysisHistoriesByParagraphId[paragraphId] ?? [];
+  if (history.some((existing) => JSON.stringify(existing) === JSON.stringify(pattern))) {
+    return analysisHistoriesByParagraphId;
+  }
+
   return {
     ...analysisHistoriesByParagraphId,
     [paragraphId]: [...history, pattern],

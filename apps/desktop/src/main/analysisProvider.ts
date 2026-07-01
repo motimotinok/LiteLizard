@@ -1,6 +1,13 @@
 import OpenAI, { AuthenticationError, RateLimitError } from 'openai';
+import type {
+  Response as OpenAiResponse,
+  ResponseCreateParamsNonStreaming,
+} from 'openai/resources/responses/responses';
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
+  buildAnalysisContextTexts,
+  buildAnalysisSystemPrompt,
+  buildAnalysisTargetPrompt,
   type AnalysisContextPolicy,
   type AnalysisProviderId,
   type AnalysisResult,
@@ -17,6 +24,8 @@ export interface AnalysisProviderRequest {
   model: string;
   temperature: number;
   contextTexts: string[];
+  documentTexts?: string[];
+  promptCacheKey?: string;
 }
 
 export interface AnalysisProvider {
@@ -32,6 +41,10 @@ export interface ResolvedAnalysisProvider {
 }
 
 type SecretMap = Partial<Record<AnalysisProviderId | string, string>>;
+type OpenAiResponseCreateParamsWithPromptCache = ResponseCreateParamsNonStreaming & {
+  prompt_cache_key?: string;
+  prompt_cache_retention?: '24h';
+};
 
 export const ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA = {
   type: 'object',
@@ -89,22 +102,32 @@ function extractJsonText(input: string): string {
   return trimmed;
 }
 
-export function buildSystemPrompt(agent: ReadingAgentInput, contextTexts: string[]): string {
-  const contextBlock =
-    contextTexts.length > 0
-      ? `Reference paragraphs (document order):\n${contextTexts.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
-      : 'Reference paragraphs: none';
-
-  return [
-    'You are LiteLizard analysis model.',
-    `Reading agent name: ${agent.name}.`,
-    `Reading agent role: ${agent.role}.`,
-    'Reading agent system prompt:',
-    agent.systemPrompt,
-    'Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1).',
-    contextBlock,
-    'Analyze only the target paragraph provided by the user. Use the reference paragraphs only as reading context.',
-  ].join('\n\n');
+export function buildOpenAiResponseRequest(
+  input: AnalysisProviderRequest,
+): OpenAiResponseCreateParamsWithPromptCache {
+  const system = buildAnalysisSystemPrompt(input.agent, input.contextTexts, input.documentTexts ?? input.contextTexts);
+  const targetPrompt = buildAnalysisTargetPrompt(input.paragraphId, input.text);
+  return {
+    model: input.model,
+    temperature: input.temperature,
+    input: [
+      { role: 'system', content: system },
+      { role: 'user', content: targetPrompt },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'litelizard_analysis',
+        schema: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
+      },
+    },
+    ...(input.promptCacheKey
+      ? {
+          prompt_cache_key: input.promptCacheKey,
+          prompt_cache_retention: '24h' as const,
+        }
+      : {}),
+  };
 }
 
 export function normalizeAnalysisPayload(
@@ -137,24 +160,9 @@ export function createOpenAiAnalysisProvider(apiKey: string): AnalysisProvider {
   return {
     id: 'openai',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.agent, input.contextTexts);
-      let completion: Awaited<ReturnType<typeof client.responses.create>>;
+      let completion: OpenAiResponse;
       try {
-        completion = await client.responses.create({
-          model: input.model,
-          temperature: input.temperature,
-          input: [
-            { role: 'system', content: system },
-            { role: 'user', content: input.text },
-          ],
-          text: {
-            format: {
-              type: 'json_schema',
-              name: 'litelizard_analysis',
-              schema: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
-            },
-          },
-        });
+        completion = await client.responses.create(buildOpenAiResponseRequest(input));
       } catch (error) {
         if (error instanceof AuthenticationError) {
           throw new Error('OpenAI API キーが無効です。設定画面で再入力してください。');
@@ -181,7 +189,7 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
   return {
     id: 'anthropic',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.agent, input.contextTexts);
+      const system = buildAnalysisSystemPrompt(input.agent, input.contextTexts);
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -200,7 +208,7 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
               content: [
                 {
                   type: 'text',
-                  text: `${input.text}\n\nReturn JSON only.`,
+                  text: buildAnalysisTargetPrompt(input.paragraphId, input.text),
                 },
               ],
             },
@@ -241,13 +249,8 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
   return {
     id: 'local-llm',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
-      const system = buildSystemPrompt(input.agent, input.contextTexts);
-      const prompt = [
-        system,
-        'Target paragraph:',
-        input.text,
-        'Return JSON only.',
-      ].join('\n\n');
+      const system = buildAnalysisSystemPrompt(input.agent, input.contextTexts);
+      const prompt = [system, buildAnalysisTargetPrompt(input.paragraphId, input.text)].join('\n\n');
 
       let response: Response;
       try {
@@ -354,30 +357,5 @@ export function buildContextTexts(
   paragraphId: string,
   policy: AnalysisContextPolicy = DEFAULT_ANALYSIS_CONTEXT_POLICY,
 ): string[] {
-  const index = paragraphs.findIndex((paragraph) => paragraph.paragraphId === paragraphId);
-  if (index < 0 || policy.mode === 'target-only') {
-    return [];
-  }
-
-  if (policy.mode === 'whole-document') {
-    return paragraphs
-      .filter((paragraph) => paragraph.paragraphId !== paragraphId)
-      .map((paragraph) => paragraph.text)
-      .filter((text) => text.trim().length > 0);
-  }
-
-  if (index === 0) {
-    return [];
-  }
-
-  let candidates = paragraphs.slice(0, index);
-
-  if (policy.range === 'lastN') {
-    const lastN = Math.max(0, Math.trunc(policy.lastN));
-    candidates = candidates.slice(Math.max(0, candidates.length - lastN));
-  }
-
-  return candidates
-    .map((paragraph) => paragraph.text)
-    .filter((text) => text.trim().length > 0);
+  return buildAnalysisContextTexts(paragraphs, paragraphId, policy);
 }

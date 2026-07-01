@@ -1,26 +1,23 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { AnalysisSettings, LiteLizardDocument } from '@litelizard/shared';
+import React, { useEffect, useMemo, useState } from 'react';
+import type { AnalysisSettings, LiteLizardDocument, ReadingAgent } from '@litelizard/shared';
 import type { AnalysisMode } from '../store/useAppStore.js';
-import { reorderByKey } from '../utils/arrayUtils.js';
-import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
 import { ChapterSummaryList } from './ChapterSummaryList.js';
 import { AnalysisRunConfirm } from './AnalysisRunConfirm.js';
 import { useAppStore } from '../store/useAppStore.js';
-import {
-  getVisiblePatternIndices,
-  resolveDisplayedPatternIndex,
-} from '../store/analysisHistory.js';
-import { IconChevronDown, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
+import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
+import { IconChevronDown, IconChevronRight, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
 
 interface Props {
   document: LiteLizardDocument | null;
   activeParagraphId: string | null;
-  linkedHighlightParagraphId?: string | null;
-  scrollRequest?: { paragraphId: string; nonce: number } | null;
   onSetActiveParagraphId?: (id: string | null) => void;
-  onPreviewParagraphLink?: (id: string | null) => void;
-  onReorderParagraphs?: (orderedIds: string[]) => void;
   onRequestScrollToParagraph?: (id: string) => void;
+}
+
+interface ParagraphChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  body: string;
 }
 
 function statusLabel(
@@ -96,14 +93,42 @@ function analysisModeRunLabel(mode: AnalysisMode) {
   return '全体解析は準備中です';
 }
 
+const FOLLOWUP_SYSTEM_PROMPT_MAX_LENGTH = 8000;
+
+function clampFollowupSystemPrompt(basePrompt: string, suffix: string) {
+  const separator = '\n\n---\n';
+  const baseBudget = FOLLOWUP_SYSTEM_PROMPT_MAX_LENGTH - separator.length - suffix.length;
+  const safeBasePrompt =
+    baseBudget > 0 ? basePrompt.trim().slice(0, baseBudget).trimEnd() : '';
+  return `${safeBasePrompt}${separator}${suffix}`.slice(0, FOLLOWUP_SYSTEM_PROMPT_MAX_LENGTH);
+}
+
+function buildFollowupAgent(agent: ReadingAgent, question: string, previousAnalysis: string) {
+  const analysisContext = previousAnalysis.trim()
+    ? `既存分析:\n${previousAnalysis.trim()}`
+    : '既存分析: まだ保存済みの分析結果はありません。';
+  const followupPrompt = `LiteLizard 段落限定の追加質問:
+対象はユーザーが現在フォーカスしている1段落だけです。本文を自動で書き換えず、既存分析を必要な範囲で参照し、次の質問に答えてください。
+
+${analysisContext}
+
+質問:
+${question.trim()}`;
+
+  return {
+    name: agent.name,
+    role: agent.role,
+    model: agent.model,
+    temperature: agent.temperature,
+    contextPolicy: { mode: 'target-only' as const },
+    systemPrompt: clampFollowupSystemPrompt(agent.systemPrompt, followupPrompt),
+  };
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
-  linkedHighlightParagraphId = null,
-  scrollRequest = null,
   onSetActiveParagraphId,
-  onPreviewParagraphLink,
-  onReorderParagraphs,
   onRequestScrollToParagraph,
 }: Props) {
   const requestAnalysisRun = useAppStore((s) => s.requestAnalysisRun);
@@ -117,16 +142,12 @@ export function AnalysisPane({
   const analysisMode = useAppStore((s) => s.analysisMode);
   const setAnalysisMode = useAppStore((s) => s.setAnalysisMode);
   const analysisRunSummary = useAppStore((s) => s.analysisRunSummary);
-  const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
-  const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
-  const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
   const agents = useAppStore((s) => s.agents);
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
   const setActiveAgent = useAppStore((s) => s.setActiveAgent);
+  const dryRunAgent = useAppStore((s) => s.dryRunAgent);
   const viewScale = useAppStore((s) => s.viewScale);
-  const cardElementByParagraphIdRef = useRef<Map<string, HTMLElement>>(new Map());
-  const consumedScrollRequestNonceRef = useRef<number | null>(null);
   const providerUi = getAnalysisProviderUiState(analysisSettings);
   const chapterSummaries = useMemo(() => aggregateChapterAnalyses(document), [document]);
 
@@ -137,33 +158,39 @@ export function AnalysisPane({
     !selectedModeImplemented || staleCount === 0 || hasPending || !providerUi.runnable || !activeAgentId;
 
   const [agentMenuOpen, setAgentMenuOpen] = useState(false);
-  const [expandedByParagraphId, setExpandedByParagraphId] = useState<Record<string, boolean>>({});
-  const [draggingParagraphId, setDraggingParagraphId] = useState<string | null>(null);
-  const [dropTargetParagraphId, setDropTargetParagraphId] = useState<string | null>(null);
+  const [draftByParagraphId, setDraftByParagraphId] = useState<Record<string, string>>({});
+  const [messagesByParagraphId, setMessagesByParagraphId] = useState<Record<string, ParagraphChatMessage[]>>({});
+  const [sendingParagraphId, setSendingParagraphId] = useState<string | null>(null);
 
   const activeAgent = useMemo(
     () => agents.find((agent) => agent.id === activeAgentId) ?? agents[0] ?? null,
     [activeAgentId, agents],
   );
 
-  useEffect(() => {
-    if (!document) {
-      setExpandedByParagraphId({});
-      return;
-    }
+  const focusedParagraph = useMemo(
+    () => document?.paragraphs.find((paragraph) => paragraph.id === activeParagraphId) ?? null,
+    [activeParagraphId, document],
+  );
 
-    const nextIds = new Set(document.paragraphs.map((paragraph) => paragraph.id));
-
-    setExpandedByParagraphId((current) => {
-      const next: Record<string, boolean> = {};
-      Object.entries(current).forEach(([paragraphId, expanded]) => {
-        if (nextIds.has(paragraphId)) {
-          next[paragraphId] = expanded;
-        }
-      });
-      return next;
-    });
-  }, [document]);
+  const selectedMessages = focusedParagraph ? messagesByParagraphId[focusedParagraph.id] ?? [] : [];
+  const draft = focusedParagraph ? draftByParagraphId[focusedParagraph.id] ?? '' : '';
+  const hasPreviousAnalysis = Boolean(focusedParagraph?.lizard.analyzedAt || focusedParagraph?.lizard.deepMeaning);
+  const focusedStatusText = focusedParagraph
+    ? statusLabel(focusedParagraph.lizard.status, hasPreviousAnalysis)
+    : '';
+  const tags = focusedParagraph
+    ? [
+        ...(focusedParagraph.lizard.theme ?? []),
+        ...(focusedParagraph.lizard.emotion ?? []),
+      ]
+    : [];
+  const canSendFollowup = Boolean(
+    focusedParagraph &&
+      activeAgent &&
+      providerUi.runnable &&
+      draft.trim() &&
+      sendingParagraphId !== focusedParagraph.id,
+  );
 
   useEffect(() => {
     const close = () => setAgentMenuOpen(false);
@@ -173,41 +200,6 @@ export function AnalysisPane({
     }
     return undefined;
   }, [agentMenuOpen]);
-
-  useEffect(() => {
-    if (!scrollRequest) {
-      return;
-    }
-    if (consumedScrollRequestNonceRef.current === scrollRequest.nonce) {
-      return;
-    }
-
-    const element = cardElementByParagraphIdRef.current.get(scrollRequest.paragraphId);
-    if (!element) {
-      return;
-    }
-
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    consumedScrollRequestNonceRef.current = scrollRequest.nonce;
-  }, [scrollRequest, document?.documentId]);
-
-  const orderedParagraphIds = useMemo(() => {
-    if (!document) {
-      return [];
-    }
-    return document.paragraphs.map((paragraph) => paragraph.id);
-  }, [document]);
-
-  const onDropReorder = (activeId: string, overId: string) => {
-    if (!document || !onReorderParagraphs) {
-      return;
-    }
-    const nextOrder = reorderByKey(orderedParagraphIds, activeId, overId);
-    if (nextOrder === orderedParagraphIds) {
-      return;
-    }
-    onReorderParagraphs(nextOrder);
-  };
 
   const runButtonTitle = !providerUi.runnable
     ? providerUi.disabledTitle
@@ -221,8 +213,62 @@ export function AnalysisPane({
             ? '再解析が必要な段落はありません'
             : `${staleCount}件の段落を解析`;
 
+  const submitFollowup = async () => {
+    if (!focusedParagraph || !activeAgent || !draft.trim()) {
+      return;
+    }
+
+    const question = draft.trim();
+    const targetParagraph = focusedParagraph;
+    const userMessage: ParagraphChatMessage = {
+      id: `${targetParagraph.id}-u-${Date.now()}`,
+      role: 'user',
+      body: question,
+    };
+
+    setDraftByParagraphId((current) => ({ ...current, [targetParagraph.id]: '' }));
+    setMessagesByParagraphId((current) => ({
+      ...current,
+      [targetParagraph.id]: [...(current[targetParagraph.id] ?? []), userMessage],
+    }));
+    setSendingParagraphId(targetParagraph.id);
+
+    try {
+      const result = await dryRunAgent({
+        agent: buildFollowupAgent(activeAgent, question, targetParagraph.lizard.deepMeaning ?? ''),
+        paragraphId: targetParagraph.id,
+        text: targetParagraph.light.text,
+        order: targetParagraph.order,
+      });
+      const assistantMessage: ParagraphChatMessage = {
+        id: `${targetParagraph.id}-a-${Date.now()}`,
+        role: 'assistant',
+        body: result.deepMeaning.trim() || '応答が空でした。',
+      };
+      setMessagesByParagraphId((current) => ({
+        ...current,
+        [targetParagraph.id]: [...(current[targetParagraph.id] ?? []), assistantMessage],
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '追加質問に失敗しました。';
+      setMessagesByParagraphId((current) => ({
+        ...current,
+        [targetParagraph.id]: [
+          ...(current[targetParagraph.id] ?? []),
+          {
+            id: `${targetParagraph.id}-e-${Date.now()}`,
+            role: 'assistant',
+            body: `追加質問に失敗しました: ${message}`,
+          },
+        ],
+      }));
+    } finally {
+      setSendingParagraphId(null);
+    }
+  };
+
   return (
-    <aside className="analysis-shell" aria-label="analysis-panel">
+    <aside className="analysis-shell analysis-shell-focused" aria-label="analysis-panel">
       <header className="analysis-header">
         <div className="analysis-section-label">Reading Agent</div>
         <div className="agent-select" onClick={(event) => event.stopPropagation()}>
@@ -250,11 +296,7 @@ export function AnalysisPane({
                 <button
                   key={agent.id}
                   type="button"
-                  className={
-                    agent.id === activeAgent?.id
-                      ? 'agent-select-option is-active'
-                      : 'agent-select-option'
-                  }
+                  className={agent.id === activeAgent?.id ? 'agent-select-option is-active' : 'agent-select-option'}
                   onClick={() => {
                     void setActiveAgent(agent.id);
                     setAgentMenuOpen(false);
@@ -287,11 +329,7 @@ export function AnalysisPane({
             <button
               key={option.id}
               type="button"
-              className={
-                option.id === analysisMode
-                  ? 'analysis-mode-option is-active'
-                  : 'analysis-mode-option'
-              }
+              className={option.id === analysisMode ? 'analysis-mode-option is-active' : 'analysis-mode-option'}
               role="radio"
               aria-checked={option.id === analysisMode}
               onClick={() => setAnalysisMode(option.id)}
@@ -310,6 +348,24 @@ export function AnalysisPane({
         >
           <IconPlay size={10} /> {analysisModeRunLabel(analysisMode)}
         </button>
+        <div className="analysis-focus-actions">
+          <button
+            type="button"
+            className="analysis-focus-link"
+            onClick={() => onSetActiveParagraphId?.(null)}
+          >
+            全体へ戻る
+          </button>
+          {focusedParagraph ? (
+            <button
+              type="button"
+              className="analysis-focus-link"
+              onClick={() => onRequestScrollToParagraph?.(focusedParagraph.id)}
+            >
+              本文へ
+            </button>
+          ) : null}
+        </div>
         {!pendingAnalysisRun && analysisRunSummary ? (
           <div className="analysis-run-summary" aria-label="解析実行結果">
             <span>対象 {analysisRunSummary.targetCount}</span>
@@ -328,8 +384,8 @@ export function AnalysisPane({
         />
       ) : null}
 
-      {!document ? (
-        <div className="analysis-empty">ドキュメントを開くと分析カードが表示されます。</div>
+      {!document || !focusedParagraph ? (
+        <div className="analysis-empty">本文横の読みから段落を選ぶと詳細が表示されます。</div>
       ) : (
         <div className="analysis-scroll">
           {!providerUi.runnable ? (
@@ -348,242 +404,95 @@ export function AnalysisPane({
           {viewScale === 'macro' ? (
             <ChapterSummaryList summaries={chapterSummaries} />
           ) : (
-          <div className="analysis-card-list">
-            {document.paragraphs.map((paragraph, index) => {
-              const expanded = Boolean(expandedByParagraphId[paragraph.id]);
-              const active = paragraph.id === activeParagraphId;
-              const isLinkedHighlight = paragraph.id === linkedHighlightParagraphId;
-              const isDragging = draggingParagraphId === paragraph.id;
-              const isDropTarget = dropTargetParagraphId === paragraph.id;
-              const isComplete = paragraph.lizard.status === 'complete';
-              const confidence =
-                typeof paragraph.lizard.confidence === 'number'
-                  ? Math.round(paragraph.lizard.confidence * 100)
-                  : null;
-              const history = analysisHistoriesByParagraphId[paragraph.id];
-              const hasHistory = Array.isArray(history) && history.length > 0;
-              const hasPreviousAnalysis = hasHistory || Boolean(paragraph.lizard.analyzedAt);
-              const isStaleWithPreviousAnalysis =
-                paragraph.lizard.status === 'stale' && hasPreviousAnalysis;
-              const statusText = statusLabel(paragraph.lizard.status, hasPreviousAnalysis);
-              const tags = [
-                ...(paragraph.lizard.theme ?? []),
-                ...(paragraph.lizard.emotion ?? []),
-              ];
-              const visiblePatternIndices = getVisiblePatternIndices(history, paragraph.light.text);
-              const activePatternIndex = resolveDisplayedPatternIndex(
-                history,
-                paragraph.light.text,
-                selectedPatternIndexByParagraphId[paragraph.id],
-              );
-              const activePatternPosition =
-                activePatternIndex === null ? 0 : visiblePatternIndices.indexOf(activePatternIndex) + 1;
-              const canMoveToPreviousPattern = activePatternPosition > 1;
-              const canMoveToNextPattern =
-                activePatternIndex !== null && activePatternPosition < visiblePatternIndices.length;
-              const showHistoryNavigation = visiblePatternIndices.length > 1;
-
-              return (
-                <article
-                  key={paragraph.id}
-                  ref={(element) => {
-                    if (element) {
-                      cardElementByParagraphIdRef.current.set(paragraph.id, element);
-                    } else {
-                      cardElementByParagraphIdRef.current.delete(paragraph.id);
-                    }
-                  }}
-                  data-analysis-paragraph-id={paragraph.id}
-                  className={[
-                    'analysis-card',
-                    active ? 'analysis-card-active' : '',
-                    isLinkedHighlight ? 'analysis-card-linked-highlight' : '',
-                    isDragging ? 'analysis-card-dragging' : '',
-                    isDropTarget ? 'analysis-card-drop-target' : '',
-                    isStaleWithPreviousAnalysis ? 'analysis-card-stale' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
+            <article className="analysis-focus-card" data-analysis-paragraph-id={focusedParagraph.id}>
+              <header className="analysis-focus-card-header">
+                <div className="analysis-focus-kicker">
+                  <span>{focusedParagraph.order}</span>
+                  <span>{activeAgent?.name ?? 'Reading Agent'}</span>
+                </div>
+                <button
+                  type="button"
+                  className="analysis-card-icon-button"
                   onClick={() => {
-                    onSetActiveParagraphId?.(paragraph.id);
-                    onRequestScrollToParagraph?.(paragraph.id);
+                    void runAnalysisFor(focusedParagraph.id);
                   }}
-                  onMouseEnter={() => onPreviewParagraphLink?.(paragraph.id)}
-                  onMouseLeave={() => onPreviewParagraphLink?.(null)}
-                  onFocus={() => onPreviewParagraphLink?.(paragraph.id)}
-                  onBlur={() => onPreviewParagraphLink?.(null)}
+                  disabled={focusedParagraph.lizard.status === 'pending' || hasPending || !providerUi.runnable}
+                  title="この段落だけ再解析"
+                  aria-label={`${focusedParagraph.order} を再解析`}
                 >
-                  <header className="analysis-card-header">
-                    <div className="analysis-card-heading">
-                      <span className="analysis-card-index">{index + 1}</span>
-                      {isStaleWithPreviousAnalysis ? (
-                        <span
-                          className="analysis-card-stale-badge"
-                          title="本文が更新されました。再解析してください。"
-                        >
-                          要再解析
+                  <IconRefresh size={11} />
+                </button>
+              </header>
+              {tags.length > 0 ? (
+                <ul className="analysis-tag-list">
+                  {tags.map((tag, tagIndex) => (
+                    <React.Fragment key={`${focusedParagraph.id}-${tag}-${tagIndex}`}>
+                      {tagIndex > 0 ? (
+                        <span className="analysis-tag-separator" aria-hidden>
+                          ·
                         </span>
                       ) : null}
-                    </div>
-
-                    <div className="analysis-card-actions">
-                      {confidence !== null ? (
-                        <span className="analysis-card-meta-confidence" title="解析の確度">
-                          {confidence}
-                        </span>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        className="analysis-card-icon-button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          runAnalysisFor(paragraph.id);
-                        }}
-                        disabled={paragraph.lizard.status === 'pending' || hasPending || !providerUi.runnable}
-                        title="この段落だけ再解析"
-                        aria-label={`${index + 1} を再解析`}
-                      >
-                        <IconRefresh size={11} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="analysis-card-icon-button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setExpandedByParagraphId((current) => ({
-                            ...current,
-                            [paragraph.id]: !current[paragraph.id],
-                          }));
-                        }}
-                        title={expanded ? '折りたたむ' : '全文を表示'}
-                        aria-label={expanded ? '折りたたむ' : '全文を表示'}
-                      >
-                        {expanded ? '−' : '＋'}
-                      </button>
-
-                      {showHistoryNavigation ? (
-                        <div
-                          className="analysis-card-history-nav"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            className="analysis-card-history-btn"
-                            disabled={!canMoveToPreviousPattern}
-                            onClick={() => {
-                              if (!canMoveToPreviousPattern || activePatternIndex === null) {
-                                return;
-                              }
-                              selectAnalysisPatternIndex(
-                                paragraph.id,
-                                visiblePatternIndices[activePatternPosition - 2],
-                              );
-                            }}
-                            aria-label="前の解析結果を表示"
-                          >
-                            &lt;
-                          </button>
-                          <span className="analysis-card-history-index">
-                            {activePatternPosition} / {visiblePatternIndices.length}
-                          </span>
-                          <button
-                            type="button"
-                            className="analysis-card-history-btn"
-                            disabled={!canMoveToNextPattern}
-                            onClick={() => {
-                              if (!canMoveToNextPattern || activePatternIndex === null) {
-                                return;
-                              }
-                              selectAnalysisPatternIndex(
-                                paragraph.id,
-                                visiblePatternIndices[activePatternPosition],
-                              );
-                            }}
-                            aria-label="次の解析結果を表示"
-                          >
-                            &gt;
-                          </button>
-                        </div>
-                      ) : null}
-
-                      <button
-                        type="button"
-                        className="analysis-card-icon-button analysis-card-drag-handle"
-                        draggable
-                        onClick={(event) => event.stopPropagation()}
-                        onDragStart={(event) => {
-                          event.dataTransfer.setData('text/plain', paragraph.id);
-                          event.dataTransfer.effectAllowed = 'move';
-                          setDraggingParagraphId(paragraph.id);
-                          setDropTargetParagraphId(null);
-                        }}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          setDropTargetParagraphId(paragraph.id);
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          const draggedId = event.dataTransfer.getData('text/plain');
-                          if (!draggedId || draggedId === paragraph.id) {
-                            setDraggingParagraphId(null);
-                            setDropTargetParagraphId(null);
-                            return;
-                          }
-                          onDropReorder(draggedId, paragraph.id);
-                          setDraggingParagraphId(null);
-                          setDropTargetParagraphId(null);
-                        }}
-                        onDragEnd={() => {
-                          setDraggingParagraphId(null);
-                          setDropTargetParagraphId(null);
-                        }}
-                        aria-label="ドラッグして並び替え"
-                        title="ドラッグして並び替え"
-                      >
-                        ⋮⋮
-                      </button>
-                    </div>
-                  </header>
-
-                  {isComplete ? (
-                    <>
-                      {tags.length > 0 ? (
-                        <ul className="analysis-tag-list">
-                          {tags.map((tag, tagIndex) => (
-                            <React.Fragment key={`${paragraph.id}-${tag}-${tagIndex}`}>
-                              {tagIndex > 0 ? (
-                                <span className="analysis-tag-separator" aria-hidden>
-                                  ·
-                                </span>
-                              ) : null}
-                              <li className="analysis-tag">{tag}</li>
-                            </React.Fragment>
-                          ))}
-                        </ul>
-                      ) : null}
-
+                      <li className="analysis-tag">{tag}</li>
+                    </React.Fragment>
+                  ))}
+                </ul>
+              ) : null}
+              {focusedParagraph.lizard.status === 'complete' || focusedParagraph.lizard.deepMeaning ? (
+                <p className="analysis-focus-body">
+                  {focusedParagraph.lizard.deepMeaning?.trim() || '生成結果が空です。'}
+                </p>
+              ) : (
+                <p className="analysis-card-status">
+                  {focusedStatusText}
+                  {focusedParagraph.lizard.status === 'failed' && focusedParagraph.lizard.error?.message
+                    ? ` (${focusedParagraph.lizard.error.message})`
+                    : ''}
+                </p>
+              )}
+              <form
+                className="analysis-followup"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void submitFollowup();
+                }}
+              >
+                {selectedMessages.length > 0 ? (
+                  <div className="analysis-followup-log" aria-label={`${focusedParagraph.order} の追加質問`}>
+                    {selectedMessages.map((message) => (
                       <p
+                        key={message.id}
                         className={
-                          expanded ? 'analysis-card-body analysis-card-body-expanded' : 'analysis-card-body'
+                          message.role === 'user'
+                            ? 'analysis-followup-message is-user'
+                            : 'analysis-followup-message is-assistant'
                         }
                       >
-                        {paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。'}
+                        {message.body}
                       </p>
-                    </>
-                  ) : (
-                    <p className="analysis-card-status">
-                      {statusText}
-                      {paragraph.lizard.status === 'failed' && paragraph.lizard.error?.message
-                        ? ` (${paragraph.lizard.error.message})`
-                        : ''}
-                    </p>
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                    ))}
+                  </div>
+                ) : null}
+                <label className="analysis-followup-input">
+                  <span>この段落について聞く</span>
+                  <textarea
+                    value={draft}
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      setDraftByParagraphId((current) => ({
+                        ...current,
+                        [focusedParagraph.id]: nextValue,
+                      }));
+                    }}
+                    rows={selectedMessages.length > 0 ? 3 : 2}
+                    placeholder="なぜそう読まれたのか、この段落だけ直すならどこか、など"
+                  />
+                </label>
+                <button type="submit" className="analysis-followup-send" disabled={!canSendFollowup}>
+                  {sendingParagraphId === focusedParagraph.id ? '送信中' : '送信'}
+                  <IconChevronRight size={12} />
+                </button>
+              </form>
+            </article>
           )}
         </div>
       )}

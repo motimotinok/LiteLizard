@@ -1,9 +1,9 @@
-import { DEFAULT_ANALYSIS_SETTINGS, type LiteLizardDocument } from '@litelizard/shared';
+import { DEFAULT_ANALYSIS_SETTINGS, listDefaultReadingAgentTemplates, type LiteLizardDocument } from '@litelizard/shared';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAppStore } from '../store/useAppStore.js';
 import { AnalysisPane } from './AnalysisPane.js';
-import { AgentModelSelector } from './AgentsScreen.js';
+import { AgentModelSelector, AgentTemplateList } from './AgentsScreen.js';
 import { ProviderModelSelector, SettingsScreen } from './SettingsScreen.js';
 
 const baseState = useAppStore.getState();
@@ -110,6 +110,21 @@ describe('analysis settings route', () => {
     );
 
     expect(html).toContain('custom-agent-model');
+  });
+
+  it('AgentsScreen のテンプレート一覧は Agent 0 件でも追加導線を表示する', () => {
+    const html = renderToStaticMarkup(
+      <AgentTemplateList
+        agents={[]}
+        agentsLoaded
+        agentTemplates={listDefaultReadingAgentTemplates()}
+        onAddTemplate={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('未追加');
+    expect(html).toContain('Templates');
+    expect(html).toContain('初見の読者');
   });
 
   it('SettingsScreen のエディタタブで Tweaks 保存導線を表示する', () => {

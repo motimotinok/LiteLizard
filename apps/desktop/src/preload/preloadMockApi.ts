@@ -1,8 +1,8 @@
 import {
   buildImportedDocument,
-  createDefaultReadingAgentsFromPresets,
   DEFAULT_ANALYSIS_SETTINGS,
   exportDocumentToPlainText,
+  listDefaultReadingAgentTemplates,
   parseTextToImportResult,
   type AnalysisRunInput,
   type AnalysisSettings,
@@ -14,6 +14,7 @@ import {
   type ParagraphAnalysisPattern,
   type ReadingAgent,
   type ReadingAgentInput,
+  type ReadingAgentTemplate,
 } from '@litelizard/shared';
 import {
   initialMockApiKeyConfigured,
@@ -279,6 +280,10 @@ function analysisFileKey(documentId: string) {
   return documentId;
 }
 
+function isSameAnalysisPattern(a: ParagraphAnalysisPattern, b: ParagraphAnalysisPattern) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 function appendAnalysisPattern(
   state: MockState,
   documentId: string,
@@ -300,6 +305,10 @@ function appendAnalysisPattern(
       };
 
   const history = nextFile.paragraphs[paragraphId]?.patterns ?? [];
+  if (history.some((existing) => isSameAnalysisPattern(existing, pattern))) {
+    return;
+  }
+
   nextFile.paragraphs[paragraphId] = {
     patterns: [...history, clone(pattern)],
   };
@@ -307,9 +316,8 @@ function appendAnalysisPattern(
   state.analysisFiles.set(key, nextFile);
 }
 
-function createInitialReadingAgents(): ReadingAgent[] {
-  const now = '2026-05-02T00:00:00.000Z';
-  return createDefaultReadingAgentsFromPresets(now);
+function listReadingAgentTemplates(): ReadingAgentTemplate[] {
+  return listDefaultReadingAgentTemplates();
 }
 
 function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: string }): ReadingAgent {
@@ -332,8 +340,32 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
   return clone(next);
 }
 
+function addReadingAgentFromTemplate(state: MockState, templateId: string): ReadingAgent {
+  const template = listReadingAgentTemplates().find((entry) => entry.id === templateId.trim());
+  if (!template) {
+    throw new Error(`Reading agent template not found: ${templateId}`);
+  }
+  const now = new Date().toISOString();
+  const baseId = template.id;
+  let id = baseId;
+  let suffix = 2;
+  while (state.readingAgents.has(id)) {
+    id = `${baseId}-${suffix}`;
+    suffix += 1;
+  }
+  const agent: ReadingAgent = {
+    ...template,
+    id,
+    createdAt: now,
+    updatedAt: now,
+    builtIn: false,
+  };
+  state.readingAgents.set(id, agent);
+  state.activeReadingAgentId = id;
+  return clone(agent);
+}
+
 export function createMockPreloadApi(): BridgeApi {
-  const initialReadingAgents = createInitialReadingAgents();
   const state: MockState = {
     tree: clone(initialMockTree),
     documents: new Map(
@@ -352,8 +384,8 @@ export function createMockPreloadApi(): BridgeApi {
         },
       },
     },
-    readingAgents: new Map(initialReadingAgents.map((agent) => [agent.id, agent])),
-    activeReadingAgentId: initialReadingAgents[0]?.id ?? null,
+    readingAgents: new Map(),
+    activeReadingAgentId: null,
   };
 
   return {
@@ -689,6 +721,10 @@ export function createMockPreloadApi(): BridgeApi {
 
     listReadingAgents: async () => Array.from(state.readingAgents.values()).map(clone),
 
+    listReadingAgentTemplates: async () => listReadingAgentTemplates().map(clone),
+
+    addReadingAgentFromTemplate: async (templateId: string) => addReadingAgentFromTemplate(state, templateId),
+
     getReadingAgent: async (id: string) => clone(state.readingAgents.get(id) ?? null),
 
     saveReadingAgent: async (input: ReadingAgentInput & { id?: string }) => upsertReadingAgent(state, input),
@@ -699,10 +735,9 @@ export function createMockPreloadApi(): BridgeApi {
     },
 
     resetReadingAgents: async () => {
-      const defaults = createInitialReadingAgents();
-      state.readingAgents = new Map(defaults.map((agent) => [agent.id, agent]));
-      state.activeReadingAgentId = defaults[0]?.id ?? null;
-      return Array.from(state.readingAgents.values()).map(clone);
+      state.readingAgents = new Map();
+      state.activeReadingAgentId = null;
+      return [];
     },
 
     getAppVersion: async () => '0.1.0-mock',

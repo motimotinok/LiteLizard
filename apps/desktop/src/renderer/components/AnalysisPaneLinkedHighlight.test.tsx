@@ -28,7 +28,7 @@ function createDocument(): LiteLizardDocument {
   };
 }
 
-describe('AnalysisPane linked highlight', () => {
+describe('AnalysisPane focused paragraph view', () => {
   beforeEach(() => {
     useAppStore.setState(baseState, true);
     useAppStore.setState({
@@ -39,28 +39,28 @@ describe('AnalysisPane linked highlight', () => {
     });
   });
 
-  it('対応ハイライト中の段落カードに専用 class を付ける', () => {
+  it('未選択時は右パネルで段落詳細を出さず、本文横レーンからの選択を促す', () => {
     const html = renderToStaticMarkup(
       <AnalysisPane
         document={createDocument()}
         activeParagraphId={null}
-        linkedHighlightParagraphId="p1"
       />,
     );
 
-    expect(html).toContain('analysis-card-linked-highlight');
+    expect(html).toContain('本文横の読みから段落を選ぶと詳細が表示されます。');
+    expect(html).not.toContain('analysis-focus-card');
   });
 
-  it('本文側からのスクロール連動で対象にできる段落 ID をカードへ付ける', () => {
+  it('選択段落の詳細と段落限定質問の入口を表示する', () => {
     const html = renderToStaticMarkup(
       <AnalysisPane
         document={createDocument()}
         activeParagraphId="p1"
-        scrollRequest={{ paragraphId: 'p1', nonce: 1 }}
       />,
     );
 
     expect(html).toContain('data-analysis-paragraph-id="p1"');
-    expect(html).toContain('analysis-card-active');
+    expect(html).toContain('analysis-focus-card');
+    expect(html).toContain('この段落について聞く');
   });
 });

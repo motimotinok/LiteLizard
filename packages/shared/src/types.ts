@@ -130,6 +130,10 @@ export interface ReadingAgentInput {
   contextPolicy: AnalysisContextPolicy;
 }
 
+export interface ReadingAgentTemplate extends ReadingAgentInput {
+  id: string;
+}
+
 export interface FileNode {
   path: string;
   name: string;

@@ -1,5 +1,8 @@
-[2026/06/29]分析・推敲統合UIプロトタイプとstderr整理
-`?prototype=analysis-flow` でA/B比較用の隔離プロトタイプを追加し、期待失敗・修復・拒否経路のテストログを明示的に抑制してstderrが残らないようにした。
+[2026/06/30]段落別の読みレーンと分析実行の安定化
+案Bを本番UIへ移し、本文横の段落別読みレーンと選択段落専用の右インスペクター・追加質問を追加した。試作用画面は削除し、分析の段落単位リトライ、final resultの永続保存、provider不整合なAgent model overrideの実行前検出、OpenAI向けprompt cache prefixの安定化、実provider入力に近い送信量見積もり、同一patternの二重履歴保存防止も入れた。
+
+[2026/06/30]Reading Agentテンプレート運用へ移行
+デフォルトReading Agentを初回seedではなくテンプレートとして扱うようにし、新規userDataではAgent 0件から始め、AgentsScreenで任意のテンプレートを明示追加できるようにした。追加後は通常Agentとして保存・編集・削除・選択され、テンプレート更新では上書きされない。旧形式agents.jsonはバックアップ退避後に空リストへ復旧する。
 
 [2026/06/25]#113 Providerモデル候補プルダウン
 Settings の OpenAI / Anthropic 既定モデルと、AgentsScreen の個別model overrideを、自由入力だけの欄から2026-06-25時点の公式モデル候補プルダウン + カスタムモデルID入力へ変更した。候補は shared の provider別静的カタログとして持ち、OpenAI は `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini` / `gpt-5.4-nano`、Anthropic は `claude-opus-4-8` / `claude-sonnet-4-6` / `claude-haiku-4-5-20251001` を表示する。現在使用不可の `claude-fable-5` は候補から除外し、限定・候補外モデルはカスタム入力で保存できる。新規既定は OpenAI `gpt-5.4`、Anthropic `claude-sonnet-4-6`。Local LLM は従来どおり自由入力のまま維持した。検証: `pnpm --filter @litelizard/shared test`、`pnpm --filter @litelizard/desktop test`、`pnpm -w lint`、`pnpm -w build` 成功。

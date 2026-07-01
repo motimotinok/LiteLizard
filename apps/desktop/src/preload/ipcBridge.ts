@@ -69,6 +69,10 @@ export function createIpcBridge(): BridgeApi {
       ipcRenderer.invoke(IPC_CHANNELS.setActiveReadingAgentId, id),
     listReadingAgents: () =>
       ipcRenderer.invoke(IPC_CHANNELS.listReadingAgents),
+    listReadingAgentTemplates: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.listReadingAgentTemplates),
+    addReadingAgentFromTemplate: (templateId) =>
+      ipcRenderer.invoke(IPC_CHANNELS.addReadingAgentFromTemplate, templateId),
     getReadingAgent: (id) =>
       ipcRenderer.invoke(IPC_CHANNELS.getReadingAgent, id),
     saveReadingAgent: (input) =>

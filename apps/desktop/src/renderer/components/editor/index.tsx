@@ -16,6 +16,8 @@ interface Props {
   setActiveParagraphId: (id: string | null) => void;
   onRequestScrollToAnalysis?: (id: string) => void;
   onPreviewParagraphLink?: (id: string | null) => void;
+  analysisRailVisible?: boolean;
+  onSelectAnalysisRailParagraph?: (id: string) => void;
   onSetViewScale: (viewScale: 'micro' | 'macro') => void;
   onSyncStructure: (input: DocumentStructureInput) => void;
   onReorderParagraphs?: (orderedIds: string[]) => void;
@@ -23,6 +25,82 @@ interface Props {
   onDeleteChapter?: (chapterId: string) => void;
   onCreateEssay: () => void;
   onOpenFolder: () => void;
+}
+
+function analysisRailStatus(paragraph: LiteLizardDocument['paragraphs'][number]) {
+  if (paragraph.lizard.status === 'complete') {
+    return '分析済み';
+  }
+  if (paragraph.lizard.status === 'pending') {
+    return '解析中';
+  }
+  if (paragraph.lizard.status === 'failed') {
+    return '失敗';
+  }
+  if (paragraph.lizard.status === 'stale' && paragraph.lizard.analyzedAt) {
+    return '要再解析';
+  }
+  return '未分析';
+}
+
+function analysisRailSummary(paragraph: LiteLizardDocument['paragraphs'][number]) {
+  if (paragraph.lizard.status === 'complete') {
+    return paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。';
+  }
+  if (paragraph.lizard.status === 'pending') {
+    return '解析中です。完了後に読みが表示されます。';
+  }
+  if (paragraph.lizard.status === 'failed') {
+    return paragraph.lizard.error?.message
+      ? `解析に失敗しました。${paragraph.lizard.error.message}`
+      : '解析に失敗しました。';
+  }
+  if (paragraph.lizard.status === 'stale' && paragraph.lizard.analyzedAt) {
+    return paragraph.lizard.deepMeaning?.trim() || '本文更新後の再解析が必要です。';
+  }
+  return 'まだ分析されていません。';
+}
+
+function AnalysisReadingRail({
+  document,
+  activeParagraphId,
+  linkedHighlightParagraphId,
+  onSelectParagraph,
+  onPreviewParagraphLink,
+}: {
+  document: LiteLizardDocument;
+  activeParagraphId: string | null;
+  linkedHighlightParagraphId: string | null;
+  onSelectParagraph?: (id: string) => void;
+  onPreviewParagraphLink?: (id: string | null) => void;
+}) {
+  return (
+    <aside className="editor-analysis-rail" aria-label="段落ごとの読み">
+      {document.paragraphs.map((paragraph) => (
+        <button
+          key={paragraph.id}
+          type="button"
+          className={[
+            'editor-analysis-rail-row',
+            paragraph.id === activeParagraphId ? 'is-active' : '',
+            paragraph.id === linkedHighlightParagraphId ? 'is-linked' : '',
+            `is-${paragraph.lizard.status}`,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => onSelectParagraph?.(paragraph.id)}
+          onMouseEnter={() => onPreviewParagraphLink?.(paragraph.id)}
+          onMouseLeave={() => onPreviewParagraphLink?.(null)}
+          onFocus={() => onPreviewParagraphLink?.(paragraph.id)}
+          onBlur={() => onPreviewParagraphLink?.(null)}
+        >
+          <span className="editor-analysis-rail-index">{paragraph.order}</span>
+          <span className="editor-analysis-rail-copy">{analysisRailSummary(paragraph)}</span>
+          <span className="editor-analysis-rail-status">{analysisRailStatus(paragraph)}</span>
+        </button>
+      ))}
+    </aside>
+  );
 }
 
 export function EditorPane({
@@ -34,6 +112,8 @@ export function EditorPane({
   setActiveParagraphId,
   onRequestScrollToAnalysis,
   onPreviewParagraphLink,
+  analysisRailVisible = false,
+  onSelectAnalysisRailParagraph,
   onSetViewScale,
   onSyncStructure,
   onReorderParagraphs,
@@ -69,7 +149,7 @@ export function EditorPane({
 
   return (
     <section className="editor-shell">
-      <div className="editor-frame">
+      <div className={analysisRailVisible ? 'editor-frame with-analysis-rail' : 'editor-frame'}>
         <div className="editor-body" ref={setEditorBodyEl}>
           <header className="editor-title">
             <h1 className="editor-title-name">{document.title}</h1>
@@ -91,6 +171,15 @@ export function EditorPane({
             />
           )}
         </div>
+        {analysisRailVisible && viewScale === 'micro' ? (
+          <AnalysisReadingRail
+            document={document}
+            activeParagraphId={activeParagraphId}
+            linkedHighlightParagraphId={linkedHighlightParagraphId}
+            onSelectParagraph={onSelectAnalysisRailParagraph}
+            onPreviewParagraphLink={onPreviewParagraphLink}
+          />
+        ) : null}
       </div>
     </section>
   );

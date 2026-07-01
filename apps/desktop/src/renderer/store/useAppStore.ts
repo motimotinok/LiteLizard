@@ -12,6 +12,7 @@ import {
   type ParagraphAnalysisPattern,
   type ReadingAgent,
   type ReadingAgentInput,
+  type ReadingAgentTemplate,
   type RecentProjectEntry,
   type UpdateCheckResult,
 } from '@litelizard/shared';
@@ -133,6 +134,7 @@ interface AppState {
   pendingAnalysisRun: PendingAnalysisRun | null;
   analysisSettings: AnalysisSettings;
   agents: ReadingAgent[];
+  agentTemplates: ReadingAgentTemplate[];
   activeAgentId: string | null;
   agentsLoaded: boolean;
   activeWorkspacePanel: WorkspacePanel;
@@ -198,6 +200,7 @@ interface AppState {
   toggleAnalysisLayer: () => void;
   loadAgents: () => Promise<void>;
   setActiveAgent: (id: string) => Promise<void>;
+  addAgentFromTemplate: (templateId: string) => Promise<ReadingAgent>;
   saveAgent: (input: ReadingAgentInput & { id?: string }) => Promise<ReadingAgent>;
   deleteAgent: (id: string) => Promise<void>;
   resetAgents: () => Promise<ReadingAgent[]>;
@@ -612,10 +615,13 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       result.results.forEach((analyzed) => {
         if (!progressedParagraphIds.has(analyzed.paragraphId)) {
-          appendPatternToStore(
-            analyzed.paragraphId,
-            createStoredPattern(analyzed, staleTextMap.get(analyzed.paragraphId) ?? ''),
-          );
+          const pattern = createStoredPattern(analyzed, staleTextMap.get(analyzed.paragraphId) ?? '');
+          if (rootPath && document.source?.format === 'lzl-v1') {
+            window.litelizard
+              .saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, pattern)
+              .catch(() => {});
+          }
+          appendPatternToStore(analyzed.paragraphId, pattern);
         }
       });
 
@@ -712,6 +718,7 @@ export const useAppStore = create<AppState>((set, get) => {
     ...resetUndoState(),
     analysisSettings: cloneAnalysisSettings(),
     agents: [],
+    agentTemplates: [],
     activeAgentId: null,
     agentsLoaded: false,
     activeWorkspacePanel: 'editor',
@@ -1409,6 +1416,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     const activeAgent = agents.find((agent) => agent.id === activeAgentId) ?? null;
     const estimate = estimateAnalysisCost({
+      providerId: analysisSettings.defaultProvider,
       targetParagraphs: staleParagraphs.map((p) => ({
         paragraphId: p.id,
         text: p.light.text,
@@ -1734,8 +1742,9 @@ export const useAppStore = create<AppState>((set, get) => {
 
   loadAgents: async () => {
     try {
-      const [agents, savedActiveAgentId] = await Promise.all([
+      const [agents, agentTemplates, savedActiveAgentId] = await Promise.all([
         window.litelizard.listReadingAgents(),
+        window.litelizard.listReadingAgentTemplates(),
         window.litelizard.getActiveReadingAgentId(),
       ]);
       const activeAgentId =
@@ -1749,6 +1758,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
       set({
         agents,
+        agentTemplates,
         activeAgentId,
         agentsLoaded: true,
         statusMessage: agents.length > 0 ? get().statusMessage : '分析エージェントがありません',
@@ -1768,6 +1778,17 @@ export const useAppStore = create<AppState>((set, get) => {
 
     await window.litelizard.setActiveReadingAgentId(id);
     set({ activeAgentId: id, statusMessage: `${agent.name} を選択しました` });
+  },
+
+  addAgentFromTemplate: async (templateId) => {
+    const saved = await window.litelizard.addReadingAgentFromTemplate(templateId);
+    await window.litelizard.setActiveReadingAgentId(saved.id);
+    set((state) => ({
+      agents: [...state.agents.filter((agent) => agent.id !== saved.id), saved],
+      activeAgentId: saved.id,
+      statusMessage: `${saved.name} を追加しました`,
+    }));
+    return saved;
   },
 
   saveAgent: async (input) => {
@@ -1794,11 +1815,6 @@ export const useAppStore = create<AppState>((set, get) => {
 
   deleteAgent: async (id) => {
     const { agents, activeAgentId } = get();
-    if (agents.length <= 1) {
-      set({ statusMessage: '最後の分析エージェントは削除できません' });
-      throw new Error('最後の分析エージェントは削除できません');
-    }
-
     await window.litelizard.deleteReadingAgent(id);
     const nextAgents = agents.filter((agent) => agent.id !== id);
     const nextActiveAgentId =
@@ -1821,7 +1837,7 @@ export const useAppStore = create<AppState>((set, get) => {
     if (activeAgentId) {
       await window.litelizard.setActiveReadingAgentId(activeAgentId);
     }
-    set({ agents, activeAgentId, statusMessage: '分析エージェントを初期状態に戻しました' });
+    set({ agents, activeAgentId, statusMessage: '分析エージェントを空に戻しました' });
     return agents;
   },
 
