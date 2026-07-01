@@ -1,3 +1,9 @@
+[2026/07/01]PR #151 のCodex Review指摘3件を修正
+クローズ済みPR #151 に残っていた指摘へ対応した。保存中にユーザーが再編集した場合、古い保存完了で `dirty=false` に戻さず再保存対象として残すようにした。単一ファイル削除時に旧形式/不正な `documentId` があっても、世代分析ファイル cleanup だけをスキップして削除自体は成功させるようにした。LZL の分析結果保存が失敗した場合は、表示上の成功履歴へ追加せず、対象段落を `ANALYSIS_SAVE_FAILED` として失敗扱いにする。検証: `corepack pnpm --filter @litelizard/desktop test -- useAppStore ipc`、`corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
+
+[2026/07/01]分析パネル縮小挙動とdev favicon 404を修正
+UIチェックとコード精査で、右上の分析パネルボタンが選択段落の詳細インスペクターだけでなく本文横の読みレーンまで同時に閉じてしまう挙動を確認した。詳細表示中の操作は選択段落だけを解除して読みレーンへ戻し、俯瞰状態でもう一度押したときだけ読みレーン自体を閉じるように修正した。あわせて desktop renderer に favicon を追加し、dev UI確認時の `/favicon.ico` 404 console error を解消した。検証: Playwright CLIでmock UIの段落選択、縮小、レーン非表示を確認、`corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
+
 [2026/07/01]#121 分析インスペクターに静かな履歴参照導線を追加
 段落詳細インスペクターに「履歴」入口を追加し、開いたときだけ前後移動、現在位置、保存日時、実行時のReading Agent名を確認できるようにした。通常時は表示中結果のAgent名だけを控えめに示し、旧形式でAgent情報がない履歴は「旧形式の履歴」として表示する。検証: `corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
 

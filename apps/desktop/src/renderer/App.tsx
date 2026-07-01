@@ -30,6 +30,23 @@ function getEditorTweaksStyle(editorTweaks: EditorTweaks): CSSProperties {
   } as CSSProperties;
 }
 
+export function resolveAnalysisPanelToggle(input: {
+  analysisPanelOpen: boolean;
+  activeParagraphId: string | null;
+}) {
+  if (input.analysisPanelOpen && input.activeParagraphId) {
+    return {
+      analysisPanelOpen: true,
+      activeParagraphId: null,
+    };
+  }
+
+  return {
+    analysisPanelOpen: !input.analysisPanelOpen,
+    activeParagraphId: input.activeParagraphId,
+  };
+}
+
 function WorkspaceShell() {
   const {
     rootPath,
@@ -123,6 +140,14 @@ function WorkspaceShell() {
   }, [consumePendingParagraphNavigation, currentDocument, pendingParagraphNavigation]);
 
   useEffect(() => {
+    const toggleAnalysisPanel = () => {
+      const next = resolveAnalysisPanelToggle({ analysisPanelOpen, activeParagraphId });
+      setAnalysisPanelOpen(next.analysisPanelOpen);
+      if (next.activeParagraphId !== activeParagraphId) {
+        setActiveParagraphId(next.activeParagraphId);
+      }
+    };
+
     const onKeyDown = (event: KeyboardEvent) => {
       const modifier = event.metaKey || event.ctrlKey;
       if (!modifier) {
@@ -139,7 +164,7 @@ function WorkspaceShell() {
 
       if (event.shiftKey && key === 'a') {
         event.preventDefault();
-        setAnalysisPanelOpen((current) => !current);
+        toggleAnalysisPanel();
       }
     };
 
@@ -147,7 +172,7 @@ function WorkspaceShell() {
     return () => {
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [saveNow]);
+  }, [activeParagraphId, analysisPanelOpen, saveNow]);
 
   if (activeWorkspacePanel === 'settings') {
     return <SettingsScreen />;
@@ -251,8 +276,20 @@ function WorkspaceShell() {
                 className={
                   analysisPanelOpen ? 'titlebar-icon-button is-active' : 'titlebar-icon-button'
                 }
-                onClick={() => setAnalysisPanelOpen((value) => !value)}
-                title={analysisPanelOpen ? '分析パネルを閉じる' : '分析パネルを開く'}
+                onClick={() => {
+                  const next = resolveAnalysisPanelToggle({ analysisPanelOpen, activeParagraphId });
+                  setAnalysisPanelOpen(next.analysisPanelOpen);
+                  if (next.activeParagraphId !== activeParagraphId) {
+                    setActiveParagraphId(next.activeParagraphId);
+                  }
+                }}
+                title={
+                  analysisPanelOpen && activeParagraphId
+                    ? '段落詳細を閉じる'
+                    : analysisPanelOpen
+                      ? '分析レーンを閉じる'
+                      : '分析レーンを開く'
+                }
                 aria-label="分析パネルを切り替え"
               >
                 <IconPanel size={15} />

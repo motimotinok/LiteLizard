@@ -566,6 +566,22 @@ describe('registerIpcHandlers', () => {
     });
   });
 
+  it('deleting a file skips generation cleanup when documentId is legacy or invalid', async () => {
+    await withTempProject(async ({ projectRoot }) => {
+      const targetFile = path.join(projectRoot, 'legacy.lzl');
+      await fs.writeFile(targetFile, 'documentId: legacy-document-id\n', 'utf8');
+
+      registerIpcHandlers();
+
+      await expect(
+        getRequiredHandler(IPC_CHANNELS.deleteEntry)(undefined as never, targetFile as never),
+      ).resolves.toEqual({ ok: true });
+
+      await expect(fs.access(targetFile)).rejects.toThrow();
+      expect(analysisStoreMock.deleteAnalysisFiles).not.toHaveBeenCalled();
+    });
+  });
+
   it('rejects delete, rename, move, load, and save calls outside a project before filesystem work runs', async () => {
     const consoleErrorSpy = silenceConsoleError();
     await withTempProject(async ({ outsidePath }) => {
