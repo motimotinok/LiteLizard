@@ -42,7 +42,6 @@ describe('analysis settings route', () => {
           role: '余韻を読む',
           systemPrompt: '余韻を中心に読んでください。',
           model: null,
-          temperature: 0.7,
           contextPolicy: { mode: 'whole-document' },
           createdAt: '2026-05-02T00:00:00.000Z',
           updatedAt: '2026-05-02T00:00:00.000Z',

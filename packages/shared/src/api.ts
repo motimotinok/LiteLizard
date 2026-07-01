@@ -37,8 +37,6 @@ export const AnalysisSuccessSchema = z.object({
   results: z.array(AnalysisResultSchema),
 });
 
-export const DEFAULT_READING_AGENT_TEMPERATURE = 0.7;
-
 const AnalysisContextPolicySchema = z.union([
   z.object({
     mode: z.literal('target-only'),
@@ -90,7 +88,6 @@ export const ReadingAgentInputSchema = z.object({
   role: z.string().trim().min(1).max(240),
   systemPrompt: z.string().trim().min(1).max(8_000),
   model: ReadingAgentModelSchema,
-  temperature: z.number().min(0).max(1).default(DEFAULT_READING_AGENT_TEMPERATURE),
   contextPolicy: AnalysisContextPolicySchema,
   tagDefinitions: ReadingAgentTagDefinitionsSchema,
 });

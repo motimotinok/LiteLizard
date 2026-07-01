@@ -66,7 +66,6 @@ describe('createReadingAgentStore', () => {
           role: '率直に読む',
           systemPrompt: '率直に読んでください。',
           model: null,
-          temperature: 0.7,
           contextPolicy: { mode: 'whole-document' },
           createdAt: '2026-05-01T00:00:00.000Z',
           updatedAt: '2026-05-01T00:00:00.000Z',
@@ -94,7 +93,6 @@ describe('createReadingAgentStore', () => {
           role: '旧形式',
           systemPrompt: '旧形式のプロンプトです。',
           model: null,
-          temperature: 0.7,
           createdAt: '2026-05-01T00:00:00.000Z',
           updatedAt: '2026-05-01T00:00:00.000Z',
           builtIn: false,
@@ -123,7 +121,6 @@ describe('createReadingAgentStore', () => {
         role: '  余白を見る  ',
         systemPrompt: '  余白を中心に読んでください。  ',
         model: '  gpt-4.1-mini  ',
-        temperature: 0.3,
         contextPolicy: { mode: 'target-only' },
       });
       const updated = await store.save({
@@ -132,7 +129,6 @@ describe('createReadingAgentStore', () => {
         role: '温度を見る',
         systemPrompt: '温度を中心に読んでください。',
         model: null,
-        temperature: 0.8,
         contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 4 },
       });
 
@@ -142,7 +138,6 @@ describe('createReadingAgentStore', () => {
         role: '余白を見る',
         systemPrompt: '余白を中心に読んでください。',
         model: 'gpt-4.1-mini',
-        temperature: 0.3,
         contextPolicy: { mode: 'target-only' },
         createdAt: '2026-05-02T00:00:01.000Z',
         builtIn: false,
@@ -151,7 +146,6 @@ describe('createReadingAgentStore', () => {
         id: 'reader-custom',
         name: '更新読者',
         model: null,
-        temperature: 0.8,
         contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 4 },
         createdAt: '2026-05-02T00:00:01.000Z',
         updatedAt: '2026-05-02T00:00:02.000Z',
@@ -172,7 +166,6 @@ describe('createReadingAgentStore', () => {
         role: '消える',
         systemPrompt: '消える読者です。',
         model: null,
-        temperature: 0.7,
         contextPolicy: { mode: 'whole-document' },
       });
       await store.delete('reader-delete-me');
@@ -194,7 +187,6 @@ describe('createReadingAgentStore', () => {
         role: '自由に読む',
         systemPrompt: '自由に読んでください。',
         model: null,
-        temperature: 0.7,
         contextPolicy: { mode: 'whole-document' },
       });
       const reset = await store.resetToDefaults();

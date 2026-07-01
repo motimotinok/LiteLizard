@@ -1,3 +1,6 @@
+[2026/07/01]#86 Reading Agent の temperature 設定を廃止
+Reading Agent の保存スキーマ、AgentsScreen、OpenAI / Anthropic / Local LLM provider 呼び出しから `temperature` を削除し、読者の揺らぎや慎重さはプロンプトで表現する方針へ移した。旧 `agents.json` に残る `temperature` は読み込み時に未知フィールドとして無視され、次回保存時に削除される。方針は `docs/decisions.md` と `docs/specs/reading-agent.md` に記録した。
+
 [2026/07/01]#102 macOSのウィンドウ操作ボタン周辺の境界線を整理
 左 rail とサイドバーの縦境界線を `border-right` ではなく `top-pad` より下から始まる疑似要素で描画するように変更し、macOS の hiddenInset traffic light 領域に線が重ならないようにした。サイドバー幅リサイズハンドルも同じ高さから始め、タイトルバー周辺のドラッグ領域を邪魔しない配置に揃えた。
 

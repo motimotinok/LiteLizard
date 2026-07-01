@@ -354,7 +354,6 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
     role: input.role.trim(),
     systemPrompt: input.systemPrompt.trim(),
     model: input.model?.trim() || null,
-    temperature: input.temperature,
     contextPolicy: input.contextPolicy,
     tagDefinitions: input.tagDefinitions ?? [],
     createdAt: current?.createdAt ?? now,

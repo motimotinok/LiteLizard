@@ -90,7 +90,6 @@ export async function runAnalysis(
         agent,
         promptVersion: input.promptVersion,
         model,
-        temperature: agent.temperature,
         contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId, contextPolicy),
         documentTexts,
         promptCacheKey,
@@ -134,7 +133,6 @@ export async function dryRunReadingAgent(
     agent,
     promptVersion: input.promptVersion,
     model,
-    temperature: agent.temperature,
     contextTexts: buildContextTexts(input.documentParagraphs, input.paragraph.paragraphId, resolvedContextPolicy),
     documentTexts,
     promptCacheKey:

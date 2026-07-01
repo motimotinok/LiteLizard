@@ -25,7 +25,6 @@ export interface AnalysisProviderRequest {
   agent: ReadingAgentInput;
   promptVersion: string;
   model: string;
-  temperature: number;
   contextTexts: string[];
   documentTexts?: string[];
   promptCacheKey?: string;
@@ -154,7 +153,6 @@ export function buildOpenAiResponseRequest(
   const targetPrompt = buildAnalysisTargetPrompt(input.paragraphId, input.text, input.additionalInstruction);
   return {
     model: input.model,
-    temperature: input.temperature,
     input: [
       { role: 'system', content: system },
       { role: 'user', content: targetPrompt },
@@ -247,7 +245,6 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
         body: JSON.stringify({
           model: input.model,
           max_tokens: 1200,
-          temperature: input.temperature,
           system,
           tools: [
             {
@@ -321,9 +318,6 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
             format: buildAnalysisProviderOutputJsonSchema(input.agent.tagDefinitions),
             stream: false,
             keep_alive: '30s',
-            options: {
-              temperature: input.temperature,
-            },
           }),
         });
       } catch (error) {

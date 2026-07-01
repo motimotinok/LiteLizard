@@ -28,7 +28,6 @@ const testAgent: ReadingAgent = {
   role: '余韻を読む',
   systemPrompt: '余韻を中心に読んでください。',
   model: null,
-  temperature: 0.7,
   contextPolicy: { mode: 'preceding', range: 'all' },
   tagDefinitions: [],
   createdAt: '2026-05-02T00:00:00.000Z',
@@ -221,7 +220,6 @@ describe('buildOpenAiResponseRequest', () => {
       agent: testAgent,
       promptVersion: 'v1',
       model: 'gpt-5.4',
-      temperature: 0.2,
       contextTexts: ['前段落'],
       documentTexts: ['前段落', '対象本文', '後段落'],
       promptCacheKey: 'llz:cache-key',
@@ -271,7 +269,6 @@ describe('createAnthropicAnalysisProvider', () => {
       agent: taggedAgent,
       promptVersion: 'v1',
       model: 'claude-sonnet-4-6',
-      temperature: 0.3,
       contextTexts: ['前段落'],
     });
 
@@ -321,7 +318,6 @@ describe('createLocalLlmAnalysisProvider', () => {
       agent: taggedAgent,
       promptVersion: 'v1',
       model: 'llama3.2',
-      temperature: 0.2,
       contextTexts: ['前の段落'],
     });
 
@@ -339,14 +335,14 @@ describe('createLocalLlmAnalysisProvider', () => {
       format: unknown;
       stream: boolean;
       keep_alive: string;
-      options: { temperature: number };
+      options?: unknown;
     };
     expect(requestBody).toMatchObject({
       model: 'llama3.2',
       stream: false,
       keep_alive: '30s',
-      options: { temperature: 0.2 },
     });
+    expect(requestBody).not.toHaveProperty('options');
     expect(requestBody.format).toEqual(
       buildAnalysisProviderOutputJsonSchema(taggedAgent.tagDefinitions),
     );
@@ -382,7 +378,6 @@ describe('createLocalLlmAnalysisProvider', () => {
       agent: testAgent,
       promptVersion: 'v1',
       model: 'llama3.2',
-      temperature: 0.7,
       contextTexts: [],
     });
 
@@ -406,7 +401,6 @@ describe('createLocalLlmAnalysisProvider', () => {
         agent: testAgent,
         promptVersion: 'v1',
         model: 'missing-model',
-        temperature: 0.7,
         contextTexts: [],
       }),
     ).rejects.toThrow('Local LLM API エラー (500): model not found');
@@ -427,7 +421,6 @@ describe('createLocalLlmAnalysisProvider', () => {
         agent: testAgent,
         promptVersion: 'v1',
         model: 'llama3.2',
-        temperature: 0.7,
         contextTexts: [],
       }),
     ).rejects.toThrow('Local LLM 接続に失敗しました: ECONNREFUSED');
@@ -507,7 +500,6 @@ describe('runAnalysis', () => {
         paragraphId: 'p2',
         agent: testAgent,
         model: 'gpt-4.1-mini',
-        temperature: 0.7,
         contextTexts: ['one'],
       }),
     );
@@ -603,7 +595,7 @@ describe('runAnalysis', () => {
       model: 'gpt-default',
       provider,
     };
-    const agent = { ...testAgent, model: 'gpt-agent', temperature: 0.4 };
+    const agent = { ...testAgent, model: 'gpt-agent' };
 
     await runAnalysis(
       {
@@ -619,7 +611,10 @@ describe('runAnalysis', () => {
     );
 
     expect(provider.analyzeParagraph).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'gpt-agent', temperature: 0.4 }),
+      expect.objectContaining({ model: 'gpt-agent' }),
+    );
+    expect(provider.analyzeParagraph).toHaveBeenCalledWith(
+      expect.not.objectContaining({ temperature: expect.anything() }),
     );
   });
 
@@ -780,7 +775,7 @@ describe('dryRunReadingAgent', () => {
 
     const result = await dryRunReadingAgent(
       {
-        agent: { ...testAgent, id: undefined, model: 'draft-model', temperature: 0.2 },
+        agent: { ...testAgent, id: undefined, model: 'draft-model' },
         paragraph: { paragraphId: 'p2', order: 2, text: 'two' },
         documentParagraphs: [
           { paragraphId: 'p1', order: 1, text: 'one' },
@@ -795,7 +790,6 @@ describe('dryRunReadingAgent', () => {
       expect.objectContaining({
         paragraphId: 'p2',
         model: 'draft-model',
-        temperature: 0.2,
         contextTexts: ['one'],
       }),
     );

@@ -43,20 +43,20 @@ LiteLizard は段落分析または Reading Agent の dry-run を実行したと
 ### OpenAI を使う場合
 
 - 送信先: `https://api.openai.com`（OpenAI 公式 SDK 経由）
-- 送信内容: 解析対象段落の本文、コンテキストポリシーに従って組み立てられた前段落の本文、Reading Agent の system prompt、使用モデル名、temperature
+- 送信内容: 解析対象段落の本文、コンテキストポリシーに従って組み立てられた前段落の本文、Reading Agent の system prompt、使用モデル名
 - 認証: 設定画面で保存した OpenAI API キーを Authorization ヘッダとして送信
 
 ### Anthropic を使う場合
 
 - 送信先: `https://api.anthropic.com/v1/messages`
-- 送信内容: OpenAI と同様の本文・コンテキスト・system prompt・モデル名・temperature
+- 送信内容: OpenAI と同様の本文・コンテキスト・system prompt・モデル名
 - 認証: 設定画面で保存した Anthropic API キーを `x-api-key` ヘッダとして送信
 
 ### Local LLM を使う場合
 
 - 送信先: ユーザーが設定画面で指定した endpoint URL（例: Ollama 互換の `http://localhost:11434`）の `/api/generate`
 - 接続確認を実行した場合のみ、同じ endpoint URL の `/api/tags` にもリクエストします
-- 送信内容: 解析対象段落の本文、コンテキスト段落、Reading Agent の system prompt、モデル名、temperature
+- 送信内容: 解析対象段落の本文、コンテキスト段落、Reading Agent の system prompt、モデル名
 - 送信先は完全にユーザー側で決まります。LiteLizard はその endpoint がローカルマシンかリモートかを問わず、設定された URL に対して HTTP リクエストを送信します
 
 ### 送信されるコンテキスト範囲

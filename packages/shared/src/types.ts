@@ -153,7 +153,6 @@ export interface ReadingAgent {
   role: string;
   systemPrompt: string;
   model: string | null;
-  temperature: number;
   contextPolicy: AnalysisContextPolicy;
   tagDefinitions: ReadingAgentTagDefinition[];
   createdAt: string;
@@ -166,7 +165,6 @@ export interface ReadingAgentInput {
   role: string;
   systemPrompt: string;
   model: string | null;
-  temperature: number;
   contextPolicy: AnalysisContextPolicy;
   tagDefinitions?: ReadingAgentTagDefinition[];
 }

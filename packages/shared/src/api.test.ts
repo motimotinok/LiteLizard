@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_READING_AGENT_TEMPERATURE, ReadingAgentInputSchema, ReadingAgentSchema } from './api.js';
+import { ReadingAgentInputSchema, ReadingAgentSchema } from './api.js';
 
 const validAgent = {
   id: 'reader-quiet',
@@ -7,7 +7,6 @@ const validAgent = {
   role: '情緒や余韻を中心に短く読む',
   systemPrompt: 'あなたは静かな読者として、段落の余韻を短く分析します。',
   model: null,
-  temperature: DEFAULT_READING_AGENT_TEMPERATURE,
   contextPolicy: { mode: 'whole-document' },
   tagDefinitions: [],
   createdAt: '2026-05-02T00:00:00.000Z',
@@ -26,7 +25,6 @@ describe('ReadingAgent schemas', () => {
       role: '売り・引っかかりを評価',
       systemPrompt: 'あなたは担当編集として、読者がつまずく点を指摘します。',
       model: 'claude-haiku-4-5-20251001',
-      temperature: 0.4,
       contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 3 },
     };
 
@@ -42,7 +40,6 @@ describe('ReadingAgent schemas', () => {
       role: '売り・引っかかりを評価',
       systemPrompt: 'あなたは担当編集として、読者がつまずく点を指摘します。',
       model: null,
-      temperature: 0.4,
       contextPolicy: { mode: 'whole-document' },
       tagDefinitions: [
         {
@@ -90,16 +87,15 @@ describe('ReadingAgent schemas', () => {
       role: '直前だけ読む',
       systemPrompt: '直前だけ読んでください。',
       model: null,
-      temperature: 0.7,
       contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 0 },
     });
 
     expect(result.success).toBe(false);
   });
 
-  it('rejects out-of-range temperature', () => {
-    const result = ReadingAgentInputSchema.safeParse({
-      name: '高温読者',
+  it('ignores legacy temperature fields', () => {
+    const result = ReadingAgentInputSchema.parse({
+      name: '旧温度つき読者',
       role: '揺らぎを見る',
       systemPrompt: '揺らぎを読んでください。',
       model: null,
@@ -107,7 +103,14 @@ describe('ReadingAgent schemas', () => {
       contextPolicy: { mode: 'whole-document' },
     });
 
-    expect(result.success).toBe(false);
+    expect(result).toEqual({
+      name: '旧温度つき読者',
+      role: '揺らぎを見る',
+      systemPrompt: '揺らぎを読んでください。',
+      model: null,
+      contextPolicy: { mode: 'whole-document' },
+      tagDefinitions: [],
+    });
   });
 
   it('rejects blank editable fields', () => {

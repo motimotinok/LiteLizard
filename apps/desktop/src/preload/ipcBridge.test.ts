@@ -54,7 +54,6 @@ describe('createIpcBridge', () => {
       role: '情緒や余韻を中心に短く',
       systemPrompt: 'あなたは静かな読者として段落を読みます。',
       model: null,
-      temperature: 0.7,
       contextPolicy: { mode: 'whole-document' },
     });
     await api.deleteReadingAgent('reader-quiet');
@@ -65,7 +64,6 @@ describe('createIpcBridge', () => {
         role: '情緒や余韻を中心に短く',
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
         model: null,
-        temperature: 0.7,
         contextPolicy: { mode: 'whole-document' },
       },
       paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },
@@ -110,7 +108,6 @@ describe('createIpcBridge', () => {
         role: '情緒や余韻を中心に短く',
         systemPrompt: 'あなたは静かな読者として段落を読みます。',
         model: null,
-        temperature: 0.7,
         contextPolicy: { mode: 'whole-document' },
       },
     );

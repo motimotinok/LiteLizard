@@ -119,8 +119,8 @@ ${question.trim()}`;
     name: agent.name,
     role: agent.role,
     model: agent.model,
-    temperature: agent.temperature,
     contextPolicy: { mode: 'target-only' as const },
+    tagDefinitions: agent.tagDefinitions,
     systemPrompt: clampFollowupSystemPrompt(agent.systemPrompt, followupPrompt),
   };
 }

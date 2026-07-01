@@ -6,6 +6,17 @@
 
 ---
 
+## [2026-07-01] Reading Agent の temperature 設定を廃止する (#86)
+
+- **決定**: Reading Agent のデータモデル、AgentsScreen、provider 呼び出しから `temperature` を削除し、OpenAI / Anthropic / Local LLM へ温度パラメータを送らない。旧 `agents.json` に残る `temperature` は読み込み時に未知フィールドとして無視し、次回保存時に削除する
+- **理由**: Reading Agent の本質は読者ペルソナと評価基準をプロンプトで定義することであり、温度はペルソナの中核ではない。reasoning 系モデルや一部ローカルモデルでは `temperature` を拒否する場合があり、任意モデル override と組み合わせると分析失敗の原因になるため、provider 既定値に任せるほうが安定する
+- **仕様**: [`docs/specs/reading-agent.md`](specs/reading-agent.md)
+- **却下した案**:
+  - モデルごとに `temperature` 送出を出し分ける: provider / model ごとの差異を継続的に追う必要があり、UI説明と保守負荷が増える
+  - 現状維持: reasoning 系モデル利用時の 400 エラーリスクを残し、ユーザーが「読者を作る」画面で低レベルなLLMパラメータを理解する必要が残る
+
+---
+
 ## [2026-06-23] 未使用のlegacy APIを削除し、将来のクラウド機能は新規設計する (#139, #140)
 
 - **決定**: デスクトップアプリから参照されていない `apps/api` のFastifyサーバー、email-link認証、JWT、利用量管理、SQLite永続化を削除する。ルートの `pnpm dev` はElectronデスクトップを起動する。将来のクラウド分析・OAuth構想は残すが、旧APIを復元・流用せず着手時に新規設計する

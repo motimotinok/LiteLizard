@@ -157,7 +157,6 @@ describe('registerIpcHandlers', () => {
       role: input.role,
       systemPrompt: input.systemPrompt,
       model: input.model ?? null,
-      temperature: input.temperature ?? 0.7,
       contextPolicy: input.contextPolicy,
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
@@ -209,7 +208,6 @@ describe('registerIpcHandlers', () => {
       role: '静かに読む',
       systemPrompt: '静かに読んでください。',
       model: null,
-      temperature: 0.7,
       contextPolicy: { mode: 'whole-document' },
     };
     readingAgentStoreMock.list.mockResolvedValue([{ id: 'reader-quiet' }]);
@@ -259,7 +257,6 @@ describe('registerIpcHandlers', () => {
       role: '静かに読む',
       systemPrompt: '静かに読んでください。',
       model: null,
-      temperature: 0.7,
       contextPolicy: { mode: 'target-only' },
       createdAt: '2026-05-02T00:00:00.000Z',
       updatedAt: '2026-05-02T00:00:00.000Z',
@@ -328,7 +325,6 @@ describe('registerIpcHandlers', () => {
         role: '静かに読む',
         systemPrompt: '静かに読んでください。',
         model: null,
-        temperature: 0.7,
         contextPolicy: { mode: 'target-only' },
       },
       paragraph: { paragraphId: 'p_123', order: 1, text: '本文' },

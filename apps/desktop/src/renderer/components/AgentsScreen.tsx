@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
-  DEFAULT_READING_AGENT_TEMPERATURE,
   NEUTRAL_TAG_COLOR,
   buildNewReadingAgentPrompt,
   getSystemReadingAgentTagDefinition,
@@ -27,7 +26,6 @@ interface AgentDraft {
   role: string;
   systemPrompt: string;
   model: string;
-  temperature: string;
   contextMode: AnalysisContextPolicy['mode'];
   contextRange: 'all' | 'lastN';
   contextLastN: string;
@@ -45,7 +43,6 @@ function createNewDraft(): AgentDraft {
     role,
     systemPrompt: buildNewReadingAgentPrompt(name, role),
     model: '',
-    temperature: String(DEFAULT_READING_AGENT_TEMPERATURE),
     contextMode: DEFAULT_ANALYSIS_CONTEXT_POLICY.mode,
     contextRange: 'all',
     contextLastN: '10',
@@ -76,7 +73,6 @@ function toDraft(agent: ReadingAgent): AgentDraft {
     role: agent.role,
     systemPrompt: agent.systemPrompt,
     model: agent.model ?? '',
-    temperature: String(agent.temperature),
     ...contextDraft,
     tagDefinitions: agent.tagDefinitions ?? [],
   };
@@ -100,14 +96,12 @@ function toContextPolicy(draft: AgentDraft): AnalysisContextPolicy {
 }
 
 function toInput(draft: AgentDraft): ReadingAgentInput & { id?: string } {
-  const temperature = Number(draft.temperature);
   return {
     id: draft.id,
     name: draft.name.trim(),
     role: draft.role.trim(),
     systemPrompt: draft.systemPrompt.trim(),
     model: draft.model.trim() || null,
-    temperature,
     contextPolicy: toContextPolicy(draft),
     tagDefinitions: draft.tagDefinitions,
   };
@@ -117,14 +111,6 @@ function validateDraft(draft: AgentDraft): string | null {
   if (!draft.name.trim()) return '名前を入力してください。';
   if (!draft.role.trim()) return '役割を入力してください。';
   if (!draft.systemPrompt.trim()) return 'プロンプトを入力してください。';
-  const temperatureText = draft.temperature.trim();
-  if (temperatureText === '') {
-    return '温度を入力してください。';
-  }
-  const temperature = Number(temperatureText);
-  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 1) {
-    return '温度は 0〜1 の範囲で入力してください。';
-  }
   if (draft.contextMode === 'preceding' && draft.contextRange === 'lastN') {
     const lastN = Number(draft.contextLastN);
     if (!Number.isInteger(lastN) || lastN < 1 || lastN > 999) {
@@ -796,21 +782,6 @@ export function AgentsScreen() {
             <AgentModelSelector
               value={draft.model}
               onChange={(model) => setDraft((current) => ({ ...current, model }))}
-            />
-          </div>
-          <div className="settings-row">
-            <div>
-              <div className="settings-row-label">温度</div>
-              <div className="settings-row-hint">0=決定的, 1=多様</div>
-            </div>
-            <input
-              type="number"
-              className="settings-input"
-              value={draft.temperature}
-              step={0.1}
-              min={0}
-              max={1}
-              onChange={(event) => setDraft((current) => ({ ...current, temperature: event.target.value }))}
             />
           </div>
           {draft.id ? (

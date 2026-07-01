@@ -127,7 +127,6 @@ export function createReadingAgentStore(
           role: parsed.role,
           systemPrompt: parsed.systemPrompt,
           model: parsed.model,
-          temperature: parsed.temperature,
           contextPolicy: parsed.contextPolicy,
           tagDefinitions: parsed.tagDefinitions,
           createdAt: existing?.createdAt ?? timestamp,

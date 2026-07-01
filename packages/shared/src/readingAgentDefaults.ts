@@ -1,4 +1,3 @@
-import { DEFAULT_READING_AGENT_TEMPERATURE } from './api.js';
 import { getSystemReadingAgentTagDefinition } from './analysisTags.js';
 import type {
   ReadingAgent,
@@ -40,7 +39,6 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 文章の添削、書き換え案、著者への助言は行わない
 - 問題点を探すために読まず、自然に起きた理解と反応を優先する`,
     model: null,
-    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'preceding', range: 'all' },
     tagDefinitions: [],
   },
@@ -65,7 +63,6 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 作者の心理や正解を決めるのではなく、自分に起きた読みの体験を具体的な表現と結びつける
 - 添削や構造評価へ広げず、感覚としてどう届いたかに集中する`,
     model: null,
-    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'preceding', range: 'all' },
     tagDefinitions: systemTags('emotion'),
   },
@@ -93,7 +90,6 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 問題がある場合は理由を示し、削除、移動、補足、圧縮など具体的な修正方向を提案する
 - 反論や反対視点は機械的に追加せず、文章の主題に関係し、検討不足が影響する場合に指摘する`,
     model: null,
-    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'whole-document' },
     tagDefinitions: systemTags('issue'),
   },
@@ -119,7 +115,6 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
 - 空疎な賞賛ではなく、何が機能し、なぜ続きを読みたいかを伝える
 - 結論や完成形を押しつけず、書き手が次の一文へ進める余地を残す`,
     model: null,
-    temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'whole-document' },
     tagDefinitions: systemTags('issue'),
   },

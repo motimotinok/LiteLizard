@@ -66,7 +66,8 @@ const agent: ReadingAgentInput = {
   systemPrompt:
     '日本語の短い本文を読み、感情、テーマ、深読みを簡潔に返してください。出力は指定されたJSON schemaに合わせてください。',
   model: '',
-  temperature: 0.2,
+  contextPolicy: { mode: 'preceding', range: 'all' },
+  tagDefinitions: [],
 };
 
 const sample = {
@@ -96,7 +97,6 @@ async function verifyProvider(providerId: AnalysisProviderId) {
     agent,
     promptVersion: 'verify-live-2026-05-13',
     model,
-    temperature: agent.temperature,
     contextTexts: sample.contextTexts,
   });
 
@@ -104,10 +104,8 @@ async function verifyProvider(providerId: AnalysisProviderId) {
     provider: providerId,
     model,
     paragraphId: result.paragraphId,
-    emotionCount: result.emotion.length,
-    themeCount: result.theme.length,
-    deepMeaningLength: result.deepMeaning.length,
-    confidence: result.confidence,
+    responseLength: result.response.length,
+    tagCount: Object.values(result.tags).flat().length,
     promptVersion: result.promptVersion,
     ok: true,
   }, null, 2));
