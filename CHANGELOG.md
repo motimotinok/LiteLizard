@@ -1,3 +1,6 @@
+[2026/07/01]#72 LiteLizard 管理のLocal LLMランタイムを非採用として記録
+Local LLM はユーザーが管理する Ollama 互換 endpoint とモデル名へ接続する方式に限定し、LiteLizard 自身はモデルのインストール、起動、停止、削除、更新、保存先管理を担わない方針を `docs/specs/local-llm-runtime.md` と `docs/decisions.md` に記録した。`docs/specs/analysis-api.md` からもこの方針へリンクし、現行の endpoint 接続方式を正とした。
+
 [2026/07/01]#86 Reading Agent の temperature 設定を廃止
 Reading Agent の保存スキーマ、AgentsScreen、OpenAI / Anthropic / Local LLM provider 呼び出しから `temperature` を削除し、読者の揺らぎや慎重さはプロンプトで表現する方針へ移した。旧 `agents.json` に残る `temperature` は読み込み時に未知フィールドとして無視され、次回保存時に削除される。方針は `docs/decisions.md` と `docs/specs/reading-agent.md` に記録した。
 

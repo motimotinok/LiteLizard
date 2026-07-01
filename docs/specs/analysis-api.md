@@ -170,7 +170,7 @@ Provider へ渡す自然言語の system prompt には `emotion / theme / deepMe
 - **外部 API キー方式**（MVP 主軸）: ユーザーが設定画面で API キーを登録。`safeStorage` で暗号化保存。main プロセスが直接 LLM API を呼び出す
 - OpenAI / Anthropic の既定モデルと Reading Agent のモデル上書きは、2026-06-25 時点の公式ドキュメントを基にしたアプリ同梱候補から選ぶ。候補外の新モデル・限定モデル・古いモデルは「カスタムモデルID」として文字列保存できる
 - 既定値は OpenAI `gpt-5.4`、Anthropic `claude-sonnet-4-6`。Local LLM はインストール済みモデルが環境依存のため候補リストを持たず、従来どおり自由入力とする
-- **ローカル LLM 方式**: ユーザーが Ollama 等をインストールし、エンドポイント URL + モデル名を設定。main プロセスが `localhost` 経由で呼び出す
+- **ローカル LLM 方式**: ユーザーが Ollama 等をインストールし、エンドポイント URL + モデル名を設定。main プロセスが `localhost` 経由で呼び出す。LiteLizard はモデルのインストール、起動、停止、削除、更新を管理しない（詳細は [`local-llm-runtime.md`](local-llm-runtime.md)）
 - **クラウド方式**（将来）: OAuth ログイン後、自社サーバー API 経由で分析する構想。現時点にサーバー実装はなく、旧legacy APIを復元せず新規設計する。OAuth の詳細は `docs/specs/auth-session.md` を参照
 
 ---

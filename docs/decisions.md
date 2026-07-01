@@ -6,6 +6,17 @@
 
 ---
 
+## [2026-07-01] LiteLizard 管理の Local LLM ランタイムは採用しない (#72)
+
+- **決定**: LiteLizard はローカル LLM のモデル配布、インストール、起動、停止、更新、削除、保存先管理を自前で持たない。Local LLM 対応は、ユーザーが別途管理する Ollama 互換 endpoint とモデル名へ接続する方式に限定する
+- **理由**: 自前ランタイム管理は provider 追加ではなく、OS/GPU差異、外部バイナリ取得、容量管理、プロセス監視、クラッシュ復旧を含む基盤機能になる。執筆環境としての主責務から外れ、未署名MVP配布と保守停止前提ではサポート負荷と安全説明の負担が大きすぎるため
+- **仕様**: [`docs/specs/local-llm-runtime.md`](specs/local-llm-runtime.md), [`docs/specs/analysis-api.md`](specs/analysis-api.md)
+- **却下した案**:
+  - LiteLizard がモデル一覧、ダウンロード、保存先、削除、推論プロセス起動停止を管理する: OS別検証と外部バイナリ実行の責任が大きく、執筆UIにも管理ノイズを持ち込む
+  - MVP範囲で簡易管理だけ実装する: 中途半端な管理はモデル破損、容量不足、更新失敗時に復旧不能な状態を作りやすい
+
+---
+
 ## [2026-07-01] Reading Agent の temperature 設定を廃止する (#86)
 
 - **決定**: Reading Agent のデータモデル、AgentsScreen、provider 呼び出しから `temperature` を削除し、OpenAI / Anthropic / Local LLM へ温度パラメータを送らない。旧 `agents.json` に残る `temperature` は読み込み時に未知フィールドとして無視し、次回保存時に削除する

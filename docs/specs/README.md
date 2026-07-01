@@ -17,3 +17,4 @@
 | [ui-redesign-minimal.md](ui-redesign-minimal.md) | UI リデザイン仕様（案 A Minimal・現行実装の基準） | R-16 | implemented baseline（今後の方向は `DESIGN.md`） |
 | [reading-agent.md](reading-agent.md) | Reading Agent 永続化・編集・解析適用 | R-18 | stable |
 | [update-data-retention.md](update-data-retention.md) | アプリ更新時の userData・APIキー・Reading Agent 保持 | #124 | stable |
+| [local-llm-runtime.md](local-llm-runtime.md) | Local LLM ランタイム管理方針 | #72 | decision（LiteLizard 管理ランタイムは非採用） |
