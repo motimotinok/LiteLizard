@@ -3,6 +3,11 @@ import type { AnalysisCostEstimate } from '@litelizard/shared';
 
 interface Props {
   estimate: AnalysisCostEstimate;
+  agentName: string;
+  targetScopeLabel: string;
+  contextPolicyLabel: string;
+  referencedParagraphCount: number;
+  hasAdditionalInstruction: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -11,7 +16,16 @@ function formatChars(value: number): string {
   return `${value.toLocaleString('ja-JP')} 文字`;
 }
 
-export function AnalysisRunConfirm({ estimate, onCancel, onConfirm }: Props) {
+export function AnalysisRunConfirm({
+  estimate,
+  agentName,
+  targetScopeLabel,
+  contextPolicyLabel,
+  referencedParagraphCount,
+  hasAdditionalInstruction,
+  onCancel,
+  onConfirm,
+}: Props) {
   return (
     <div className="analysis-run-confirm-overlay" role="presentation">
       <div
@@ -30,6 +44,26 @@ export function AnalysisRunConfirm({ estimate, onCancel, onConfirm }: Props) {
           以下の段落を Reading Agent に送って解析します。送信前に内容を確認してください。
         </p>
         <dl className="analysis-run-confirm-list">
+          <div>
+            <dt>Reading Agent</dt>
+            <dd>{agentName}</dd>
+          </div>
+          <div>
+            <dt>対象</dt>
+            <dd>{targetScopeLabel} / {estimate.targetCount} 件</dd>
+          </div>
+          <div>
+            <dt>文脈ポリシー</dt>
+            <dd>{contextPolicyLabel}</dd>
+          </div>
+          <div>
+            <dt>参照範囲</dt>
+            <dd>{referencedParagraphCount} 段落</dd>
+          </div>
+          <div>
+            <dt>追加指示</dt>
+            <dd>{hasAdditionalInstruction ? 'あり' : 'なし'}</dd>
+          </div>
           <div>
             <dt>解析する段落</dt>
             <dd>{estimate.targetCount} 段落</dd>

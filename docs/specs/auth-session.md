@@ -60,6 +60,8 @@ OS ごとのバックエンド:
 - API キー: `app.getPath('userData')/api-keys.bin`
 - セッショントークン（将来）: `app.getPath('userData')/session.bin`
 
+アプリ更新時の `userData`、API キー、Reading Agent、将来の entitlement 保持方針は [`update-data-retention.md`](update-data-retention.md) を参照する。
+
 ---
 
 ## 3. 分析機能の利用条件と UI 制御

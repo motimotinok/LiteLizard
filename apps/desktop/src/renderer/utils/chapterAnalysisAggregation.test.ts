@@ -70,56 +70,52 @@ describe('aggregateChapterAnalyses', () => {
     });
   });
 
-  it('complete 段落のテーマ・感情を頻度順に集計し、空文字や空配列は無視する', () => {
+  it('complete 段落の任意タグを頻度順に集計し、旧 theme/emotion も互換表示する', () => {
     const doc = makeDocument(
       [
-        makeParagraph({ id: 'p1', chapterId: 'c1', lizard: { status: 'complete', theme: ['対話', '別れ'], emotion: ['寂しさ'] } }),
-        makeParagraph({ id: 'p2', chapterId: 'c1', lizard: { status: 'complete', theme: ['対話', '  '], emotion: ['寂しさ', '安堵'] } }),
+        makeParagraph({ id: 'p1', chapterId: 'c1', lizard: { status: 'complete', tags: { issue: ['対話', '別れ'], emotion: ['寂しさ'] } } }),
+        makeParagraph({ id: 'p2', chapterId: 'c1', lizard: { status: 'complete', tags: { issue: ['対話', '  '], emotion: ['寂しさ', '安堵'] } } }),
         makeParagraph({ id: 'p3', chapterId: 'c1', lizard: { status: 'stale', theme: ['対話'], emotion: ['焦り'] } }),
+        makeParagraph({ id: 'p4', chapterId: 'c1', lizard: { status: 'complete', theme: ['旧テーマ'], emotion: ['旧感情'] } }),
       ],
       [{ id: 'c1', order: 1, title: '一章' }],
     );
 
     const [summary] = aggregateChapterAnalyses(doc);
 
-    expect(summary.topThemes).toEqual([
+    expect(summary.topTags).toEqual([
+      { value: '寂しさ', count: 2 },
       { value: '対話', count: 2 },
       { value: '別れ', count: 1 },
-    ]);
-    expect(summary.topEmotions).toEqual([
-      { value: '寂しさ', count: 2 },
       { value: '安堵', count: 1 },
+      { value: '旧テーマ', count: 1 },
     ]);
   });
 
-  it('topTagLimit でテーマ・感情の上位件数を制限する', () => {
+  it('topTagLimit でタグの上位件数を制限する', () => {
     const doc = makeDocument(
       [
-        makeParagraph({ id: 'p1', chapterId: 'c1', lizard: { status: 'complete', theme: ['a', 'b', 'c', 'd'] } }),
+        makeParagraph({ id: 'p1', chapterId: 'c1', lizard: { status: 'complete', tags: { issue: ['a', 'b', 'c', 'd'] } } }),
       ],
       [{ id: 'c1', order: 1, title: '一章' }],
     );
 
     const [summary] = aggregateChapterAnalyses(doc, { topTagLimit: 2 });
 
-    expect(summary.topThemes).toHaveLength(2);
+    expect(summary.topTags).toHaveLength(2);
   });
 
-  it('complete 段落の confidence 平均だけを計算し、サンプルがなければ null を返す', () => {
+  it('confidence は新契約のサマリー対象にしない', () => {
     const doc = makeDocument(
       [
         makeParagraph({ id: 'p1', chapterId: 'c1', lizard: { status: 'complete', confidence: 0.6 } }),
         makeParagraph({ id: 'p2', chapterId: 'c1', lizard: { status: 'complete', confidence: 0.8 } }),
-        makeParagraph({ id: 'p3', chapterId: 'c1', lizard: { status: 'complete' } }),
-        makeParagraph({ id: 'p4', chapterId: 'c1', lizard: { status: 'stale', confidence: 0.99, analyzedAt: 'x' } }),
-        makeParagraph({ id: 'p5', chapterId: 'c2', lizard: { status: 'stale' } }),
       ],
     );
 
-    const [first, second] = aggregateChapterAnalyses(doc);
+    const [first] = aggregateChapterAnalyses(doc);
 
-    expect(first.averageConfidence).toBeCloseTo(0.7, 5);
-    expect(second.averageConfidence).toBeNull();
+    expect(first.topTags).toEqual([]);
   });
 
   it('段落が無い章でも 0 件のサマリーを返す', () => {
@@ -132,7 +128,6 @@ describe('aggregateChapterAnalyses', () => {
 
     expect(result).toHaveLength(2);
     expect(result[0].counts.total).toBe(0);
-    expect(result[0].topThemes).toEqual([]);
-    expect(result[0].averageConfidence).toBeNull();
+    expect(result[0].topTags).toEqual([]);
   });
 });

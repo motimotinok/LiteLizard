@@ -31,7 +31,7 @@ interface ChapterSummaryCardProps {
 interface ChapterSummaryTagListProps {
   ariaLabel: string;
   caption: string;
-  entries: ChapterAnalysisSummary['topThemes'];
+  entries: ChapterAnalysisSummary['topTags'];
   keyPrefix: string;
 }
 
@@ -67,10 +67,8 @@ function ChapterSummaryTagList({ ariaLabel, caption, entries, keyPrefix }: Chapt
 function ChapterSummaryCard({ summary, index }: ChapterSummaryCardProps) {
   const indexLabel = `C${String(index + 1).padStart(2, '0')}`;
   const titleText = summary.title.trim() || '無題の章';
-  const { counts, topThemes, topEmotions, averageConfidence } = summary;
+  const { counts, topTags } = summary;
   const hasAnyAnalysis = counts.complete > 0;
-  const confidencePercent =
-    averageConfidence === null ? null : Math.round(averageConfidence * 100);
 
   const countItems: Array<{ key: string; label: string; value: number; tone: string }> = [
     { key: 'complete', label: '解析済み', value: counts.complete, tone: 'complete' },
@@ -110,23 +108,11 @@ function ChapterSummaryCard({ summary, index }: ChapterSummaryCardProps) {
       {hasAnyAnalysis ? (
         <>
           <ChapterSummaryTagList
-            ariaLabel="主要なテーマ"
-            caption="主要テーマ"
-            entries={topThemes}
-            keyPrefix={`${summary.chapterId}-theme`}
+            ariaLabel="よく出るタグ"
+            caption="タグ"
+            entries={topTags}
+            keyPrefix={`${summary.chapterId}-tag`}
           />
-          <ChapterSummaryTagList
-            ariaLabel="主要な感情"
-            caption="主要な感情"
-            entries={topEmotions}
-            keyPrefix={`${summary.chapterId}-emotion`}
-          />
-          {confidencePercent !== null ? (
-            <p className="analysis-chapter-summary-confidence">
-              <span className="analysis-chapter-summary-confidence-label">確度平均</span>
-              <span className="analysis-chapter-summary-confidence-value">{confidencePercent}</span>
-            </p>
-          ) : null}
         </>
       ) : (
         <p className="analysis-card-status">

@@ -1,3 +1,33 @@
+[2026/07/01]#103 左ツールバーのフォルダアイコンでサイドバーを折りたためるようにした
+Workspace画面でフォルダアイコンを押すと、表示中のエクスプローラーサイドバーを折りたたみ、もう一度押すと再表示できるようにした。折りたたみ中はメイン領域を rail の隣まで広げ、現在文書やファイル一覧のデータは store 側に残るため、再表示しても状態を失わない。フォルダアイコンの aria-label / title / aria-expanded も開閉状態に合わせて切り替えるようにした。
+
+[2026/07/01]#120 左右パネルのドラッグ幅調整を追加
+エクスプローラーとエディターの境界、エディターと右分析パネルの境界にリサイズハンドルを追加し、左右補助パネルをセッション中にドラッグで広げたり狭めたりできるようにした。幅は最小/最大値と viewport の半分上限でクランプし、overlay モードでは右分析パネルのリサイズハンドルを出さない。幅の永続化は settings/userData 契約を広げるため今回の範囲外とし、実装コメントでセッション限定方針を明示した。
+
+[2026/07/01]#108 初見ユーザー向けの使い方ガイドを追加
+初回利用者がインストール後に最初の段落分析まで進めるよう、`articles/getting-started.md` を追加した。代表的な利用場面、作業フォルダ選択、新規文書作成、provider設定、Reading Agent選択、段落分析、結果を直す・直さない判断に使う例を、現行の対応OS・保存・外部送信条件と矛盾しない形で整理した。README と LP から初回ガイドへ到達できる導線も追加した。
+
+[2026/07/01]#124 アプリ更新時のローカルデータ保持仕様を追加
+アプリ更新後も Reading Agent、分析設定、APIキー、最近開いたプロジェクト、active Reading Agent を保持するための仕様として `docs/specs/update-data-retention.md` を追加した。現行の `userData` 保存対象、`appId` / `productName` を不用意に変えない制約、`safeStorage` 復号失敗時の非破壊フォールバック、将来の premium entitlement / セッション保存方針を整理し、release checklist に DMG 更新後の保持確認項目を追加した。
+
+[2026/07/01]#125 起動時文言と初回導線を整理
+ProjectSetupScreen に「作業フォルダを開く → 文章を書く、または開く → 必要な段落を読ませる」の短い流れを追加し、文書と分析結果がローカル保存されることを起動時に示すようにした。EditorEmptyState は「新しい文書を書く」を主導線にし、APIキーやReading Agentは書き始めたあとで設定できることを明示した。AnalysisPane の設定不足メッセージは、設定後に戻って「段落を読ませる」を押す流れが分かる文言へ更新した。
+
+[2026/07/01]#137 Reading Agentごとの構造化タグ定義を追加
+AgentsScreenでReading Agentごとに構造化タグ項目と許可値、タグ値色を設定できるようにした。providerへ渡すJSON schema/tool schema/Local LLM formatは選択Agentの `tagDefinitions` から生成し、未選択タグや未知値は正規化時に破棄する。既存Agentは `tagDefinitions: []` に補完し、タグなしAgentは本文だけを返す。デフォルトテンプレートには感覚系の `emotion`、構造系の `issue` を同梱し、dry-runとpreload mockも同じタグ定義に従うようにした。
+
+[2026/07/01]分析結果契約をresponseと任意tagsへ移行
+新規の分析結果を `response` 必須・`tags` 任意の契約へ変更し、`emotion / theme / deepMeaning / confidence` をprovider promptと新規schemaから外した。OpenAIとLocal LLMはJSON schema、Anthropicはtool input schemaで構造を強制し、dry-runと通常分析を同じ正規化経路へ揃えた。旧履歴は `deepMeaning` を本文として読み替え、旧 `theme` / `emotion` はタグ表示・章サマリー集計の互換フォールバックとして保持する。
+
+[2026/07/01]分析履歴へ最小来歴と本文fingerprintを保存
+新規の段落分析履歴にAgent ID、実行時表示名、prompt version、contextPolicy、参照段落数、追加指示有無、対象スコープ、使用モデル、結果契約バージョンを保存するようにした。新規履歴では段落本文を `sourceText` として複製せず、本文変更後の互換判定は本文長と安定ハッシュから作る `targetTextFingerprint` で行う。旧 `sourceText` 履歴は引き続き読み込み互換として扱う。
+
+[2026/07/01]分析実行前確認に送信条件を追加し省略設定を保存
+分析実行前確認にReading Agent名、対象スコープ、文脈ポリシー、参照段落数、追加指示の有無を追加した。設定画面から確認画面の表示を無効化できるようにし、既定は確認ありのまま維持した。省略時も同じpending run snapshotとconfirm guardを通すため、確認後に本文や文書が変わった場合の実行中止条件は共通で働く。
+
+[2026/07/01]分析実行時の即興追加指示を追加
+分析パネルに「今回だけの観点」入力を追加し、保存済みReading Agentを編集せずに、その回の分析だけへ追加指示を添えられるようにした。追加指示はproviderのtarget prompt側へ渡し、OpenAIの共通prefix cacheを汚さない。確認画面と履歴provenanceには追加指示の有無だけを残し、追加指示本文やhashは保存しない。
+
 [2026/06/30]段落別の読みレーンと分析実行の安定化
 案Bを本番UIへ移し、本文横の段落別読みレーンと選択段落専用の右インスペクター・追加質問を追加した。試作用画面は削除し、分析の段落単位リトライ、final resultの永続保存、provider不整合なAgent model overrideの実行前検出、OpenAI向けprompt cache prefixの安定化、実provider入力に近い送信量見積もり、同一patternの二重履歴保存防止も入れた。
 

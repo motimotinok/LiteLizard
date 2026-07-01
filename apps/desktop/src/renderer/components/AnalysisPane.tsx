@@ -45,8 +45,8 @@ function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
       label: 'OpenAI',
       configured,
       runnable: configured,
-      missingTitle: 'OpenAI API キーを設定すると解析を開始できます。',
-      missingBody: '設定画面で OpenAI のキーを保存してください。',
+      missingTitle: 'OpenAI API キーを保存すると、この段落を読ませられます。',
+      missingBody: '設定画面でキーを保存したあと、ここに戻って「段落を読ませる」を押してください。',
       disabledTitle: 'OpenAI API キーが未設定です',
     };
   }
@@ -57,8 +57,8 @@ function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
       label: 'Anthropic',
       configured,
       runnable: configured,
-      missingTitle: 'Anthropic API キーを設定すると解析を開始できます。',
-      missingBody: '設定画面で Anthropic のキーを保存してください。',
+      missingTitle: 'Anthropic API キーを保存すると、この段落を読ませられます。',
+      missingBody: '設定画面でキーを保存したあと、ここに戻って「段落を読ませる」を押してください。',
       disabledTitle: 'Anthropic API キーが未設定です',
     };
   }
@@ -67,8 +67,8 @@ function getAnalysisProviderUiState(analysisSettings: AnalysisSettings) {
     label: 'Local LLM',
     configured: analysisSettings.localLlm.configured,
     runnable: analysisSettings.localLlm.configured,
-    missingTitle: 'ローカル LLM の設定が必要です。',
-    missingBody: '設定画面でエンドポイントとモデル名を保存してください。',
+    missingTitle: 'ローカル LLM を保存すると、この段落を読ませられます。',
+    missingBody: '設定画面でエンドポイントとモデル名を保存したあと、ここに戻って実行してください。',
     disabledTitle: 'ローカル LLM が未設定です',
   };
 }
@@ -125,6 +125,23 @@ ${question.trim()}`;
   };
 }
 
+function analysisResponseText(paragraph: LiteLizardDocument['paragraphs'][number]) {
+  return paragraph.lizard.response?.trim() || paragraph.lizard.deepMeaning?.trim() || '';
+}
+
+function analysisTags(paragraph: LiteLizardDocument['paragraphs'][number]) {
+  const explicitTags = paragraph.lizard.tags
+    ? Object.values(paragraph.lizard.tags).flatMap((values) => values)
+    : [];
+  if (explicitTags.length > 0) {
+    return explicitTags;
+  }
+  return [
+    ...(paragraph.lizard.theme ?? []),
+    ...(paragraph.lizard.emotion ?? []),
+  ];
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
@@ -141,6 +158,8 @@ export function AnalysisPane({
   const analysisSettings = useAppStore((s) => s.analysisSettings);
   const analysisMode = useAppStore((s) => s.analysisMode);
   const setAnalysisMode = useAppStore((s) => s.setAnalysisMode);
+  const analysisAdditionalInstruction = useAppStore((s) => s.analysisAdditionalInstruction);
+  const setAnalysisAdditionalInstruction = useAppStore((s) => s.setAnalysisAdditionalInstruction);
   const analysisRunSummary = useAppStore((s) => s.analysisRunSummary);
   const agents = useAppStore((s) => s.agents);
   const activeAgentId = useAppStore((s) => s.activeAgentId);
@@ -174,16 +193,12 @@ export function AnalysisPane({
 
   const selectedMessages = focusedParagraph ? messagesByParagraphId[focusedParagraph.id] ?? [] : [];
   const draft = focusedParagraph ? draftByParagraphId[focusedParagraph.id] ?? '' : '';
-  const hasPreviousAnalysis = Boolean(focusedParagraph?.lizard.analyzedAt || focusedParagraph?.lizard.deepMeaning);
+  const previousAnalysis = focusedParagraph ? analysisResponseText(focusedParagraph) : '';
+  const hasPreviousAnalysis = Boolean(focusedParagraph?.lizard.analyzedAt || previousAnalysis);
   const focusedStatusText = focusedParagraph
     ? statusLabel(focusedParagraph.lizard.status, hasPreviousAnalysis)
     : '';
-  const tags = focusedParagraph
-    ? [
-        ...(focusedParagraph.lizard.theme ?? []),
-        ...(focusedParagraph.lizard.emotion ?? []),
-      ]
-    : [];
+  const tags = focusedParagraph ? analysisTags(focusedParagraph) : [];
   const canSendFollowup = Boolean(
     focusedParagraph &&
       activeAgent &&
@@ -235,7 +250,7 @@ export function AnalysisPane({
 
     try {
       const result = await dryRunAgent({
-        agent: buildFollowupAgent(activeAgent, question, targetParagraph.lizard.deepMeaning ?? ''),
+        agent: buildFollowupAgent(activeAgent, question, analysisResponseText(targetParagraph)),
         paragraphId: targetParagraph.id,
         text: targetParagraph.light.text,
         order: targetParagraph.order,
@@ -243,7 +258,7 @@ export function AnalysisPane({
       const assistantMessage: ParagraphChatMessage = {
         id: `${targetParagraph.id}-a-${Date.now()}`,
         role: 'assistant',
-        body: result.deepMeaning.trim() || '応答が空でした。',
+        body: result.response.trim() || '応答が空でした。',
       };
       setMessagesByParagraphId((current) => ({
         ...current,
@@ -348,6 +363,16 @@ export function AnalysisPane({
         >
           <IconPlay size={10} /> {analysisModeRunLabel(analysisMode)}
         </button>
+        <label className="analysis-run-instruction">
+          <span>今回だけの観点</span>
+          <textarea
+            value={analysisAdditionalInstruction}
+            onChange={(event) => setAnalysisAdditionalInstruction(event.target.value)}
+            rows={2}
+            maxLength={2000}
+            placeholder="例: 初見読者として引っかかる場所だけ見る"
+          />
+        </label>
         <div className="analysis-focus-actions">
           <button
             type="button"
@@ -377,6 +402,11 @@ export function AnalysisPane({
       {pendingAnalysisRun ? (
         <AnalysisRunConfirm
           estimate={pendingAnalysisRun.estimate}
+          agentName={pendingAnalysisRun.agentName}
+          targetScopeLabel={pendingAnalysisRun.targetScopeLabel}
+          contextPolicyLabel={pendingAnalysisRun.contextPolicyLabel}
+          referencedParagraphCount={pendingAnalysisRun.referencedParagraphCount}
+          hasAdditionalInstruction={pendingAnalysisRun.hasAdditionalInstruction}
           onCancel={cancelAnalysisRun}
           onConfirm={() => {
             void confirmAnalysisRun();
@@ -437,9 +467,9 @@ export function AnalysisPane({
                   ))}
                 </ul>
               ) : null}
-              {focusedParagraph.lizard.status === 'complete' || focusedParagraph.lizard.deepMeaning ? (
+              {focusedParagraph.lizard.status === 'complete' || previousAnalysis ? (
                 <p className="analysis-focus-body">
-                  {focusedParagraph.lizard.deepMeaning?.trim() || '生成結果が空です。'}
+                  {previousAnalysis || '生成結果が空です。'}
                 </p>
               ) : (
                 <p className="analysis-card-status">

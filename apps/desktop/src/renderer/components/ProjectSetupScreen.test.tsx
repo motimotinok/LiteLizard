@@ -14,6 +14,9 @@ describe('ProjectSetupScreen', () => {
     );
 
     expect(html).toContain('フォルダを開く');
-    expect(html).toContain('新しい作業フォルダを作成できます');
+    expect(html).toContain('作業フォルダを開く');
+    expect(html).toContain('文章を書く、または開く');
+    expect(html).toContain('必要な段落を読ませる');
+    expect(html).toContain('文書と分析結果はローカルに保存されます');
   });
 });

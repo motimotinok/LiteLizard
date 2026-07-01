@@ -2,6 +2,7 @@ import type { LiteLizardDocument, ParagraphAnalysisPattern } from '@litelizard/s
 import { describe, expect, it } from 'vitest';
 import {
   appendPatternToHistories,
+  createParagraphTextFingerprint,
   getVisiblePatternIndices,
   projectAnalysisHistoriesToDocument,
   resolveDisplayedPatternIndex,
@@ -52,6 +53,28 @@ describe('analysisHistory helpers', () => {
     const history = [
       makePattern('2026-04-11T00:00:00.000Z', '古い本文', 'old'),
       makePattern('2026-04-12T00:00:00.000Z', '本文A', 'latest'),
+    ];
+
+    expect(getVisiblePatternIndices(history, '本文A')).toEqual([1]);
+    expect(resolveDisplayedPatternIndex(history, '本文A')).toBe(1);
+  });
+
+  it('targetTextFingerprint が一致する新形式 pattern だけを表示対象にする', () => {
+    const history: ParagraphAnalysisPattern[] = [
+      {
+        analyzedAt: '2026-04-11T00:00:00.000Z',
+        result: {
+          response: 'old',
+          targetTextFingerprint: createParagraphTextFingerprint('古い本文'),
+        },
+      },
+      {
+        analyzedAt: '2026-04-12T00:00:00.000Z',
+        result: {
+          response: 'latest',
+          targetTextFingerprint: createParagraphTextFingerprint('本文A'),
+        },
+      },
     ];
 
     expect(getVisiblePatternIndices(history, '本文A')).toEqual([1]);

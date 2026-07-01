@@ -64,6 +64,17 @@ LiteLizard MVP（未署名 macOS `.dmg`）を GitHub Releases に置く前に確
 - [ ] アプリを通常終了し、再起動すると直前の作業フォルダが自動で復元される。
 - [ ] フォルダ選択を明示的に切り替えると、ready 状態が古い復元結果で上書きされず、選んだフォルダがそのまま開かれる。
 
+### 更新後のローカルデータ保持
+
+根拠仕様: `docs/specs/update-data-retention.md`
+
+- [ ] 1つ前の `.dmg` 相当で Reading Agent、分析設定、API キー、最近開いたプロジェクトを保存してから最新版 `.dmg` を入れ直す。
+- [ ] 更新後も `agents.json` のユーザー作成 Reading Agent と active Reading Agent が保持される。
+- [ ] 更新後も `analysis-settings.json` の provider / Local LLM / エディタ調整が保持される。
+- [ ] 更新後も `app-store.json` の直近フォルダと最近開いたプロジェクトが保持される。
+- [ ] `api-keys.bin` または `api-keys.plaintext` が保持され、復号可能な環境では API キー保存済みとして表示される。
+- [ ] 復号できない場合は API キー未設定として表示され、設定画面から再入力できる。
+
 ### 既知の制約として確認しておく
 
 - [ ] dev 環境および Electron 直接起動で `SIGABRT` 等の起動失敗が発生していないか手元で確認する。発生する場合は dev 用 main process の問題として別途追跡する（公開判断にも影響）。

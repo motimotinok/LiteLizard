@@ -59,7 +59,8 @@ describe('analysis settings route', () => {
       <AnalysisPane document={createDocument()} activeParagraphId="p1" />,
     );
 
-    expect(html).toContain('OpenAI API キーを設定すると解析を開始できます。');
+    expect(html).toContain('OpenAI API キーを保存すると、この段落を読ませられます。');
+    expect(html).toContain('ここに戻って「段落を読ませる」を押してください。');
     expect(html).toContain('設定を開く');
   });
 

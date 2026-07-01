@@ -16,9 +16,7 @@ function makeSummary(overrides: Partial<ChapterAnalysisSummary>): ChapterAnalysi
       staleWithPrevious: 0,
       notAnalyzed: 0,
     },
-    topThemes: [],
-    topEmotions: [],
-    averageConfidence: null,
+    topTags: [],
     ...overrides,
   };
 }
@@ -30,7 +28,7 @@ describe('ChapterSummaryList', () => {
     expect(html).not.toContain('analysis-chapter-summary-list');
   });
 
-  it('章タイトル・段落数・カウンタ・タグ・確度平均を描画する', () => {
+  it('章タイトル・段落数・カウンタ・タグを描画する', () => {
     const summaries: ChapterAnalysisSummary[] = [
       makeSummary({
         chapterId: 'c1',
@@ -43,12 +41,11 @@ describe('ChapterSummaryList', () => {
           staleWithPrevious: 1,
           notAnalyzed: 1,
         },
-        topThemes: [
+        topTags: [
           { value: '対話', count: 2 },
           { value: '別れ', count: 1 },
+          { value: '寂しさ', count: 2 },
         ],
-        topEmotions: [{ value: '寂しさ', count: 2 }],
-        averageConfidence: 0.74,
       }),
     ];
 
@@ -65,8 +62,7 @@ describe('ChapterSummaryList', () => {
     expect(html).toContain('対話');
     expect(html).toContain('×2');
     expect(html).toContain('寂しさ');
-    expect(html).toContain('確度平均');
-    expect(html).toContain('74');
+    expect(html).not.toContain('確度平均');
   });
 
   it('complete が 0 でも段落数があれば未解析メッセージを描画する', () => {
@@ -88,7 +84,7 @@ describe('ChapterSummaryList', () => {
     const html = renderToStaticMarkup(<ChapterSummaryList summaries={summaries} />);
 
     expect(html).toContain('段落分析がまだありません');
-    expect(html).not.toContain('主要テーマ');
+    expect(html).not.toContain('主要タグ');
     expect(html).not.toContain('確度平均');
   });
 

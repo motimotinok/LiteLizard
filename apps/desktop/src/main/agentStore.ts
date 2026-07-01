@@ -35,7 +35,7 @@ function isMissingFileError(error: unknown) {
 }
 
 function cloneAgents(agents: ReadingAgent[]) {
-  return agents.map((agent) => ({ ...agent }));
+  return structuredClone(agents);
 }
 
 export function createReadingAgentStore(
@@ -129,6 +129,7 @@ export function createReadingAgentStore(
           model: parsed.model,
           temperature: parsed.temperature,
           contextPolicy: parsed.contextPolicy,
+          tagDefinitions: parsed.tagDefinitions,
           createdAt: existing?.createdAt ?? timestamp,
           updatedAt: timestamp,
           builtIn: existing?.builtIn ?? false,
@@ -165,6 +166,7 @@ export function createReadingAgentStore(
 
         const agent: ReadingAgent = {
           ...template,
+          tagDefinitions: template.tagDefinitions ?? [],
           id,
           createdAt: timestamp,
           updatedAt: timestamp,

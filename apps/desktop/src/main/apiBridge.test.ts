@@ -8,9 +8,10 @@ import {
 } from '@litelizard/shared';
 import { dryRunReadingAgent, runAnalysis } from './apiBridge.js';
 import {
-  ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
   buildContextTexts,
+  buildAnalysisProviderOutputJsonSchema,
   buildOpenAiResponseRequest,
+  createAnthropicAnalysisProvider,
   createLocalLlmAnalysisProvider,
   normalizeAnalysisPayload,
   resolveAnalysisProvider,
@@ -29,9 +30,24 @@ const testAgent: ReadingAgent = {
   model: null,
   temperature: 0.7,
   contextPolicy: { mode: 'preceding', range: 'all' },
+  tagDefinitions: [],
   createdAt: '2026-05-02T00:00:00.000Z',
   updatedAt: '2026-05-02T00:00:00.000Z',
   builtIn: true,
+};
+
+const taggedAgent: ReadingAgent = {
+  ...testAgent,
+  tagDefinitions: [
+    {
+      id: 'reading',
+      label: '読み',
+      values: [
+        { id: 'afterglow', label: '余韻', color: '#6d8b6d' },
+        { id: 'tension', label: '緊張', color: '#9a7a4d' },
+      ],
+    },
+  ],
 };
 
 describe('resolveAnalysisProvider', () => {
@@ -188,6 +204,13 @@ describe('analysis prompt builders', () => {
       ].join('\n\n'),
     );
   });
+
+  it('追加指示は target prompt の可変部分にだけ入れる', () => {
+    const prompt = buildAnalysisTargetPrompt('p-2', '対象本文', '今回は矛盾だけを見る');
+
+    expect(prompt).toContain('Additional instruction for this run:');
+    expect(prompt).toContain('今回は矛盾だけを見る');
+  });
 });
 
 describe('buildOpenAiResponseRequest', () => {
@@ -202,6 +225,7 @@ describe('buildOpenAiResponseRequest', () => {
       contextTexts: ['前段落'],
       documentTexts: ['前段落', '対象本文', '後段落'],
       promptCacheKey: 'llz:cache-key',
+      additionalInstruction: '今回は矛盾だけを見る',
     });
 
     expect(request.prompt_cache_key).toBe('llz:cache-key');
@@ -212,8 +236,63 @@ describe('buildOpenAiResponseRequest', () => {
     expect(input[0]?.content).toContain('1. 前段落');
     expect(input[0]?.content).toContain('2. 対象本文');
     expect(input[0]?.content).toContain('3. 後段落');
+    expect(input[0]?.content).not.toContain('今回は矛盾だけを見る');
     expect(input[1]?.content).toContain('ID: p-2');
     expect(input[1]?.content).toContain('対象本文');
+    expect(input[1]?.content).toContain('今回は矛盾だけを見る');
+  });
+});
+
+describe('createAnthropicAnalysisProvider', () => {
+  it('Messages API に tool schema を渡し tool_use input を正規化する', async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          content: [
+            {
+              type: 'tool_use',
+              name: 'return_litelizard_analysis',
+              input: {
+                response: '余韻が段落の最後に残る。',
+                tags: { reading: ['afterglow'] },
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createAnthropicAnalysisProvider('sk-ant');
+    const result = await provider.analyzeParagraph({
+      paragraphId: 'p-1',
+      text: '対象本文',
+      agent: taggedAgent,
+      promptVersion: 'v1',
+      model: 'claude-sonnet-4-6',
+      temperature: 0.3,
+      contextTexts: ['前段落'],
+    });
+
+    const requestBody = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+      tools: Array<{ input_schema: unknown }>;
+      tool_choice: { type: string; name: string };
+    };
+    expect(requestBody.tools[0]?.input_schema).toEqual(
+      buildAnalysisProviderOutputJsonSchema(taggedAgent.tagDefinitions),
+    );
+    expect(requestBody.tool_choice).toEqual({
+      type: 'tool',
+      name: 'return_litelizard_analysis',
+    });
+    expect(result).toMatchObject({
+      paragraphId: 'p-1',
+      response: '余韻が段落の最後に残る。',
+      tags: { reading: ['afterglow'] },
+      model: 'claude-sonnet-4-6',
+      promptVersion: 'v1',
+    });
   });
 });
 
@@ -223,11 +302,12 @@ describe('createLocalLlmAnalysisProvider', () => {
       new Response(
         JSON.stringify({
           response: JSON.stringify({
-            emotion: ['静けさ'],
-            theme: ['旅'],
-            deepMeaning: '出発前の不安が描かれている。',
-            confidence: 0.75,
-          }),
+          response: '出発前の不安が描かれている。',
+          tags: {
+              reading: ['afterglow'],
+              unknown: ['drop'],
+          },
+        }),
         }),
         { status: 200 },
       ),
@@ -238,7 +318,7 @@ describe('createLocalLlmAnalysisProvider', () => {
     const result = await provider.analyzeParagraph({
       paragraphId: 'p-1',
       text: '旅立ちの朝、彼女はまだ扉の前にいた。',
-      agent: testAgent,
+      agent: taggedAgent,
       promptVersion: 'v1',
       model: 'llama3.2',
       temperature: 0.2,
@@ -267,7 +347,9 @@ describe('createLocalLlmAnalysisProvider', () => {
       keep_alive: '30s',
       options: { temperature: 0.2 },
     });
-    expect(requestBody.format).toEqual(ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA);
+    expect(requestBody.format).toEqual(
+      buildAnalysisProviderOutputJsonSchema(taggedAgent.tagDefinitions),
+    );
     expect(requestBody.prompt).toContain('Reference paragraphs');
     expect(requestBody.prompt).toContain('余韻を中心に読んでください。');
     expect(requestBody.prompt).toContain('旅立ちの朝');
@@ -275,10 +357,10 @@ describe('createLocalLlmAnalysisProvider', () => {
       paragraphId: 'p-1',
       model: 'llama3.2',
       promptVersion: 'v1',
-      emotion: ['静けさ'],
-      theme: ['旅'],
-      deepMeaning: '出発前の不安が描かれている。',
-      confidence: 0.75,
+      response: '出発前の不安が描かれている。',
+      tags: {
+        reading: ['afterglow'],
+      },
     });
   });
 
@@ -306,10 +388,8 @@ describe('createLocalLlmAnalysisProvider', () => {
 
     expect(result).toMatchObject({
       paragraphId: 'p-2',
-      emotion: ['期待'],
-      theme: ['再会'],
-      deepMeaning: '再会への期待。',
-      confidence: 0.6,
+      response: '再会への期待。',
+      tags: {},
     });
   });
 
@@ -357,20 +437,21 @@ describe('createLocalLlmAnalysisProvider', () => {
 describe('normalizeAnalysisPayload', () => {
   it('raw payload を AnalysisResult に正規化する', () => {
     const result = normalizeAnalysisPayload('p-1', 'v1', 'test-model', {
-      emotion: [' 安心 ', '', 1],
-      theme: ['旅', null],
-      deepMeaning: '  深い意味  ',
-      confidence: 1.7,
-    });
+      response: '  回答本文  ',
+      tags: {
+        reading: [' afterglow ', 'unknown', 'afterglow'],
+        other: ['afterglow'],
+      },
+    }, taggedAgent.tagDefinitions);
 
     expect(result).toMatchObject({
       paragraphId: 'p-1',
       promptVersion: 'v1',
       model: 'test-model',
-      emotion: ['安心', '1'],
-      theme: ['旅', 'null'],
-      deepMeaning: '深い意味',
-      confidence: 1,
+      response: '回答本文',
+      tags: {
+        reading: ['afterglow'],
+      },
     });
     expect(result.analyzedAt).toMatch(/T/);
   });

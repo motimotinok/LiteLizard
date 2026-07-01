@@ -7,6 +7,7 @@ export type LeftIconRailPanel = 'editor' | 'agents' | 'settings' | 'search';
 interface LeftIconRailProps {
   activePanel: LeftIconRailPanel;
   onSelectPanel: (panel: LeftIconRailPanel) => void;
+  editorPanelExpanded?: boolean;
 }
 
 interface NavItem {
@@ -21,7 +22,7 @@ const PRIMARY_NAV: NavItem[] = [
   { id: 'search', label: '検索', Icon: IconSearch },
 ];
 
-export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) {
+export function LeftIconRail({ activePanel, onSelectPanel, editorPanelExpanded }: LeftIconRailProps) {
   const updateAvailable = useAppStore((state) => state.updateCheck?.updateAvailable ?? false);
   const settingsLabel = updateAvailable ? '設定（新しいバージョンあり）' : '設定';
 
@@ -29,13 +30,20 @@ export function LeftIconRail({ activePanel, onSelectPanel }: LeftIconRailProps) 
     <nav className="left-icon-rail" aria-label="primary-navigation">
       {PRIMARY_NAV.map(({ id, label, Icon }) => {
         const active = activePanel === id;
+        const itemLabel =
+          id === 'editor' && typeof editorPanelExpanded === 'boolean'
+            ? editorPanelExpanded
+              ? 'エクスプローラーを閉じる'
+              : 'エクスプローラーを開く'
+            : label;
         return (
           <button
             key={id}
             type="button"
             className={active ? 'rail-icon-button is-active' : 'rail-icon-button'}
-            aria-label={label}
-            title={label}
+            aria-label={itemLabel}
+            aria-expanded={id === 'editor' && typeof editorPanelExpanded === 'boolean' ? editorPanelExpanded : undefined}
+            title={itemLabel}
             onClick={() => onSelectPanel(id)}
           >
             <Icon size={17} />

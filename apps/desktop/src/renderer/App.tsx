@@ -10,6 +10,7 @@ import { AgentsScreen } from './components/AgentsScreen.js';
 import { SearchScreen } from './components/SearchScreen.js';
 import { useAppStore } from './store/useAppStore.js';
 import { IconExport, IconPanel } from './components/ui/icons.js';
+import { useResizablePanel } from './hooks/useResizablePanel.js';
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -65,7 +66,13 @@ function WorkspaceShell() {
   const [activeParagraphId, setActiveParagraphId] = useState<string | null>(null);
   const [linkedHighlightParagraphId, setLinkedHighlightParagraphId] = useState<string | null>(null);
   const [analysisPanelOpen, setAnalysisPanelOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [scrollRequest, setScrollRequest] = useState<{ paragraphId: string; nonce: number } | null>(null);
+  // #120: panel widths are session-local for now. Persisting them would expand the settings/userData contract.
+  const sidebarPanel = useResizablePanel(232, 180, 360);
+  const analysisPanel = useResizablePanel(380, 280, 560, {
+    disabled: analysisSettings.editorTweaks.analysisPanelMode === 'overlay',
+  });
 
   useEffect(() => {
     if (!dirty || !currentDocument || !currentFilePath) {
@@ -166,30 +173,49 @@ function WorkspaceShell() {
     .filter(Boolean)
     .join(' ');
 
+  const workspaceStyle = {
+    ...getEditorTweaksStyle(analysisSettings.editorTweaks),
+    '--sidebar-width': `${sidebarPanel.width}px`,
+    '--panel-width': `${analysisPanel.width}px`,
+  } as CSSProperties;
+
   return (
-    <div className="workspace-root" style={getEditorTweaksStyle(analysisSettings.editorTweaks)}>
+    <div className={sidebarOpen ? 'workspace-root' : 'workspace-root sidebar-collapsed'} style={workspaceStyle}>
       <LeftIconRail
         activePanel="editor"
+        editorPanelExpanded={sidebarOpen}
         onSelectPanel={(panel) => {
-          if (panel === 'editor') openEditorPanel();
-          else if (panel === 'settings') openSettingsPanel();
+          if (panel === 'editor') {
+            openEditorPanel();
+            setSidebarOpen((current) => !current);
+          } else if (panel === 'settings') openSettingsPanel();
           else if (panel === 'agents') openAgentsPanel();
           else if (panel === 'search') openSearchPanel();
         }}
       />
-      <aside className="workspace-sidebar">
-        <ExplorerPane
-          rootPath={rootPath}
-          tree={tree}
-          currentFilePath={currentFilePath}
-          onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
-          onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
-          onMoveEntry={(sourcePath, destinationFolderPath) => void moveEntry(sourcePath, destinationFolderPath)}
-          onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
-          onSelectFile={(path) => void loadDocument(path)}
-          onImportTextFile={(createParent) => void importTextFile(createParent)}
-        />
-      </aside>
+      {sidebarOpen ? (
+        <aside className="workspace-sidebar">
+          <ExplorerPane
+            rootPath={rootPath}
+            tree={tree}
+            currentFilePath={currentFilePath}
+            onCreateEntry={(parentPath, type, name) => void createEntry(parentPath, type, name)}
+            onRenameEntry={(targetPath, nextName) => void renameEntry(targetPath, nextName)}
+            onMoveEntry={(sourcePath, destinationFolderPath) => void moveEntry(sourcePath, destinationFolderPath)}
+            onDeleteEntry={(targetPath) => void deleteEntry(targetPath)}
+            onSelectFile={(path) => void loadDocument(path)}
+            onImportTextFile={(createParent) => void importTextFile(createParent)}
+          />
+          <div
+            className="panel-resizer panel-resizer-sidebar"
+            role="separator"
+            aria-label="ファイルパネル幅を調整"
+            aria-orientation="vertical"
+            title="ファイルパネル幅を調整"
+            onMouseDown={(event) => sidebarPanel.onMouseDown(event, 1)}
+          />
+        </aside>
+      ) : null}
 
       <main className={workspaceMainClass}>
         <div className="workspace-titlebar">
@@ -265,6 +291,16 @@ function WorkspaceShell() {
           onOpenFolder={() => void openFolder()}
         />
 
+        {showAnalysisPanel && analysisPanelMode === 'side' ? (
+          <div
+            className="panel-resizer panel-resizer-analysis"
+            role="separator"
+            aria-label="分析パネル幅を調整"
+            aria-orientation="vertical"
+            title="分析パネル幅を調整"
+            onMouseDown={(event) => analysisPanel.onMouseDown(event, -1)}
+          />
+        ) : null}
         {showAnalysisPanel ? (
           <AnalysisPane
             document={currentDocument}

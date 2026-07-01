@@ -22,10 +22,24 @@ export function toAnalysisHistories(
   );
 }
 
+export function createParagraphTextFingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `llz-fnv1a:${text.length}:${(hash >>> 0).toString(16).padStart(8, '0')}`;
+}
+
 export function isPatternCompatibleWithParagraph(
   pattern: ParagraphAnalysisPattern,
   paragraphText: string,
 ): boolean {
+  const fingerprint = pattern.result.targetTextFingerprint;
+  if (typeof fingerprint === 'string') {
+    return fingerprint === createParagraphTextFingerprint(paragraphText);
+  }
+
   const sourceText = pattern.result.sourceText;
   return typeof sourceText !== 'string' || sourceText === paragraphText;
 }
@@ -85,14 +99,32 @@ export function projectAnalysisHistoriesToDocument(
 
       const pattern = history[displayedIndex];
       const result = pattern.result;
+      const response =
+        typeof result.response === 'string'
+          ? result.response
+          : typeof result.deepMeaning === 'string'
+            ? result.deepMeaning
+            : '';
+      const tags =
+        result.tags && typeof result.tags === 'object' && !Array.isArray(result.tags)
+          ? result.tags
+          : {};
 
       return {
         ...paragraph,
         lizard: {
           status: 'complete',
+          response,
+          tags,
+          resultContractVersion:
+            typeof result.resultContractVersion === 'string'
+              ? result.resultContractVersion
+              : result.response
+                ? 'response-tags-v1'
+                : 'legacy-deepMeaning-v1',
           emotion: Array.isArray(result.emotion) ? result.emotion : [],
           theme: Array.isArray(result.theme) ? result.theme : [],
-          deepMeaning: typeof result.deepMeaning === 'string' ? result.deepMeaning : '',
+          deepMeaning: typeof result.deepMeaning === 'string' ? result.deepMeaning : response,
           confidence: typeof result.confidence === 'number' ? result.confidence : 0,
           model: typeof result.model === 'string' ? result.model : '',
           analyzedAt: pattern.analyzedAt,

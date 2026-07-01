@@ -52,6 +52,10 @@ xattr -dr com.apple.quarantine /Applications/LiteLizard.app
 
 その後、もう一度 `Applications` フォルダから `LiteLizard.app` を開きます。
 
+## はじめての使い方
+
+インストール後に最初の段落分析まで試す流れは [`articles/getting-started.md`](./articles/getting-started.md) にまとめています。作業フォルダの選択、新規文書作成、provider 設定、Reading Agent の選択、分析結果を推敲判断に使う例を短く確認できます。
+
 ## 開発
 
 詳細仕様: `docs/LiteLizard_spec_v003.md`

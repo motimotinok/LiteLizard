@@ -73,6 +73,7 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
   });
   const [settingsDraft, setSettingsDraft] = useState({
     defaultProvider: analysisSettings.defaultProvider,
+    analysisRunConfirmationEnabled: analysisSettings.analysisRunConfirmationEnabled,
     openaiModel: analysisSettings.providers.openai.defaultModel,
     anthropicModel: analysisSettings.providers.anthropic.defaultModel,
     localEndpoint: analysisSettings.localLlm.endpoint,
@@ -88,6 +89,7 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
   useEffect(() => {
     setSettingsDraft({
       defaultProvider: analysisSettings.defaultProvider,
+      analysisRunConfirmationEnabled: analysisSettings.analysisRunConfirmationEnabled,
       openaiModel: analysisSettings.providers.openai.defaultModel,
       anthropicModel: analysisSettings.providers.anthropic.defaultModel,
       localEndpoint: analysisSettings.localLlm.endpoint,
@@ -120,6 +122,7 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
       : analysisSettings.editorTweaks.paperWarmth;
     await saveAnalysisSettings({
       defaultProvider: settingsDraft.defaultProvider,
+      analysisRunConfirmationEnabled: settingsDraft.analysisRunConfirmationEnabled,
       providers: {
         openai: {
           defaultModel:
@@ -338,7 +341,37 @@ export function SettingsScreen({ initialTab = 'analysis' }: SettingsScreenProps 
               </div>
             </Section>
 
-            <Section label={toKanjiIndex(3)} title="ローカル LLM">
+            <Section label={toKanjiIndex(3)} title="実行前の確認">
+              <Row label="確認画面">
+                <label className="settings-checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={settingsDraft.analysisRunConfirmationEnabled}
+                    onChange={(event) =>
+                      setSettingsDraft((current) => ({
+                        ...current,
+                        analysisRunConfirmationEnabled: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>分析実行前に送信内容を確認する</span>
+                </label>
+              </Row>
+              <div className="settings-actions-row">
+                <span>既定では確認画面を表示します。</span>
+                <div className="settings-actions-buttons">
+                  <button
+                    type="button"
+                    className="button-small button-small-primary"
+                    onClick={() => void saveDraftSettings()}
+                  >
+                    確認設定を保存
+                  </button>
+                </div>
+              </div>
+            </Section>
+
+            <Section label={toKanjiIndex(4)} title="ローカル LLM">
               <Row label="Endpoint URL" hint="Ollama 等">
                 <input
                   type="url"

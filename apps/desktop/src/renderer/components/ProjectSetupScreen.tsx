@@ -59,12 +59,26 @@ export function ProjectSetupScreen({
               title="静かに、段落の手応えを"
               subtitle={
                 <>
-                  段落ごとに、想定する読者がどう感じるかを
+                  文章を置くフォルダを選び、段落ごとに読まれ方を
                   <br />
-                  書き手が見られるエディタです。
+                  観測しながら推敲できるエディタです。
                 </>
               }
             />
+            <ol className="welcome-guide" aria-label="最初の流れ">
+              <li>
+                <span>{toKanjiIndex(1)}</span>
+                <p>作業フォルダを開く</p>
+              </li>
+              <li>
+                <span>{toKanjiIndex(2)}</span>
+                <p>文章を書く、または開く</p>
+              </li>
+              <li>
+                <span>{toKanjiIndex(3)}</span>
+                <p>必要な段落を読ませる</p>
+              </li>
+            </ol>
             <div className="welcome-actions">
               <button type="button" className="button-primary" onClick={onSelectFolder}>
                 <IconFolder size={13} />
@@ -72,7 +86,7 @@ export function ProjectSetupScreen({
               </button>
             </div>
             <p className="welcome-empty-message">
-              既存の作業フォルダを選ぶか、フォルダ選択画面で新しい作業フォルダを作成できます。
+              既存の作業フォルダを選ぶか、新しい作業フォルダを作成してください。文書と分析結果はローカルに保存されます。
             </p>
             {recentProjects.length > 0 ? (
               <div className="welcome-recent">

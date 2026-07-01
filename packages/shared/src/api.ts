@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeReadingAgentTagDefinitions } from './analysisTags.js';
 
 export const AnalysisParagraphSchema = z.object({
   paragraphId: z.string().min(1),
@@ -13,16 +14,15 @@ export const AnalysisRequestSchema = z.object({
   agentId: z.string().min(1),
   personaMode: z.enum(['friendly', 'editor', 'general-reader']).default('general-reader'),
   promptVersion: z.string().min(1),
+  additionalInstruction: z.string().trim().max(2_000).optional(),
   paragraphs: z.array(AnalysisParagraphSchema).min(1).max(20),
   documentParagraphs: z.array(AnalysisParagraphSchema).min(1),
 });
 
 export const AnalysisResultSchema = z.object({
   paragraphId: z.string().min(1),
-  emotion: z.array(z.string()).max(8),
-  theme: z.array(z.string()).max(8),
-  deepMeaning: z.string().max(1000),
-  confidence: z.number().min(0).max(1),
+  response: z.string().min(1).max(4_000),
+  tags: z.record(z.array(z.string()).max(16)).default({}),
   model: z.string().min(1),
   analyzedAt: z.string().datetime(),
   promptVersion: z.string().min(1),
@@ -67,6 +67,24 @@ const ReadingAgentModelSchema = z.preprocess(
   z.string().trim().min(1).max(120).nullable().default(null),
 );
 
+const ReadingAgentTagDefinitionsSchema = z.preprocess(
+  normalizeReadingAgentTagDefinitions,
+  z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      values: z.array(
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          color: z.string().optional(),
+        }),
+      ),
+      system: z.boolean().optional(),
+    }),
+  ).default([]),
+);
+
 export const ReadingAgentInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   role: z.string().trim().min(1).max(240),
@@ -74,6 +92,7 @@ export const ReadingAgentInputSchema = z.object({
   model: ReadingAgentModelSchema,
   temperature: z.number().min(0).max(1).default(DEFAULT_READING_AGENT_TEMPERATURE),
   contextPolicy: AnalysisContextPolicySchema,
+  tagDefinitions: ReadingAgentTagDefinitionsSchema,
 });
 
 export const ReadingAgentSchema = ReadingAgentInputSchema.extend({

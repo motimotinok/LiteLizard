@@ -554,10 +554,8 @@ describe('useAppStore L-06 analysis state', () => {
         paragraphId: 'p1',
         result: {
           paragraphId: 'p1',
-          emotion: ['安心'],
-          theme: ['構成'],
-          deepMeaning: 'progress result',
-          confidence: 0.88,
+          response: 'progress result',
+          tags: { theme: ['構成'] },
           model: 'gpt-4o-mini',
           analyzedAt: '2026-04-12T00:00:00.000Z',
           promptVersion: 'v1.0.0',
@@ -573,20 +571,16 @@ describe('useAppStore L-06 analysis state', () => {
         results: [
           {
             paragraphId: 'p1',
-            emotion: ['安心'],
-            theme: ['構成'],
-            deepMeaning: 'progress result',
-            confidence: 0.88,
+            response: 'progress result',
+            tags: { theme: ['構成'] },
             model: 'gpt-4o-mini',
             analyzedAt: '2026-04-12T00:00:00.000Z',
             promptVersion: 'v1.0.0',
           },
           {
             paragraphId: 'p2',
-            emotion: ['期待'],
-            theme: ['描写'],
-            deepMeaning: 'final only',
-            confidence: 0.75,
+            response: 'final only',
+            tags: { theme: ['描写'] },
             model: 'gpt-4o-mini',
             analyzedAt: '2026-04-12T00:01:00.000Z',
             promptVersion: 'v1.0.0',
@@ -628,14 +622,27 @@ describe('useAppStore L-06 analysis state', () => {
       document.documentId,
       'p2',
       expect.objectContaining({
-        result: expect.objectContaining({ deepMeaning: 'final only' }),
+        result: expect.objectContaining({ response: 'final only' }),
       }),
     );
+    const savedPattern = saveAnalysisResult.mock.calls.find((call) => call[2] === 'p2')?.[3];
+    expect(savedPattern?.result).not.toHaveProperty('sourceText');
+    expect(savedPattern?.result.targetTextFingerprint).toMatch(/^llz-fnv1a:/);
+    expect(savedPattern?.provenance).toMatchObject({
+      agentId: 'reader-quiet',
+      agentName: '静かな読者',
+      agentPromptVersion: 'v1.0.0',
+      referencedParagraphCount: 1,
+      hasAdditionalInstruction: false,
+      targetScope: 'paragraph',
+      model: 'gpt-4o-mini',
+      resultContractVersion: 'response-tags-v1',
+    });
     expect(state.analysisHistoriesByParagraphId.p1).toHaveLength(1);
     expect(state.analysisHistoriesByParagraphId.p2).toHaveLength(1);
-    expect(state.document?.paragraphs[0].lizard.deepMeaning).toBe('progress result');
+    expect(state.document?.paragraphs[0].lizard.response).toBe('progress result');
     expect(state.document?.paragraphs[0].lizard.requestId).toBe('req_1');
-    expect(state.document?.paragraphs[1].lizard.deepMeaning).toBe('final only');
+    expect(state.document?.paragraphs[1].lizard.response).toBe('final only');
     expect(state.analysisRunSummary).toEqual({ targetCount: 2, successCount: 2, failureCount: 0 });
     expect(state.statusMessage).toBe('全体解析が完了しました（対象 2 / 成功 2 / 失敗 0）');
   });
@@ -651,10 +658,8 @@ describe('useAppStore L-06 analysis state', () => {
       results: [
         {
           paragraphId: 'p1',
-          emotion: ['安心'],
-          theme: ['構成'],
-          deepMeaning: 'only p1',
-          confidence: 0.88,
+          response: 'only p1',
+          tags: { theme: ['構成'] },
           model: 'gpt-4o-mini',
           analyzedAt: '2026-04-12T00:00:00.000Z',
           promptVersion: 'v1.0.0',
@@ -681,7 +686,7 @@ describe('useAppStore L-06 analysis state', () => {
     const state = useAppStore.getState();
     expect(state.analysisRunSummary).toEqual({ targetCount: 2, successCount: 1, failureCount: 1 });
     expect(state.statusMessage).toBe('全体解析が完了しました（対象 2 / 成功 1 / 失敗 1）');
-    expect(state.document?.paragraphs[0].lizard.deepMeaning).toBe('only p1');
+    expect(state.document?.paragraphs[0].lizard.response).toBe('only p1');
     expect(state.document?.paragraphs[1].lizard.status).toBe('failed');
   });
 
@@ -1129,8 +1134,97 @@ describe('useAppStore 分析実行前の見積もり確認', () => {
     expect(pending?.estimate.targetTextChars).toBeGreaterThan(0);
     expect(pending?.estimate.totalInputChars).toBeGreaterThan(pending?.estimate.targetTextChars ?? 0);
     expect(pending?.estimate.estimatedOutputChars).toBeGreaterThan(0);
+    expect(pending).toMatchObject({
+      agentName: '静かな読者',
+      targetScopeLabel: '段落',
+      contextPolicyLabel: '文書全体参照',
+      referencedParagraphCount: 2,
+      hasAdditionalInstruction: false,
+    });
     expect(runAnalysis).not.toHaveBeenCalled();
     expect(createAnalysisGeneration).not.toHaveBeenCalled();
+  });
+
+  it('requestAnalysisRun は追加指示の有無を確認画面へ反映し、confirm でリクエストへ渡す', async () => {
+    const document = setupReadyState();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_instruction',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          response: 'with instruction p1',
+          tags: {},
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+        {
+          paragraphId: 'p2',
+          response: 'with instruction p2',
+          tags: {},
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-05-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+    const saveAnalysisResult = vi.fn().mockResolvedValue(undefined);
+    window.litelizard = createBridge({ runAnalysis, saveAnalysisResult });
+    useAppStore.getState().setAnalysisAdditionalInstruction('  初見読者が引っかかる場所だけ見る  ');
+
+    useAppStore.getState().requestAnalysisRun();
+    expect(useAppStore.getState().pendingAnalysisRun?.hasAdditionalInstruction).toBe(true);
+
+    await useAppStore.getState().confirmAnalysisRun();
+
+    expect(runAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        additionalInstruction: '初見読者が引っかかる場所だけ見る',
+      }),
+    );
+    const savedPattern = saveAnalysisResult.mock.calls[0]?.[3];
+    expect(savedPattern?.provenance?.hasAdditionalInstruction).toBe(true);
+    expect(JSON.stringify(savedPattern)).not.toContain('初見読者が引っかかる場所だけ見る');
+  });
+
+  it('requestAnalysisRun は確認省略設定なら同じ snapshot guard を経由して即実行する', async () => {
+    const document = setupReadyState();
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_skip_confirm',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: document.paragraphs.map((paragraph) => ({
+        paragraphId: paragraph.id,
+        response: `confirmed ${paragraph.id}`,
+        tags: {},
+        model: 'gpt-4o-mini',
+        analyzedAt: '2026-05-12T00:00:00.000Z',
+        promptVersion: 'v1.0.0',
+      })),
+    } satisfies AnalysisRunResult);
+    window.litelizard = createBridge({ runAnalysis });
+    useAppStore.setState((state) => ({
+      analysisSettings: {
+        ...state.analysisSettings,
+        analysisRunConfirmationEnabled: false,
+      },
+    }));
+
+    useAppStore.getState().requestAnalysisRun();
+    await vi.waitFor(() => expect(runAnalysis).toHaveBeenCalledTimes(1));
+
+    expect(useAppStore.getState().pendingAnalysisRun).toBeNull();
+    expect(useAppStore.getState().analysisRunSummary).toEqual({
+      targetCount: 2,
+      successCount: 2,
+      failureCount: 0,
+    });
   });
 
   it('requestAnalysisRun は lastN 設定で contextTextChars を縮める', () => {

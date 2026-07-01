@@ -43,9 +43,13 @@ function analysisRailStatus(paragraph: LiteLizardDocument['paragraphs'][number])
   return '未分析';
 }
 
+function analysisResponseText(paragraph: LiteLizardDocument['paragraphs'][number]) {
+  return paragraph.lizard.response?.trim() || paragraph.lizard.deepMeaning?.trim() || '';
+}
+
 function analysisRailSummary(paragraph: LiteLizardDocument['paragraphs'][number]) {
   if (paragraph.lizard.status === 'complete') {
-    return paragraph.lizard.deepMeaning?.trim() || '生成結果が空です。';
+    return analysisResponseText(paragraph) || '生成結果が空です。';
   }
   if (paragraph.lizard.status === 'pending') {
     return '解析中です。完了後に読みが表示されます。';
@@ -56,7 +60,7 @@ function analysisRailSummary(paragraph: LiteLizardDocument['paragraphs'][number]
       : '解析に失敗しました。';
   }
   if (paragraph.lizard.status === 'stale' && paragraph.lizard.analyzedAt) {
-    return paragraph.lizard.deepMeaning?.trim() || '本文更新後の再解析が必要です。';
+    return analysisResponseText(paragraph) || '本文更新後の再解析が必要です。';
   }
   return 'まだ分析されていません。';
 }

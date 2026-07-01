@@ -2,13 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_ANALYSIS_CONTEXT_POLICY,
   DEFAULT_READING_AGENT_TEMPERATURE,
+  NEUTRAL_TAG_COLOR,
   buildNewReadingAgentPrompt,
+  getSystemReadingAgentTagDefinition,
+  SYSTEM_READING_AGENT_TAG_DEFINITIONS,
   getProviderModelOptions,
   isKnownProviderModel,
   type AnalysisResult,
   type AnalysisContextPolicy,
   type ReadingAgent,
   type ReadingAgentInput,
+  type ReadingAgentTagDefinition,
 } from '@litelizard/shared';
 import { useAppStore } from '../store/useAppStore.js';
 import { AuxShell } from './ui/AuxShell.js';
@@ -27,6 +31,7 @@ interface AgentDraft {
   contextMode: AnalysisContextPolicy['mode'];
   contextRange: 'all' | 'lastN';
   contextLastN: string;
+  tagDefinitions: ReadingAgentTagDefinition[];
 }
 
 const DEFAULT_AGENT_MODEL_OPTION = '__default_agent_model__';
@@ -44,6 +49,7 @@ function createNewDraft(): AgentDraft {
     contextMode: DEFAULT_ANALYSIS_CONTEXT_POLICY.mode,
     contextRange: 'all',
     contextLastN: '10',
+    tagDefinitions: [],
   };
 }
 
@@ -72,6 +78,7 @@ function toDraft(agent: ReadingAgent): AgentDraft {
     model: agent.model ?? '',
     temperature: String(agent.temperature),
     ...contextDraft,
+    tagDefinitions: agent.tagDefinitions ?? [],
   };
 }
 
@@ -102,6 +109,7 @@ function toInput(draft: AgentDraft): ReadingAgentInput & { id?: string } {
     model: draft.model.trim() || null,
     temperature,
     contextPolicy: toContextPolicy(draft),
+    tagDefinitions: draft.tagDefinitions,
   };
 }
 
@@ -124,6 +132,40 @@ function validateDraft(draft: AgentDraft): string | null {
     }
   }
   return null;
+}
+
+function tagValuesToText(definition: ReadingAgentTagDefinition): string {
+  return definition.values
+    .map((value) => [value.id, value.label, value.color ?? ''].join(' | ').replace(/\s+\|\s+$/, ''))
+    .join('\n');
+}
+
+function tagValuesFromText(text: string): ReadingAgentTagDefinition['values'] {
+  return text
+    .split('\n')
+    .map((line) => {
+      const [id = '', label = '', color = ''] = line.split('|').map((part) => part.trim());
+      return {
+        id,
+        label: label || id,
+        color: color || undefined,
+      };
+    })
+    .filter((value) => value.id.trim());
+}
+
+function tagDefinitionLabel(definitions: ReadingAgentTagDefinition[], tagId: string) {
+  return definitions.find((definition) => definition.id === tagId)?.label ?? tagId;
+}
+
+function tagValueDisplay(definitions: ReadingAgentTagDefinition[], tagId: string, valueId: string) {
+  const value = definitions
+    .find((definition) => definition.id === tagId)
+    ?.values.find((entry) => entry.id === valueId);
+  return {
+    label: value?.label ?? valueId,
+    color: value?.color ?? NEUTRAL_TAG_COLOR,
+  };
 }
 
 export function AgentTemplateList({
@@ -349,6 +391,57 @@ export function AgentsScreen() {
     }
   };
 
+  const updateTagDefinition = (
+    index: number,
+    update: (definition: ReadingAgentTagDefinition) => ReadingAgentTagDefinition,
+  ) => {
+    setDraft((current) => ({
+      ...current,
+      tagDefinitions: current.tagDefinitions.map((definition, definitionIndex) =>
+        definitionIndex === index ? update(definition) : definition
+      ),
+    }));
+  };
+
+  const addSystemTagDefinition = (id: string) => {
+    const definition = getSystemReadingAgentTagDefinition(id);
+    if (!definition) {
+      return;
+    }
+    setDraft((current) => {
+      if (current.tagDefinitions.some((entry) => entry.id === definition.id)) {
+        return current;
+      }
+      return {
+        ...current,
+        tagDefinitions: [...current.tagDefinitions, definition],
+      };
+    });
+  };
+
+  const addCustomTagDefinition = () => {
+    setDraft((current) => ({
+      ...current,
+      tagDefinitions: [
+        ...current.tagDefinitions,
+        {
+          id: `custom-${current.tagDefinitions.length + 1}`,
+          label: 'カスタムタグ',
+          values: [
+            { id: 'value-1', label: '値1' },
+          ],
+        },
+      ],
+    }));
+  };
+
+  const removeTagDefinition = (index: number) => {
+    setDraft((current) => ({
+      ...current,
+      tagDefinitions: current.tagDefinitions.filter((_, definitionIndex) => definitionIndex !== index),
+    }));
+  };
+
   const sidebar = (
     <>
       <div className="sidebar-section-header">
@@ -466,18 +559,31 @@ export function AgentsScreen() {
           {previewError ? <div className="agents-error">{previewError}</div> : null}
           {preview ? (
             <div className="agents-preview">
-              <div className="agents-preview-row">
-                <span>emotion</span>
-                <strong>{preview.emotion.join(' / ') || 'なし'}</strong>
-              </div>
-              <div className="agents-preview-row">
-                <span>theme</span>
-                <strong>{preview.theme.join(' / ') || 'なし'}</strong>
-              </div>
-              <p>{preview.deepMeaning}</p>
+              {Object.entries(preview.tags).map(([key, values]) => (
+                <div className="agents-preview-row" key={key}>
+                  <span>{tagDefinitionLabel(draft.tagDefinitions, key)}</span>
+                  <div className="agents-preview-tags">
+                    {values.length === 0 ? <strong>なし</strong> : null}
+                    {values.map((value) => {
+                      const display = tagValueDisplay(draft.tagDefinitions, key, value);
+                      return (
+                        <strong className="agents-preview-tag" key={value}>
+                          <span
+                            className="agents-preview-tag-swatch"
+                            style={{ backgroundColor: display.color }}
+                            aria-hidden
+                          />
+                          {display.label}
+                        </strong>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <p>{preview.response}</p>
               <div className="agents-preview-foot">
                 <span>{preview.model}</span>
-                <span>{Math.round(preview.confidence * 100)}%</span>
+                <span>{preview.promptVersion}</span>
               </div>
             </div>
           ) : null}
@@ -486,6 +592,95 @@ export function AgentsScreen() {
         <section className="settings-section">
           <div className="settings-section-heading">
             <span className="settings-section-kanji">{toKanjiIndex(3)}</span>
+            <h2 className="settings-section-title">構造化タグ</h2>
+          </div>
+          <div className="agents-tag-toolbar">
+            {SYSTEM_READING_AGENT_TAG_DEFINITIONS.map((definition) => (
+              <button
+                key={definition.id}
+                type="button"
+                className="button-small"
+                onClick={() => addSystemTagDefinition(definition.id)}
+                disabled={draft.tagDefinitions.some((entry) => entry.id === definition.id)}
+              >
+                {definition.label}を追加
+              </button>
+            ))}
+            <button type="button" className="button-small" onClick={addCustomTagDefinition}>
+              カスタムタグを追加
+            </button>
+          </div>
+          {draft.tagDefinitions.length === 0 ? (
+            <p className="settings-row-hint">タグを選ばない場合、分析は回答本文だけを返します。</p>
+          ) : null}
+          <div className="agents-tag-list">
+            {draft.tagDefinitions.map((definition, index) => (
+              <div className="agents-tag-editor" key={`${definition.id}-${index}`}>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">項目ID</div>
+                    <div className="settings-row-hint">英小文字、数字、ハイフン</div>
+                  </div>
+                  <input
+                    type="text"
+                    className="settings-input settings-input-mono"
+                    value={definition.id}
+                    disabled={definition.system}
+                    onChange={(event) =>
+                      updateTagDefinition(index, (current) => ({
+                        ...current,
+                        id: event.target.value,
+                        system: false,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <div className="settings-row-label">表示名</div>
+                  </div>
+                  <input
+                    type="text"
+                    className="settings-input"
+                    value={definition.label}
+                    onChange={(event) =>
+                      updateTagDefinition(index, (current) => ({
+                        ...current,
+                        label: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <label className="agents-tag-values">
+                  <span>候補値</span>
+                  <textarea
+                    className="settings-textarea settings-textarea-mono"
+                    value={tagValuesToText(definition)}
+                    onChange={(event) =>
+                      updateTagDefinition(index, (current) => ({
+                        ...current,
+                        values: tagValuesFromText(event.target.value),
+                      }))
+                    }
+                    rows={Math.max(3, definition.values.length)}
+                  />
+                </label>
+                <div className="settings-actions-row">
+                  <span>形式: value-id | 表示名 | #aabbcc</span>
+                  <div className="settings-actions-buttons">
+                    <button type="button" className="button-small" onClick={() => removeTagDefinition(index)}>
+                      削除
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-heading">
+            <span className="settings-section-kanji">{toKanjiIndex(4)}</span>
             <h2 className="settings-section-title">参照範囲</h2>
           </div>
           <div className="settings-row">
@@ -590,7 +785,7 @@ export function AgentsScreen() {
 
         <section className="settings-section">
           <div className="settings-section-heading">
-            <span className="settings-section-kanji">{toKanjiIndex(4)}</span>
+            <span className="settings-section-kanji">{toKanjiIndex(5)}</span>
             <h2 className="settings-section-title">モデル設定</h2>
           </div>
           <div className="settings-row">

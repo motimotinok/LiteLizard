@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   DEFAULT_ANALYSIS_SETTINGS,
+  buildAnalysisContextTexts,
   estimateAnalysisCost,
   type AnalysisCostEstimate,
   type AnalysisResult,
@@ -20,6 +21,7 @@ import type { DocumentStructureInput } from '../types/documentStructure.js';
 import {
   appendPatternToHistories,
   type AnalysisHistoriesByParagraphId,
+  createParagraphTextFingerprint,
   projectAnalysisHistoriesToDocument,
   type SelectedPatternIndexByParagraphId,
   toAnalysisHistories,
@@ -66,6 +68,11 @@ export interface PendingAnalysisRun {
   filePath: string | null;
   documentSignature: string;
   targetParagraphIds: string[];
+  agentName: string;
+  targetScopeLabel: string;
+  contextPolicyLabel: string;
+  referencedParagraphCount: number;
+  hasAdditionalInstruction: boolean;
 }
 
 export interface UndoSnapshot {
@@ -141,6 +148,7 @@ interface AppState {
   editorMode: EditorMode;
   viewScale: ViewScale;
   analysisMode: AnalysisMode;
+  analysisAdditionalInstruction: string;
   analysisLayerOpen: boolean;
   statusMessage: string;
   pendingParagraphNavigation: PendingParagraphNavigation | null;
@@ -186,6 +194,7 @@ interface AppState {
   setEditorMode: (mode: EditorMode) => void;
   setViewScale: (viewScale: ViewScale) => void;
   setAnalysisMode: (mode: AnalysisMode) => void;
+  setAnalysisAdditionalInstruction: (instruction: string) => void;
   toggleViewScale: () => void;
   cycleEditorMode: () => void;
   openSettingsPanel: (options?: { intent?: SettingsScreenIntent }) => void;
@@ -275,6 +284,11 @@ function getAnalysisRunInputSignature(document: LiteLizardDocument, targetParagr
   return `${getAnalysisStructureSignature(document)}::targets=${targetSignature}::context=${contextSignature}`;
 }
 
+function normalizeAdditionalInstruction(input: string): string | undefined {
+  const trimmed = input.trim();
+  return trimmed ? trimmed.slice(0, 2_000) : undefined;
+}
+
 function formatAnalysisRunSummary(prefix: string, summary: AnalysisRunSummary) {
   return `${prefix}（対象 ${summary.targetCount} / 成功 ${summary.successCount} / 失敗 ${summary.failureCount}）`;
 }
@@ -317,25 +331,54 @@ function shouldRotateAnalysisGeneration(
 function createStoredPattern(
   result: {
     analyzedAt: string;
-    emotion: string[];
-    theme: string[];
-    deepMeaning: string;
-    confidence: number;
+    response?: string;
+    deepMeaning?: string;
+    tags?: Record<string, string[]>;
     model: string;
   },
-  sourceText: string,
+  input: {
+    targetText: string;
+    agent: ReadingAgent;
+    promptVersion: string;
+    referencedParagraphCount: number;
+    hasAdditionalInstruction: boolean;
+  },
 ): ParagraphAnalysisPattern {
+  const resultContractVersion = 'response-tags-v1';
   return {
     analyzedAt: result.analyzedAt,
-    result: {
-      emotion: result.emotion,
-      theme: result.theme,
-      deepMeaning: result.deepMeaning,
-      confidence: result.confidence,
+    provenance: {
+      agentId: input.agent.id,
+      agentName: input.agent.name,
+      agentPromptVersion: input.promptVersion,
+      contextPolicy: input.agent.contextPolicy,
+      referencedParagraphCount: input.referencedParagraphCount,
+      hasAdditionalInstruction: input.hasAdditionalInstruction,
+      targetScope: 'paragraph',
       model: result.model,
-      sourceText,
+      resultContractVersion,
+    },
+    result: {
+      response: result.response ?? result.deepMeaning ?? '',
+      tags: result.tags ?? {},
+      resultContractVersion,
+      model: result.model,
+      targetTextFingerprint: createParagraphTextFingerprint(input.targetText),
     },
   };
+}
+
+function formatAnalysisContextPolicy(policy: ReadingAgent['contextPolicy'] | undefined): string {
+  if (!policy || policy.mode === 'whole-document') {
+    return '文書全体参照';
+  }
+  if (policy.mode === 'target-only') {
+    return '対象段落のみ';
+  }
+  if (policy.range === 'all') {
+    return '先行全文';
+  }
+  return `先行${policy.lastN}段落`;
 }
 
 function applyProjectedDocument(
@@ -514,6 +557,7 @@ export const useAppStore = create<AppState>((set, get) => {
       document,
       analysisSettings,
       activeAgentId,
+      agents,
       currentFilePath: analysisTargetFilePath,
     } = get();
     if (!document) {
@@ -527,6 +571,11 @@ export const useAppStore = create<AppState>((set, get) => {
     const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
     if (!selectedProvider.runnable) {
       set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
+      return;
+    }
+    const activeAgent = agents.find((agent) => agent.id === activeAgentId);
+    if (!activeAgent) {
+      set({ statusMessage: '分析エージェントを選択してください' });
       return;
     }
 
@@ -566,6 +615,7 @@ export const useAppStore = create<AppState>((set, get) => {
       agentId: activeAgentId,
       personaMode: document.personaMode,
       promptVersion: 'v1.0.0',
+      additionalInstruction: normalizeAdditionalInstruction(get().analysisAdditionalInstruction),
       paragraphs: staleParagraphs.map((paragraph) => ({
         paragraphId: paragraph.id,
         order: paragraph.order,
@@ -576,6 +626,19 @@ export const useAppStore = create<AppState>((set, get) => {
 
     const rootPath = get().rootPath;
     const staleTextMap = new Map(staleParagraphs.map((p) => [p.id, p.light.text]));
+    const documentParagraphInputs = payload.documentParagraphs;
+    const createPatternForResult = (result: AnalysisResult) =>
+      createStoredPattern(result, {
+        targetText: staleTextMap.get(result.paragraphId) ?? '',
+        agent: activeAgent,
+        promptVersion: payload.promptVersion,
+        referencedParagraphCount: buildAnalysisContextTexts(
+          documentParagraphInputs,
+          result.paragraphId,
+          activeAgent.contextPolicy,
+        ).length,
+        hasAdditionalInstruction: Boolean(payload.additionalInstruction),
+      });
     const progressedParagraphIds = new Set<string>();
     const analysisTargetSignature = getAnalysisStructureSignature(document);
     const isAnalysisTargetCurrent = () => {
@@ -597,7 +660,7 @@ export const useAppStore = create<AppState>((set, get) => {
       progressedParagraphIds.add(paragraphId);
 
       if (rootPath && document.source?.format === 'lzl-v1') {
-        const pattern = createStoredPattern(result, staleTextMap.get(paragraphId) ?? '');
+        const pattern = createPatternForResult(result);
         window.litelizard
           .saveAnalysisResult(rootPath, document.documentId, paragraphId, pattern)
           .catch(() => {});
@@ -605,7 +668,7 @@ export const useAppStore = create<AppState>((set, get) => {
         return;
       }
 
-      appendPatternToStore(paragraphId, createStoredPattern(result, staleTextMap.get(paragraphId) ?? ''));
+      appendPatternToStore(paragraphId, createPatternForResult(result));
     });
 
     try {
@@ -615,7 +678,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
       result.results.forEach((analyzed) => {
         if (!progressedParagraphIds.has(analyzed.paragraphId)) {
-          const pattern = createStoredPattern(analyzed, staleTextMap.get(analyzed.paragraphId) ?? '');
+          const pattern = createPatternForResult(analyzed);
           if (rootPath && document.source?.format === 'lzl-v1') {
             window.litelizard
               .saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, pattern)
@@ -725,6 +788,7 @@ export const useAppStore = create<AppState>((set, get) => {
     editorMode: 'writing',
     viewScale: 'micro',
     analysisMode: 'paragraph',
+    analysisAdditionalInstruction: '',
     analysisLayerOpen: false,
     statusMessage: '準備完了',
     pendingParagraphNavigation: null,
@@ -1415,6 +1479,21 @@ export const useAppStore = create<AppState>((set, get) => {
     }
 
     const activeAgent = agents.find((agent) => agent.id === activeAgentId) ?? null;
+    if (!activeAgent) {
+      set({ statusMessage: '分析エージェントを選択してください' });
+      return;
+    }
+    const targetParagraphIds = staleParagraphs.map((p) => p.id);
+    const additionalInstruction = normalizeAdditionalInstruction(get().analysisAdditionalInstruction);
+    const documentParagraphs = document.paragraphs.map((p) => ({
+      paragraphId: p.id,
+      text: p.light.text,
+      chapterId: p.chapterId,
+      order: p.order,
+    }));
+    const referencedParagraphCount = staleParagraphs.reduce((sum, paragraph) => (
+      sum + buildAnalysisContextTexts(documentParagraphs, paragraph.id, activeAgent.contextPolicy).length
+    ), 0);
     const estimate = estimateAnalysisCost({
       providerId: analysisSettings.defaultProvider,
       targetParagraphs: staleParagraphs.map((p) => ({
@@ -1423,20 +1502,14 @@ export const useAppStore = create<AppState>((set, get) => {
         chapterId: p.chapterId,
         order: p.order,
       })),
-      documentParagraphs: document.paragraphs.map((p) => ({
-        paragraphId: p.id,
-        text: p.light.text,
-        chapterId: p.chapterId,
-        order: p.order,
-      })),
-      contextPolicy: activeAgent?.contextPolicy,
-      agent: activeAgent
-        ? {
-            name: activeAgent.name,
-            role: activeAgent.role,
-            systemPrompt: activeAgent.systemPrompt,
-          }
-        : null,
+      documentParagraphs,
+      contextPolicy: activeAgent.contextPolicy,
+      additionalInstruction,
+      agent: {
+        name: activeAgent.name,
+        role: activeAgent.role,
+        systemPrompt: activeAgent.systemPrompt,
+      },
     });
 
     set({
@@ -1444,11 +1517,21 @@ export const useAppStore = create<AppState>((set, get) => {
         estimate,
         documentId: document.documentId,
         filePath: get().currentFilePath,
-        documentSignature: getAnalysisRunInputSignature(document, staleParagraphs.map((p) => p.id)),
-        targetParagraphIds: staleParagraphs.map((p) => p.id),
+        documentSignature: `${getAnalysisRunInputSignature(document, targetParagraphIds)}::additional=${additionalInstruction ?? ''}`,
+        targetParagraphIds,
+        agentName: activeAgent.name,
+        targetScopeLabel: '段落',
+        contextPolicyLabel: formatAnalysisContextPolicy(activeAgent.contextPolicy),
+        referencedParagraphCount,
+        hasAdditionalInstruction: Boolean(additionalInstruction),
       },
-      statusMessage: '解析実行の確認をお待ちしています',
+      statusMessage: analysisSettings.analysisRunConfirmationEnabled !== false
+        ? '解析実行の確認をお待ちしています'
+        : '解析実行を開始します',
     });
+    if (analysisSettings.analysisRunConfirmationEnabled === false) {
+      void get().confirmAnalysisRun();
+    }
   },
 
   confirmAnalysisRun: async () => {
@@ -1461,7 +1544,8 @@ export const useAppStore = create<AppState>((set, get) => {
       !document ||
       document.documentId !== pending.documentId ||
       currentFilePath !== pending.filePath ||
-      getAnalysisRunInputSignature(document, pending.targetParagraphIds) !== pending.documentSignature
+      `${getAnalysisRunInputSignature(document, pending.targetParagraphIds)}::additional=${normalizeAdditionalInstruction(get().analysisAdditionalInstruction) ?? ''}` !==
+        pending.documentSignature
     ) {
       set({
         pendingAnalysisRun: null,
@@ -1481,7 +1565,7 @@ export const useAppStore = create<AppState>((set, get) => {
   },
 
   runAnalysisFor: async (paragraphId: string) => {
-    const { document, analysisSettings, activeAgentId } = get();
+    const { document, analysisSettings, activeAgentId, agents } = get();
     if (!document) return;
     if (!activeAgentId) {
       set({ statusMessage: '分析エージェントを選択してください' });
@@ -1491,6 +1575,11 @@ export const useAppStore = create<AppState>((set, get) => {
     const selectedProvider = getSelectedAnalysisProviderState(analysisSettings);
     if (!selectedProvider.runnable) {
       set({ statusMessage: selectedProvider.reason ?? `${selectedProvider.label} を設定してください。` });
+      return;
+    }
+    const activeAgent = agents.find((agent) => agent.id === activeAgentId);
+    if (!activeAgent) {
+      set({ statusMessage: '分析エージェントを選択してください' });
       return;
     }
 
@@ -1516,11 +1605,24 @@ export const useAppStore = create<AppState>((set, get) => {
       agentId: activeAgentId,
       personaMode: document.personaMode,
       promptVersion: 'v1.0.0',
+      additionalInstruction: normalizeAdditionalInstruction(get().analysisAdditionalInstruction),
       paragraphs: [{ paragraphId: paragraph.id, order: paragraph.order, text: paragraph.light.text }],
       documentParagraphs: toAnalysisParagraphInput(document),
     };
 
     const rootPath = get().rootPath;
+    const createPatternForResult = (result: AnalysisResult) =>
+      createStoredPattern(result, {
+        targetText: paragraph.light.text,
+        agent: activeAgent,
+        promptVersion: payload.promptVersion,
+        referencedParagraphCount: buildAnalysisContextTexts(
+          payload.documentParagraphs,
+          result.paragraphId,
+          activeAgent.contextPolicy,
+        ).length,
+        hasAdditionalInstruction: Boolean(payload.additionalInstruction),
+      });
     const progressedParagraphIds = new Set<string>();
     const analysisTargetSignature = getAnalysisStructureSignature(document);
     const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId: progressedParagraphId, result }) => {
@@ -1538,7 +1640,7 @@ export const useAppStore = create<AppState>((set, get) => {
       }
 
       progressedParagraphIds.add(progressedParagraphId);
-      const pattern = createStoredPattern(result, paragraph.light.text);
+      const pattern = createPatternForResult(result);
       if (rootPath && document.source?.format === 'lzl-v1') {
         window.litelizard
           .saveAnalysisResult(rootPath, document.documentId, progressedParagraphId, pattern)
@@ -1552,7 +1654,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const analyzed = result.results.find((r) => r.paragraphId === paragraphId);
 
       if (analyzed && !progressedParagraphIds.has(paragraphId)) {
-        const pattern = createStoredPattern(analyzed, paragraph.light.text);
+        const pattern = createPatternForResult(analyzed);
         if (rootPath && document.source?.format === 'lzl-v1') {
           await Promise.allSettled([
             window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, pattern),
@@ -1639,6 +1741,10 @@ export const useAppStore = create<AppState>((set, get) => {
 
   setAnalysisMode: (mode: AnalysisMode) => {
     set({ analysisMode: mode });
+  },
+
+  setAnalysisAdditionalInstruction: (instruction: string) => {
+    set({ analysisAdditionalInstruction: instruction.slice(0, 2_000) });
   },
 
   toggleViewScale: () => {
@@ -1924,6 +2030,10 @@ export const useAppStore = create<AppState>((set, get) => {
       const analysisSettings: AnalysisSettings = {
         ...current,
         defaultProvider: input.defaultProvider,
+        analysisRunConfirmationEnabled:
+          typeof input.analysisRunConfirmationEnabled === 'boolean'
+            ? input.analysisRunConfirmationEnabled
+            : current.analysisRunConfirmationEnabled,
         providers: {
           openai: {
             ...current.providers.openai,

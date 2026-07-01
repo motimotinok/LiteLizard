@@ -9,6 +9,7 @@ const validAgent = {
   model: null,
   temperature: DEFAULT_READING_AGENT_TEMPERATURE,
   contextPolicy: { mode: 'whole-document' },
+  tagDefinitions: [],
   createdAt: '2026-05-02T00:00:00.000Z',
   updatedAt: '2026-05-02T00:00:00.000Z',
   builtIn: true,
@@ -29,7 +30,44 @@ describe('ReadingAgent schemas', () => {
       contextPolicy: { mode: 'preceding', range: 'lastN', lastN: 3 },
     };
 
-    expect(ReadingAgentInputSchema.parse(input)).toEqual(input);
+    expect(ReadingAgentInputSchema.parse(input)).toEqual({
+      ...input,
+      tagDefinitions: [],
+    });
+  });
+
+  it('normalizes editable structured tag definitions', () => {
+    const result = ReadingAgentInputSchema.parse({
+      name: '担当編集',
+      role: '売り・引っかかりを評価',
+      systemPrompt: 'あなたは担当編集として、読者がつまずく点を指摘します。',
+      model: null,
+      temperature: 0.4,
+      contextPolicy: { mode: 'whole-document' },
+      tagDefinitions: [
+        {
+          id: ' Issue ',
+          label: '問題',
+          values: [
+            { id: ' Strong ', label: '強み', color: '#6D8B6D' },
+            { id: 'broken', label: '色なし', color: 'green' },
+            { id: 'strong', label: '重複' },
+          ],
+        },
+      ],
+    });
+
+    expect(result.tagDefinitions).toEqual([
+      {
+        id: 'issue',
+        label: '問題',
+        values: [
+          { id: 'strong', label: '強み', color: '#6D8B6D' },
+          { id: 'broken', label: '色なし' },
+        ],
+        system: false,
+      },
+    ]);
   });
 
   it('rejects legacy reading agents without contextPolicy', () => {

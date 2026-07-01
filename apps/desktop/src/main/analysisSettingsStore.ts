@@ -87,6 +87,10 @@ function normalizeSettings(input?: Partial<AnalysisSettingsInput> | null): Analy
 
   return {
     defaultProvider: input?.defaultProvider ?? DEFAULT_ANALYSIS_SETTINGS.defaultProvider,
+    analysisRunConfirmationEnabled:
+      typeof input?.analysisRunConfirmationEnabled === 'boolean'
+        ? input.analysisRunConfirmationEnabled
+        : DEFAULT_ANALYSIS_SETTINGS.analysisRunConfirmationEnabled,
     providers: {
       openai: {
         defaultModel: input?.providers?.openai?.defaultModel?.trim() || DEFAULT_ANALYSIS_SETTINGS.providers.openai.defaultModel,
@@ -111,6 +115,7 @@ export function mergeAnalysisSettings(
   const settings = cloneDefaultSettings();
 
   settings.defaultProvider = normalized.defaultProvider;
+  settings.analysisRunConfirmationEnabled = normalized.analysisRunConfirmationEnabled ?? true;
   settings.providers.openai.defaultModel = normalized.providers.openai.defaultModel;
   settings.providers.openai.apiKeyConfigured = configured.openai;
   settings.providers.anthropic.defaultModel = normalized.providers.anthropic.defaultModel;

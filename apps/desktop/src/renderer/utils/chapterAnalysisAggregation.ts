@@ -19,9 +19,7 @@ export interface ChapterAnalysisSummary {
   title: string;
   order: number;
   counts: ChapterAnalysisCounts;
-  topThemes: ChapterTopTagEntry[];
-  topEmotions: ChapterTopTagEntry[];
-  averageConfidence: number | null;
+  topTags: ChapterTopTagEntry[];
 }
 
 export interface AggregateChapterAnalysesOptions {
@@ -102,10 +100,7 @@ export function aggregateChapterAnalyses(
   return sortedChapters.map((chapter) => {
     const paragraphs = groupedByChapterId.get(chapter.id) ?? [];
     const counts = emptyCounts();
-    const themeCounts = new Map<string, number>();
-    const emotionCounts = new Map<string, number>();
-    let confidenceSum = 0;
-    let confidenceSamples = 0;
+    const tagCounts = new Map<string, number>();
 
     for (const paragraph of paragraphs) {
       classifyParagraph(paragraph, counts);
@@ -114,15 +109,14 @@ export function aggregateChapterAnalyses(
         continue;
       }
 
-      for (const theme of paragraph.lizard.theme ?? []) {
-        increment(themeCounts, theme);
-      }
-      for (const emotion of paragraph.lizard.emotion ?? []) {
-        increment(emotionCounts, emotion);
-      }
-      if (typeof paragraph.lizard.confidence === 'number') {
-        confidenceSum += paragraph.lizard.confidence;
-        confidenceSamples += 1;
+      const tagValues = paragraph.lizard.tags
+        ? Object.values(paragraph.lizard.tags).flatMap((values) => values)
+        : [
+            ...(paragraph.lizard.theme ?? []),
+            ...(paragraph.lizard.emotion ?? []),
+          ];
+      for (const value of tagValues) {
+        increment(tagCounts, value);
       }
     }
 
@@ -131,9 +125,7 @@ export function aggregateChapterAnalyses(
       title: chapter.title,
       order: chapter.order,
       counts,
-      topThemes: toTopEntries(themeCounts, limit),
-      topEmotions: toTopEntries(emotionCounts, limit),
-      averageConfidence: confidenceSamples === 0 ? null : confidenceSum / confidenceSamples,
+      topTags: toTopEntries(tagCounts, limit),
     };
   });
 }

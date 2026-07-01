@@ -2,11 +2,11 @@
 
 関連タスク: S-06, S-09
 決定経緯: `docs/decisions.md` [2026-03-28] S-06, [2026-03-30] S-09
-改訂: 2026-06-30 contextPolicy を Reading Agent 所有の設定へ移行 / provider 既定モデルを候補選択化 / OpenAI prompt cache prefix を安定化
+改訂: 2026-07-01 Reading Agentごとの構造化タグ定義を追加、分析結果契約を response + 任意 tags へ移行、分析履歴へ最小来歴と本文fingerprintを保存、実行前確認内容と省略設定を追加 / 2026-06-30 contextPolicy を Reading Agent 所有の設定へ移行 / provider 既定モデルを候補選択化 / OpenAI prompt cache prefix を安定化
 
 ---
 
-> この文書は2026-06-25時点のElectron IPC・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、将来の `response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とする。
+> この文書は2026-07-01時点のElectron IPC・保存契約を中心に記録する。分析内容をユーザー定義のAgentへ委ねる原則、`response` と任意タグ、Agent単位の文脈ポリシーは [`analysis-philosophy.md`](analysis-philosophy.md) を正とする。
 >
 > 現在、自社サーバーの分析APIは存在しない。旧Fastify APIは削除済みであり、将来のクラウド方式はOAuth、ストリーミング、利用量・課金管理を含めて新規設計する。
 
@@ -30,7 +30,7 @@
 interface AnalysisRequest {
   documentId: string;
   paragraphs: AnalysisTargetParagraph[];
-  userPrompt?: string; // 再分析時のユーザー指示
+  additionalInstruction?: string; // その分析実行だけに添える追加指示。保存済みAgent promptには混ぜない
   provider: AnalysisProvider; // S-09 追加: プロバイダー設定
 }
 
@@ -76,6 +76,8 @@ type AnalysisContextPolicy =
 - 既存の `analysis-settings.json` に残る `contextPolicy` は読み込み時に無視し、保存契約からも外す。
 - `contextPolicy` を持たない旧 `agents.json` は互換補完せず、`agents.json.bak` へ退避して空の Agent 一覧へ復旧する。デフォルトAgentはテンプレートから明示追加する。
 - OpenAI provider prompt は、固定指示、Reading Agent prompt、全文、参照本文を共通prefixに置き、対象本文だけを可変promptとして送る。`prompt_cache_key` は同一文書・同一Agent・同一本文で安定し、本文またはAgent promptが変わると変わる。
+- 分析実行前確認は既定で有効。`analysis-settings.json` の `analysisRunConfirmationEnabled: false` で省略できる。旧設定ファイルでは未指定を `true` として補完する。
+- 追加指示は `additionalInstruction` として対象段落側の可変promptに添える。OpenAI provider では system prompt の共通prefixへ混ぜず、prompt cache の安定性を保つ。
 
 例:
 
@@ -123,17 +125,27 @@ interface AnalysisErrorEvent {
 }
 
 // `packages/shared/src/types.ts` の ParagraphAnalysisResult を参照する。
-// 標準フィールド（emotion / theme / deepMeaning / confidence / model / sourceText）
-// はすべて optional で、既存の保存済みデータとも互換を保つ。
+// 新規結果の標準契約は response + 任意 tags。
+// deepMeaning / emotion / theme / confidence は旧履歴読み込み互換のため optional に残す。
 interface ParagraphAnalysisResult {
+  response?: string;
+  tags?: Record<string, string[]>;
+  resultContractVersion?: string;
   emotion?: string[];
   theme?: string[];
   deepMeaning?: string;
   confidence?: number;
   model?: string;
+  targetTextFingerprint?: string;
   sourceText?: string;
 }
 ```
+
+Provider へ渡す自然言語の system prompt には `emotion / theme / deepMeaning / confidence` の固定出力指示を追加しない。構造化出力は OpenAI Responses API の JSON schema、Anthropic Messages API の tool input schema、Local LLM の `format` schema で強制し、各 provider の戻り値は同じ正規化経路で `response` と `tags` に揃える。
+
+`tags` の許可項目は、実行時の Reading Agent が持つ `tagDefinitions` から provider schema を生成する。Agent がタグ定義を持たない場合、provider にはタグ項目を要求せず、正規化後の `tags` は空オブジェクトになる。タグ定義がある場合も、選択された tag ID と value ID 以外は保存・表示に回さない。タグ値の色は Agent 定義の `values[].color` を使い、未指定値は UI 側で共通のニュートラル色として扱う。未知タグや未知値をAI応答から自動登録しない。
+
+旧形式の保存済み結果は、表示時に `deepMeaning` を `response` 相当の本文として読み替える。旧 `emotion` / `theme` は任意タグ表示・集計の互換フォールバックとして扱い、旧 `confidence` は新規表示・新規保存の対象にしない。旧 `sourceText` は互換判定にだけ使い、新規保存では使わない。
 
 ### 3.3 処理層の責務
 
@@ -199,10 +211,41 @@ interface ParagraphAnalysisHistory {
 
 interface ParagraphAnalysisPattern {
   analyzedAt: string; // ISO 8601
-  userPrompt?: string; // 再分析時のユーザー指示
+  provenance?: ParagraphAnalysisProvenance;
   result: ParagraphAnalysisResult; // §3.2 と同一の型
 }
+
+interface ParagraphAnalysisProvenance {
+  agentId: string;
+  agentName: string; // 実行時表示名
+  agentPromptVersion: string;
+  contextPolicy: AnalysisContextPolicy;
+  referencedParagraphCount: number;
+  hasAdditionalInstruction: boolean;
+  targetScope: 'paragraph';
+  model: string;
+  resultContractVersion: string;
+}
 ```
+
+新形式の `ParagraphAnalysisPattern` は、本文やプロンプト本文を複製しない。本文変更後の互換判定には `result.targetTextFingerprint` を使う。fingerprint は段落本文の長さと安定ハッシュから作る照合用キーであり、本文復元や完全再現を目的にしない。
+
+新規履歴に保存する情報:
+- Agent ID と実行時表示名
+- Agent prompt version
+- 文脈ポリシーと実際に参照した段落数
+- 追加指示の有無
+- 対象スコープ
+- 使用モデル
+- 結果契約バージョン
+- 対象本文の fingerprint
+
+新規履歴に保存しない情報:
+- Agent prompt 本文
+- 追加指示本文
+- 追加指示本文の hash
+- 参照段落本文
+- 対象段落本文そのもの
 
 ---
 
@@ -235,7 +278,32 @@ interface ParagraphAnalysisPattern {
 
 ---
 
-## 8. 将来の最適化ポイント
+## 8. 実行前確認
+
+分析実行前確認は、外部providerまたはローカルLLMへ何を送るかをユーザーが把握するための入口である。既定では表示する。
+
+確認画面に表示する項目:
+
+- Reading Agent 名
+- 対象スコープと対象件数
+- 文脈ポリシー
+- 実際に参照する段落数
+- 追加指示の有無
+- 対象本文文字数
+- 文脈本文文字数
+- 概算入力文字数
+- 概算応答文字数
+
+確認省略設定:
+
+- `analysisRunConfirmationEnabled` が `false` の場合、確認画面を表示せず実行へ進む。
+- 省略時も、内部的には同じ pending run snapshot を作成してから confirm 経路を通す。
+- そのため、対象確定後に文書・本文・ファイルパスが変わった場合の実行中止ガードは確認あり/なしで共通である。
+- 実際の課金額は保証せず、文字数ベースの概算として表示する。
+
+---
+
+## 9. 将来の最適化ポイント
 
 > 以下は MVP スコープ外。実運用で問題が顕在化した時点で対応する。
 

@@ -1,8 +1,21 @@
 import { DEFAULT_READING_AGENT_TEMPERATURE } from './api.js';
-import type { ReadingAgent, ReadingAgentInput, ReadingAgentTemplate } from './types.js';
+import { getSystemReadingAgentTagDefinition } from './analysisTags.js';
+import type {
+  ReadingAgent,
+  ReadingAgentInput,
+  ReadingAgentTagDefinition,
+  ReadingAgentTemplate,
+} from './types.js';
 
 export interface DefaultReadingAgentPreset extends ReadingAgentInput {
   id: string;
+}
+
+function systemTags(...ids: string[]): ReadingAgentTagDefinition[] {
+  return ids.flatMap((id) => {
+    const definition = getSystemReadingAgentTagDefinition(id);
+    return definition ? [definition] : [];
+  });
 }
 
 export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[] = [
@@ -29,6 +42,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'preceding', range: 'all' },
+    tagDefinitions: [],
   },
   {
     id: 'reader-sensory',
@@ -53,6 +67,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'preceding', range: 'all' },
+    tagDefinitions: systemTags('emotion'),
   },
   {
     id: 'reader-structure-editor',
@@ -80,6 +95,7 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'whole-document' },
+    tagDefinitions: systemTags('issue'),
   },
   {
     id: 'reader-writing-companion',
@@ -105,12 +121,14 @@ export const DEFAULT_READING_AGENT_PRESETS: readonly DefaultReadingAgentPreset[]
     model: null,
     temperature: DEFAULT_READING_AGENT_TEMPERATURE,
     contextPolicy: { mode: 'whole-document' },
+    tagDefinitions: systemTags('issue'),
   },
 ];
 
 export function createDefaultReadingAgentsFromPresets(now: string): ReadingAgent[] {
   return DEFAULT_READING_AGENT_PRESETS.map((preset) => ({
     ...preset,
+    tagDefinitions: preset.tagDefinitions ?? [],
     createdAt: now,
     updatedAt: now,
     builtIn: true,

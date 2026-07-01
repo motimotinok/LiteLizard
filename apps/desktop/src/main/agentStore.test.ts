@@ -77,7 +77,10 @@ describe('createReadingAgentStore', () => {
       const store = createReadingAgentStore(userDataPath, { now: () => '2026-05-02T00:00:00.000Z' });
 
       await expect(store.list()).resolves.toEqual([
-        existing[0],
+        {
+          ...existing[0],
+          tagDefinitions: [],
+        },
       ]);
     });
   });

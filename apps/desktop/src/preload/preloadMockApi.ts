@@ -2,6 +2,7 @@ import {
   buildImportedDocument,
   DEFAULT_ANALYSIS_SETTINGS,
   exportDocumentToPlainText,
+  filterTagsByDefinitions,
   listDefaultReadingAgentTemplates,
   parseTextToImportResult,
   type AnalysisRunInput,
@@ -256,23 +257,46 @@ function paragraphAnalysisFromText(text: string) {
   const emotion = emotionPool[score % emotionPool.length];
   const themeA = themePool[score % themePool.length];
   const themeB = themePool[(score + 2) % themePool.length];
-  const confidenceRaw = 0.55 + (score % 40) / 100;
 
   return {
-    emotion: [emotion],
-    theme: themeA === themeB ? [themeA] : [themeA, themeB],
-    deepMeaning: `段落の焦点は「${themeA}」にあり、読み手へ${emotion}を残す構成です。`,
-    confidence: Number(Math.min(confidenceRaw, 0.95).toFixed(2)),
+    response: `段落の焦点は「${themeA}」にあり、読み手へ${emotion}を残す構成です。`,
+    tags: {
+      emotion: [emotion],
+      theme: themeA === themeB ? [themeA] : [themeA, themeB],
+    },
     model: 'mock-model-v1',
   };
 }
 
 function paragraphAnalysisFromAgent(text: string, agent: ReadingAgentInput) {
   const base = paragraphAnalysisFromText(`${agent.name}:${agent.role}:${agent.systemPrompt}:${text}`);
+  const tags = filterTagsByDefinitions(
+    Object.fromEntries(
+      (agent.tagDefinitions ?? []).map((definition, index) => {
+        const values = definition.values.map((value) => value.id);
+        const first = values[base.response.length % Math.max(values.length, 1)];
+        const second = values[(base.response.length + index + 1) % Math.max(values.length, 1)];
+        return [definition.id, first && second && first !== second ? [first, second] : first ? [first] : []];
+      }),
+    ),
+    agent.tagDefinitions ?? [],
+  );
   return {
     ...base,
-    deepMeaning: `『${agent.name}』は、${base.deepMeaning}`,
+    response: `『${agent.name}』は、${base.response}`,
+    tags,
     model: agent.model?.trim() || base.model,
+  };
+}
+
+function applyAdditionalInstruction(analysis: ReturnType<typeof paragraphAnalysisFromAgent>, instruction?: string) {
+  const trimmed = instruction?.trim();
+  if (!trimmed) {
+    return analysis;
+  }
+  return {
+    ...analysis,
+    response: `${analysis.response} 今回の追加観点「${trimmed.slice(0, 80)}」も踏まえています。`,
   };
 }
 
@@ -332,6 +356,7 @@ function upsertReadingAgent(state: MockState, input: ReadingAgentInput & { id?: 
     model: input.model?.trim() || null,
     temperature: input.temperature,
     contextPolicy: input.contextPolicy,
+    tagDefinitions: input.tagDefinitions ?? [],
     createdAt: current?.createdAt ?? now,
     updatedAt: now,
     builtIn: current?.builtIn ?? false,
@@ -356,6 +381,7 @@ function addReadingAgentFromTemplate(state: MockState, templateId: string): Read
   const agent: ReadingAgent = {
     ...template,
     id,
+    tagDefinitions: template.tagDefinitions ?? [],
     createdAt: now,
     updatedAt: now,
     builtIn: false,
@@ -589,13 +615,14 @@ export function createMockPreloadApi(): BridgeApi {
         personaMode: input.personaMode,
         promptVersion: input.promptVersion,
         results: input.paragraphs.map((paragraph) => {
-          const analysis = paragraphAnalysisFromAgent(paragraph.text, agent);
+          const analysis = applyAdditionalInstruction(
+            paragraphAnalysisFromAgent(paragraph.text, agent),
+            input.additionalInstruction,
+          );
           return {
             paragraphId: paragraph.paragraphId,
-            emotion: analysis.emotion,
-            theme: analysis.theme,
-            deepMeaning: analysis.deepMeaning,
-            confidence: analysis.confidence,
+            response: analysis.response,
+            tags: analysis.tags,
             model: analysis.model,
             analyzedAt,
             promptVersion: input.promptVersion,
@@ -627,6 +654,10 @@ export function createMockPreloadApi(): BridgeApi {
       state.analysisSettings = {
         ...state.analysisSettings,
         defaultProvider: input.defaultProvider,
+        analysisRunConfirmationEnabled:
+          typeof input.analysisRunConfirmationEnabled === 'boolean'
+            ? input.analysisRunConfirmationEnabled
+            : state.analysisSettings.analysisRunConfirmationEnabled,
         providers: {
           openai: {
             ...state.analysisSettings.providers.openai,
@@ -759,10 +790,8 @@ export function createMockPreloadApi(): BridgeApi {
       const analysis = paragraphAnalysisFromAgent(input.paragraph.text, input.agent);
       return {
         paragraphId: input.paragraph.paragraphId,
-        emotion: analysis.emotion,
-        theme: analysis.theme,
-        deepMeaning: analysis.deepMeaning,
-        confidence: analysis.confidence,
+        response: analysis.response,
+        tags: analysis.tags,
         model: analysis.model,
         analyzedAt,
         promptVersion: input.promptVersion,

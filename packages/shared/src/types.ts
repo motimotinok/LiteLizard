@@ -10,6 +10,12 @@ export interface LizardError {
 
 export interface LizardData {
   status: LizardStatus;
+  response?: string;
+  tags?: Record<string, string[]>;
+  resultContractVersion?: string;
+  /**
+   * 旧分析契約との表示互換用。新規結果では response/tags を優先する。
+   */
   emotion?: string[];
   theme?: string[];
   deepMeaning?: string;
@@ -94,18 +100,51 @@ export interface ParagraphAnalysisHistory {
  *   将来的に標準フィールドが増えた場合はこの interface に追記する。
  */
 export interface ParagraphAnalysisResult {
+  response?: string;
+  tags?: Record<string, string[]>;
+  resultContractVersion?: string;
+  /**
+   * 旧分析契約との読み込み互換用。新規結果では response/tags を保存する。
+   */
   emotion?: string[];
   theme?: string[];
   deepMeaning?: string;
   confidence?: number;
   model?: string;
+  targetTextFingerprint?: string;
   sourceText?: string;
+}
+
+export interface ParagraphAnalysisProvenance {
+  agentId: string;
+  agentName: string;
+  agentPromptVersion: string;
+  contextPolicy: AnalysisContextPolicy;
+  referencedParagraphCount: number;
+  hasAdditionalInstruction: boolean;
+  targetScope: 'paragraph';
+  model: string;
+  resultContractVersion: string;
 }
 
 export interface ParagraphAnalysisPattern {
   analyzedAt: string;
   userPrompt?: string;
+  provenance?: ParagraphAnalysisProvenance;
   result: ParagraphAnalysisResult;
+}
+
+export interface ReadingAgentTagValueDefinition {
+  id: string;
+  label: string;
+  color?: string;
+}
+
+export interface ReadingAgentTagDefinition {
+  id: string;
+  label: string;
+  values: ReadingAgentTagValueDefinition[];
+  system?: boolean;
 }
 
 export interface ReadingAgent {
@@ -116,6 +155,7 @@ export interface ReadingAgent {
   model: string | null;
   temperature: number;
   contextPolicy: AnalysisContextPolicy;
+  tagDefinitions: ReadingAgentTagDefinition[];
   createdAt: string;
   updatedAt: string;
   builtIn: boolean;
@@ -128,6 +168,7 @@ export interface ReadingAgentInput {
   model: string | null;
   temperature: number;
   contextPolicy: AnalysisContextPolicy;
+  tagDefinitions?: ReadingAgentTagDefinition[];
 }
 
 export interface ReadingAgentTemplate extends ReadingAgentInput {
@@ -196,6 +237,7 @@ export const DEFAULT_EDITOR_TWEAKS: EditorTweaks = {
 
 export interface AnalysisSettings {
   defaultProvider: AnalysisProviderId;
+  analysisRunConfirmationEnabled: boolean;
   providers: {
     openai: CloudProviderSettings;
     anthropic: CloudProviderSettings;
@@ -206,6 +248,8 @@ export interface AnalysisSettings {
 
 export interface AnalysisSettingsInput {
   defaultProvider: AnalysisProviderId;
+  // 旧クライアント互換のため optional。未指定時は true が使われる。
+  analysisRunConfirmationEnabled?: boolean;
   providers: {
     openai: {
       defaultModel: string;
@@ -224,6 +268,7 @@ export interface AnalysisSettingsInput {
 
 export const DEFAULT_ANALYSIS_SETTINGS: AnalysisSettings = {
   defaultProvider: 'openai',
+  analysisRunConfirmationEnabled: true,
   providers: {
     openai: {
       apiKeyConfigured: false,

@@ -55,6 +55,8 @@ export interface AnalysisEstimateInput {
   agent: AnalysisEstimateAgent | null;
   /** 既定 provider。OpenAI は prompt cache 向けに全文を共通prefixへ含める。 */
   providerId?: AnalysisProviderId;
+  /** その分析実行だけに添える追加指示。保存済み Agent prompt には混ぜない。 */
+  additionalInstruction?: string;
   /** 1 段落あたりの概算 output 文字数。指定しない場合は {@link OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT}。 */
   outputCharsPerParagraph?: number;
 }
@@ -62,7 +64,7 @@ export interface AnalysisEstimateInput {
 /**
  * 1 段落あたりの概算 output 文字数の既定値。
  *
- * LiteLizard の分析結果は emotion(<= 8) + theme(<= 8) + deepMeaning(<= 1000) + confidence。
+ * LiteLizard の分析結果は response(<= 4000) + 任意 tags。
  * 実測の感触で 200〜600 文字程度。中央値を見て 500 を採用している。
  */
 export const OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT = 500;
@@ -73,7 +75,7 @@ export const OUTPUT_CHARS_PER_PARAGRAPH_DEFAULT = 500;
  *
  * - "You are LiteLizard analysis model." 等のフレーム文
  * - "Reading agent name: ." 等の見出し
- * - "Return strict JSON with keys: ..." の指示文
+ * - 構造化出力は provider の JSON schema 等で強制するため、固定キー指示は含めない
  * - "Reference paragraphs (document order):" もしくは "Reference paragraphs: none"
  *
  * 微小な差分は概算誤差として許容する。実際の system prompt 長を一字一句測る必要が出たら、
@@ -148,20 +150,29 @@ export function buildAnalysisSystemPrompt(
     'Reading agent system prompt:',
     agent.systemPrompt,
     documentBlock,
-    'Return strict JSON with keys: emotion(string[]), theme(string[]), deepMeaning(string), confidence(number 0..1).',
     contextBlock,
     'Analyze only the target paragraph provided by the user. Use the reference paragraphs only as reading context.',
+    'Return an answer for the target paragraph. The app will enforce the machine-readable response shape separately.',
   ].join('\n\n');
 }
 
-export function buildAnalysisTargetPrompt(paragraphId: string, text: string): string {
-  return [
+export function buildAnalysisTargetPrompt(
+  paragraphId: string,
+  text: string,
+  additionalInstruction?: string,
+): string {
+  const parts = [
     'Target paragraph:',
     `ID: ${paragraphId}`,
     'Text:',
     text,
-    'Analyze this target paragraph only. Return JSON only.',
-  ].join('\n\n');
+  ];
+  const instruction = additionalInstruction?.trim();
+  if (instruction) {
+    parts.push('Additional instruction for this run:', instruction);
+  }
+  parts.push('Analyze this target paragraph only. Return JSON only.');
+  return parts.join('\n\n');
 }
 
 export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCostEstimate {
@@ -192,7 +203,9 @@ export function estimateAnalysisCost(input: AnalysisEstimateInput): AnalysisCost
         contextTexts,
         providerId === 'openai' ? documentTexts : contextTexts,
       );
-      totalInputChars += systemPrompt.length + buildAnalysisTargetPrompt(target.paragraphId, target.text).length;
+      totalInputChars +=
+        systemPrompt.length +
+        buildAnalysisTargetPrompt(target.paragraphId, target.text, input.additionalInstruction).length;
     } else {
       totalInputChars += target.text.length;
     }

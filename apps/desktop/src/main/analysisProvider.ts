@@ -8,12 +8,15 @@ import {
   buildAnalysisContextTexts,
   buildAnalysisSystemPrompt,
   buildAnalysisTargetPrompt,
+  filterTagsByDefinitions,
+  normalizeReadingAgentTagDefinitions,
   type AnalysisContextPolicy,
   type AnalysisProviderId,
   type AnalysisResult,
   type AnalysisRunInput,
   type AnalysisSettings,
   type ReadingAgentInput,
+  type ReadingAgentTagDefinition,
 } from '@litelizard/shared';
 
 export interface AnalysisProviderRequest {
@@ -26,6 +29,7 @@ export interface AnalysisProviderRequest {
   contextTexts: string[];
   documentTexts?: string[];
   promptCacheKey?: string;
+  additionalInstruction?: string;
 }
 
 export interface AnalysisProvider {
@@ -49,14 +53,52 @@ type OpenAiResponseCreateParamsWithPromptCache = ResponseCreateParamsNonStreamin
 export const ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['emotion', 'theme', 'deepMeaning', 'confidence'],
+  required: ['response'],
   properties: {
-    emotion: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-    theme: { type: 'array', items: { type: 'string' }, maxItems: 8 },
-    deepMeaning: { type: 'string', maxLength: 1000 },
-    confidence: { type: 'number', minimum: 0, maximum: 1 },
+    response: { type: 'string', maxLength: 4000 },
+    tags: {
+      type: 'object',
+      additionalProperties: {
+        type: 'array',
+        items: { type: 'string' },
+        maxItems: 16,
+      },
+    },
   },
 } as const;
+
+export function buildAnalysisProviderOutputJsonSchema(
+  tagDefinitions: readonly ReadingAgentTagDefinition[] = [],
+) {
+  const definitions = normalizeReadingAgentTagDefinitions(tagDefinitions);
+  const tagProperties = Object.fromEntries(
+    definitions.map((definition) => [
+      definition.id,
+      {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: definition.values.map((value) => value.id),
+        },
+        maxItems: 16,
+      },
+    ]),
+  );
+
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['response'],
+    properties: {
+      response: { type: 'string', maxLength: 4000 },
+      tags: {
+        type: 'object',
+        additionalProperties: false,
+        properties: tagProperties,
+      },
+    },
+  } as const;
+}
 
 function normalizeArray(input: unknown): string[] {
   if (!Array.isArray(input)) {
@@ -69,17 +111,20 @@ function normalizeArray(input: unknown): string[] {
     .slice(0, 8);
 }
 
-function normalizeConfidence(input: unknown): number {
-  if (typeof input !== 'number' || Number.isNaN(input)) {
-    return 0;
+function normalizeTags(input: unknown): Record<string, string[]> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {};
   }
-  if (input < 0) {
-    return 0;
+
+  const tags: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(input)) {
+    const tagKey = key.trim();
+    const values = normalizeArray(value);
+    if (tagKey && values.length > 0) {
+      tags[tagKey] = values;
+    }
   }
-  if (input > 1) {
-    return 1;
-  }
-  return input;
+  return tags;
 }
 
 function extractJsonText(input: string): string {
@@ -106,7 +151,7 @@ export function buildOpenAiResponseRequest(
   input: AnalysisProviderRequest,
 ): OpenAiResponseCreateParamsWithPromptCache {
   const system = buildAnalysisSystemPrompt(input.agent, input.contextTexts, input.documentTexts ?? input.contextTexts);
-  const targetPrompt = buildAnalysisTargetPrompt(input.paragraphId, input.text);
+  const targetPrompt = buildAnalysisTargetPrompt(input.paragraphId, input.text, input.additionalInstruction);
   return {
     model: input.model,
     temperature: input.temperature,
@@ -118,7 +163,7 @@ export function buildOpenAiResponseRequest(
       format: {
         type: 'json_schema',
         name: 'litelizard_analysis',
-        schema: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
+        schema: buildAnalysisProviderOutputJsonSchema(input.agent.tagDefinitions),
       },
     },
     ...(input.promptCacheKey
@@ -135,19 +180,23 @@ export function normalizeAnalysisPayload(
   promptVersion: string,
   model: string,
   payload: {
-    emotion?: unknown;
-    theme?: unknown;
+    response?: unknown;
+    tags?: unknown;
     deepMeaning?: unknown;
-    confidence?: unknown;
   },
+  tagDefinitions: readonly ReadingAgentTagDefinition[] = [],
 ): AnalysisResult {
+  const response =
+    typeof payload.response === 'string'
+      ? payload.response.trim().slice(0, 4000)
+      : typeof payload.deepMeaning === 'string'
+        ? payload.deepMeaning.trim().slice(0, 4000)
+        : 'No response provided.';
+
   return {
     paragraphId,
-    emotion: normalizeArray(payload.emotion),
-    theme: normalizeArray(payload.theme),
-    deepMeaning:
-      typeof payload.deepMeaning === 'string' ? payload.deepMeaning.trim().slice(0, 1000) : 'No deep meaning provided.',
-    confidence: normalizeConfidence(payload.confidence),
+    response,
+    tags: filterTagsByDefinitions(normalizeTags(payload.tags), tagDefinitions),
     model,
     analyzedAt: new Date().toISOString(),
     promptVersion,
@@ -174,13 +223,11 @@ export function createOpenAiAnalysisProvider(apiKey: string): AnalysisProvider {
       }
 
       const parsed = JSON.parse(completion.output_text) as {
-        emotion?: unknown;
-        theme?: unknown;
-        deepMeaning?: unknown;
-        confidence?: unknown;
+        response?: unknown;
+        tags?: unknown;
       };
 
-      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed);
+      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed, input.agent.tagDefinitions);
     },
   };
 }
@@ -202,13 +249,21 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
           max_tokens: 1200,
           temperature: input.temperature,
           system,
+          tools: [
+            {
+              name: 'return_litelizard_analysis',
+              description: 'Return the LiteLizard paragraph analysis result.',
+              input_schema: buildAnalysisProviderOutputJsonSchema(input.agent.tagDefinitions),
+            },
+          ],
+          tool_choice: { type: 'tool', name: 'return_litelizard_analysis' },
           messages: [
             {
               role: 'user',
               content: [
                 {
                   type: 'text',
-                  text: buildAnalysisTargetPrompt(input.paragraphId, input.text),
+                  text: buildAnalysisTargetPrompt(input.paragraphId, input.text, input.additionalInstruction),
                 },
               ],
             },
@@ -228,17 +283,18 @@ export function createAnthropicAnalysisProvider(apiKey: string): AnalysisProvide
       }
 
       const payload = await response.json() as {
-        content?: Array<{ type?: string; text?: string }>;
+        content?: Array<{ type?: string; text?: string; input?: unknown }>;
       };
+      const toolInput = payload.content?.find((part) => part.type === 'tool_use')?.input;
       const text = payload.content?.find((part) => part.type === 'text')?.text ?? '';
-      const parsed = JSON.parse(extractJsonText(text)) as {
-        emotion?: unknown;
-        theme?: unknown;
-        deepMeaning?: unknown;
-        confidence?: unknown;
+      const parsed = (toolInput && typeof toolInput === 'object'
+        ? toolInput
+        : JSON.parse(extractJsonText(text))) as {
+        response?: unknown;
+        tags?: unknown;
       };
 
-      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed);
+      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed, input.agent.tagDefinitions);
     },
   };
 }
@@ -250,7 +306,7 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
     id: 'local-llm',
     async analyzeParagraph(input: AnalysisProviderRequest): Promise<AnalysisResult> {
       const system = buildAnalysisSystemPrompt(input.agent, input.contextTexts);
-      const prompt = [system, buildAnalysisTargetPrompt(input.paragraphId, input.text)].join('\n\n');
+      const prompt = [system, buildAnalysisTargetPrompt(input.paragraphId, input.text, input.additionalInstruction)].join('\n\n');
 
       let response: Response;
       try {
@@ -262,7 +318,7 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
           body: JSON.stringify({
             model: input.model,
             prompt,
-            format: ANALYSIS_PROVIDER_OUTPUT_JSON_SCHEMA,
+            format: buildAnalysisProviderOutputJsonSchema(input.agent.tagDefinitions),
             stream: false,
             keep_alive: '30s',
             options: {
@@ -283,13 +339,11 @@ export function createLocalLlmAnalysisProvider(endpoint: string): AnalysisProvid
       const payload = await response.json() as { response?: unknown };
       const text = typeof payload.response === 'string' ? payload.response : '';
       const parsed = JSON.parse(extractJsonText(text)) as {
-        emotion?: unknown;
-        theme?: unknown;
-        deepMeaning?: unknown;
-        confidence?: unknown;
+        response?: unknown;
+        tags?: unknown;
       };
 
-      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed);
+      return normalizeAnalysisPayload(input.paragraphId, input.promptVersion, input.model, parsed, input.agent.tagDefinitions);
     },
   };
 }

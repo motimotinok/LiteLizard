@@ -141,6 +141,14 @@ button {
   grid-template-columns: var(--rail-width) 1fr;
 }
 
+.workspace-root.sidebar-collapsed {
+  grid-template-columns: var(--rail-width) 1fr;
+}
+
+.workspace-root.sidebar-collapsed .workspace-main {
+  grid-column: 2;
+}
+
 /* タイトルバー (メイン領域に重ねる絶対配置) */
 .workspace-titlebar {
   position: absolute;
@@ -1261,6 +1269,36 @@ button {
   cursor: not-allowed;
 }
 
+.analysis-run-instruction {
+  display: grid;
+  gap: 5px;
+}
+
+.analysis-run-instruction span {
+  font-family: var(--ui-font);
+  font-size: 10.5px;
+  color: var(--ink-3);
+}
+
+.analysis-run-instruction textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 8px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--ui-font);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.analysis-run-instruction textarea:focus {
+  outline: none;
+  border-color: var(--ink-3);
+}
+
 .analysis-run-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1998,21 +2036,23 @@ button {
 }
 
 /* =========================================================
- * パネルリサイズハンドル (今回は使わないが互換維持)
+ * パネルリサイズハンドル
  * ========================================================= */
 .panel-resizer {
   position: absolute;
   top: 0;
-  right: 0;
   bottom: 0;
   width: 5px;
   cursor: col-resize;
   z-index: 10;
 }
 
-.panel-resizer-left {
-  right: auto;
-  left: 0;
+.panel-resizer-sidebar {
+  right: -3px;
+}
+
+.panel-resizer-analysis {
+  right: var(--panel-width);
 }
 
 .panel-resizer:hover::after {
@@ -2023,6 +2063,16 @@ button {
   width: 1px;
   height: 100%;
   background: var(--rule-strong);
+}
+
+.panel-resizer:active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 1px;
+  height: 100%;
+  background: var(--accent);
 }
 
 /* =========================================================
@@ -2202,6 +2252,40 @@ button {
   text-align: center;
   line-height: 1.9;
   letter-spacing: 0.05em;
+}
+
+.welcome-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: min(520px, 100%);
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.welcome-guide li {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.welcome-guide span {
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--ink-4);
+}
+
+.welcome-guide p {
+  margin: 0;
+  font-family: var(--ui-font);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-align: center;
 }
 
 /* =========================================================
@@ -2482,6 +2566,20 @@ button {
 }
 
 .settings-radio-option input {
+  accent-color: var(--accent);
+}
+
+.settings-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-family: var(--ui-font);
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.settings-checkbox-row input {
   accent-color: var(--accent);
 }
 
@@ -2819,12 +2917,73 @@ button {
   font-weight: 500;
 }
 
+.agents-preview-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
+.agents-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.agents-preview-tag-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(40, 30, 20, 0.14);
+}
+
 .agents-preview p {
   margin: 0;
   font-family: var(--serif);
   font-size: 13px;
   line-height: 1.8;
   color: var(--ink);
+}
+
+.agents-tag-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.agents-tag-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.agents-tag-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.agents-tag-editor:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.agents-tag-values {
+  display: grid;
+  gap: 6px;
+}
+
+.agents-tag-values > span {
+  font-family: var(--ui-font);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.agents-tag-values textarea {
+  min-height: 96px;
 }
 
 /* =========================================================
@@ -2939,5 +3098,10 @@ button {
   .editor-macro-list,
   .editor-title {
     padding: 0 24px;
+  }
+
+  .welcome-guide {
+    grid-template-columns: 1fr;
+    width: min(360px, 100%);
   }
 }

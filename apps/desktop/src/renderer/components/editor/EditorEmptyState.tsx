@@ -12,19 +12,19 @@ export function EditorEmptyState({ onCreateEssay, onOpenFolder }: Props) {
       <div className="editor-empty-state">
         <div className="editor-empty-inner">
           <div className="editor-empty-overline">LiteLizard</div>
-          <h2 className="editor-empty-title">静かに、段落の手応えを</h2>
+          <h2 className="editor-empty-title">まず一文を置く</h2>
           <div className="editor-empty-rule" />
           <p className="editor-empty-description">
-            段落ごとに、想定する読者がどう感じるかを書き手が見られるエディタです。
+            新しい文書を作ると、本文の横に段落ごとの読みが並びます。APIキーやReading Agentは、書き始めたあとで設定できます。
           </p>
           <div className="editor-empty-actions">
             <button type="button" className="button-primary" onClick={onCreateEssay}>
               <IconNewFile size={13} />
-              新しいエッセイを書く
+              新しい文書を書く
             </button>
             <button type="button" className="button-secondary" onClick={onOpenFolder}>
               <IconFolder size={13} />
-              フォルダを開く
+              別のフォルダを開く
             </button>
           </div>
         </div>

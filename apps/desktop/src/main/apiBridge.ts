@@ -94,6 +94,7 @@ export async function runAnalysis(
         contextTexts: buildContextTexts(input.documentParagraphs, paragraph.paragraphId, contextPolicy),
         documentTexts,
         promptCacheKey,
+        additionalInstruction: input.additionalInstruction,
       });
 
     let analyzed: AnalysisResult;
