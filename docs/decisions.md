@@ -6,6 +6,18 @@
 
 ---
 
+## [2026-07-01] 章単位AI分析は現行公開版では実装しない (#117)
+
+- **決定**: LiteLizard は現行公開版では章そのものを AI 分析対象として実行・保存する機能を実装しない。実行できる分析対象は段落に限定し、マクロ視点の章サマリーは既存の段落分析履歴を集計する表示として維持する
+- **理由**: 現行の `GenerationalAnalysisFile` は `paragraphs: Record<string, ParagraphAnalysisHistory>` に限定され、provenance の `targetScope` も `'paragraph'` のみである。章単位分析を入れるには、target/result/storage/stale判定/履歴/UI状態/送信量見積もりを scope-aware に拡張する必要があり、保守停止前提では保存契約の拡張より段落分析経路の安定を優先する
+- **仕様**: [`docs/specs/analysis-scope-boundaries.md`](specs/analysis-scope-boundaries.md), [`docs/specs/analysis-api.md`](specs/analysis-api.md)
+- **却下した案**:
+  - 章本文を結合して既存の段落保存先へ入れる: 段落履歴と章履歴が混在し、本文変更後の stale 判定や表示が壊れやすい
+  - 章サマリーを AI 章分析として扱う: 既存の段落分析集計と、章そのものを読ませた結果の役割が混同される
+  - #117 単体で ad hoc な章保存構造を足す: #118 の一文分析、#134 の文書全体分析と互換しない保存形式を増やす
+
+---
+
 ## [2026-07-01] Gemini provider は現行公開版では追加しない (#94)
 
 - **決定**: LiteLizard の現行公開版でサポートする分析 provider は OpenAI、Anthropic、Local LLM（Ollama 互換 endpoint）の3系統に限定し、Gemini provider は追加しない

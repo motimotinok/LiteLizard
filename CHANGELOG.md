@@ -1,3 +1,6 @@
+[2026/07/01]#117 章単位AI分析を現行公開版では非採用として記録
+章そのものをAI分析対象として実行・保存する機能は、現行の段落 keyed な分析保存形式を scope-aware に広げる必要があるため、公開版では実装しない判断を `docs/specs/analysis-scope-boundaries.md` と `docs/decisions.md` に記録した。マクロ視点の章サマリーは段落分析履歴の集計表示であり、AIに章全文を読ませた結果とは区別する。
+
 [2026/07/01]#94 Gemini provider を現行公開版では追加しない判断を記録
 分析 provider は OpenAI / Anthropic / Local LLM の3系統に限定し、Gemini provider は追加しない判断を `docs/specs/provider-support-boundary.md` と `docs/decisions.md` に記録した。provider追加は型、settings、safeStorage、preload、renderer、privacy/security、実API検証へ横断し、保守停止前提では既存3経路の安定を優先する。
 
