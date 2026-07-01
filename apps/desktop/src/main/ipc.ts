@@ -463,8 +463,7 @@ export function registerIpcHandlers() {
       }
 
       // 新形式世代ファイル削除
-      if (documentId) {
-        assertDocumentId(documentId);
+      if (documentId && DOCUMENT_ID_PATTERN.test(documentId)) {
         await deleteAnalysisFiles(validatedTarget.projectRoot, documentId);
       }
 

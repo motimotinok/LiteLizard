@@ -688,6 +688,106 @@ describe('useAppStore L-06 analysis state', () => {
     expect(state.document?.paragraphs[1].lizard.status).toBe('failed');
   });
 
+  it('runAnalysis は分析結果の保存に失敗した段落を成功扱いにしない', async () => {
+    const document = createLzlDocument({
+      paragraphs: [createLzlDocument().paragraphs[0]],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_save_failed',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          response: '保存できない読み',
+          tags: { theme: ['構成'] },
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-04-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+    const saveAnalysisResult = vi.fn().mockRejectedValue(new Error('disk full'));
+
+    window.litelizard = createBridge({ runAnalysis, saveAnalysisResult });
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      document,
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+      },
+    });
+
+    await useAppStore.getState().runAnalysis();
+
+    const state = useAppStore.getState();
+    expect(saveAnalysisResult).toHaveBeenCalledTimes(1);
+    expect(state.analysisHistoriesByParagraphId.p1).toBeUndefined();
+    expect(state.analysisRunSummary).toEqual({ targetCount: 1, successCount: 0, failureCount: 1 });
+    expect(state.document?.paragraphs[0].lizard.status).toBe('failed');
+    expect(state.document?.paragraphs[0].lizard.error).toMatchObject({
+      code: 'ANALYSIS_SAVE_FAILED',
+      message: 'disk full',
+    });
+  });
+
+  it('runAnalysisFor は分析結果の保存に失敗した段落を成功扱いにしない', async () => {
+    const document = createLzlDocument({
+      paragraphs: [createLzlDocument().paragraphs[0]],
+    });
+    const runAnalysis = vi.fn().mockResolvedValue({
+      requestId: 'req_single_save_failed',
+      documentId: document.documentId,
+      agentId: 'reader-quiet',
+      personaMode: document.personaMode,
+      promptVersion: 'v1.0.0',
+      results: [
+        {
+          paragraphId: 'p1',
+          response: '保存できない単段落読み',
+          tags: { theme: ['構成'] },
+          model: 'gpt-4o-mini',
+          analyzedAt: '2026-04-12T00:00:00.000Z',
+          promptVersion: 'v1.0.0',
+        },
+      ],
+    } satisfies AnalysisRunResult);
+    const saveAnalysisResult = vi.fn().mockRejectedValue(new Error('permission denied'));
+
+    window.litelizard = createBridge({ runAnalysis, saveAnalysisResult });
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      document,
+      analysisSettings: {
+        defaultProvider: 'openai',
+        providers: {
+          openai: { apiKeyConfigured: true, defaultModel: 'gpt-4o-mini' },
+          anthropic: { apiKeyConfigured: false, defaultModel: 'claude-haiku-4-5-20251001' },
+        },
+        localLlm: { endpoint: 'http://127.0.0.1:11434', defaultModel: 'llama3.1:8b', configured: false },
+      },
+    });
+
+    await useAppStore.getState().runAnalysisFor('p1');
+
+    const state = useAppStore.getState();
+    expect(saveAnalysisResult).toHaveBeenCalledTimes(1);
+    expect(state.analysisHistoriesByParagraphId.p1).toBeUndefined();
+    expect(state.document?.paragraphs[0].lizard.status).toBe('failed');
+    expect(state.document?.paragraphs[0].lizard.error).toMatchObject({
+      code: 'ANALYSIS_SAVE_FAILED',
+      message: 'permission denied',
+    });
+    expect(state.statusMessage).toBe('解析に失敗しました: permission denied');
+  });
+
   it('runAnalysis は対象0件でも件数表示用の summary を更新する', async () => {
     const document = createLzlDocument({
       paragraphs: createLzlDocument().paragraphs.map((paragraph) => ({
@@ -763,6 +863,33 @@ describe('useAppStore L-06 analysis state', () => {
     expect(state.analysisHistoriesByParagraphId).toEqual({});
     expect(state.selectedPatternIndexByParagraphId).toEqual({});
     expect(state.generationSyncPending).toBe(false);
+  });
+
+  it('saveNow は保存中の再編集を dirty=false で上書きしない', async () => {
+    const document = createLzlDocument();
+    const saveDeferred = createDeferred<{ ok: true; revision: number }>();
+    const saveDocument = vi.fn().mockReturnValue(saveDeferred.promise);
+    window.litelizard = createBridge({ saveDocument });
+
+    useAppStore.setState({
+      rootPath: '/projects/novel',
+      currentFilePath: '/projects/novel/draft.lzl',
+      document,
+      revision: 1,
+      dirty: true,
+    });
+
+    const savePromise = useAppStore.getState().saveNow();
+    useAppStore.getState().updateParagraph('p1', '保存中に追記した本文');
+    saveDeferred.resolve({ ok: true, revision: 2 });
+    await savePromise;
+
+    const state = useAppStore.getState();
+    expect(saveDocument).toHaveBeenCalledWith('/projects/novel/draft.lzl', document, 1);
+    expect(state.revision).toBe(2);
+    expect(state.dirty).toBe(true);
+    expect(state.document?.paragraphs[0].light.text).toBe('保存中に追記した本文');
+    expect(state.statusMessage).toBe('保存中に新しい変更がありました');
   });
 
   it('generationSyncPending かつ未保存変更がある間は解析を開始しない', async () => {

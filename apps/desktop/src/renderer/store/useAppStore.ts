@@ -639,7 +639,9 @@ export const useAppStore = create<AppState>((set, get) => {
         ).length,
         hasAdditionalInstruction: Boolean(payload.additionalInstruction),
       });
-    const progressedParagraphIds = new Set<string>();
+    const persistedParagraphIds = new Set<string>();
+    const saveFailureByParagraphId = new Map<string, string>();
+    const saveTasks: Promise<void>[] = [];
     const analysisTargetSignature = getAnalysisStructureSignature(document);
     const isAnalysisTargetCurrent = () => {
       const state = get();
@@ -651,24 +653,29 @@ export const useAppStore = create<AppState>((set, get) => {
           getAnalysisStructureSignature(state.document) === analysisTargetSignature,
       );
     };
+    const persistPattern = async (paragraphId: string, pattern: ParagraphAnalysisPattern) => {
+      try {
+        if (rootPath && document.source?.format === 'lzl-v1') {
+          await window.litelizard.saveAnalysisResult(rootPath, document.documentId, paragraphId, pattern);
+        }
+        if (!isAnalysisTargetCurrent()) {
+          return;
+        }
+        appendPatternToStore(paragraphId, pattern);
+        persistedParagraphIds.add(paragraphId);
+        saveFailureByParagraphId.delete(paragraphId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '分析結果の保存に失敗しました。';
+        saveFailureByParagraphId.set(paragraphId, message);
+      }
+    };
 
     const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId, result }) => {
       if (!isAnalysisTargetCurrent()) {
         return;
       }
 
-      progressedParagraphIds.add(paragraphId);
-
-      if (rootPath && document.source?.format === 'lzl-v1') {
-        const pattern = createPatternForResult(result);
-        window.litelizard
-          .saveAnalysisResult(rootPath, document.documentId, paragraphId, pattern)
-          .catch(() => {});
-        appendPatternToStore(paragraphId, pattern);
-        return;
-      }
-
-      appendPatternToStore(paragraphId, createPatternForResult(result));
+      saveTasks.push(persistPattern(paragraphId, createPatternForResult(result)));
     });
 
     try {
@@ -676,22 +683,16 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!isAnalysisTargetCurrent() || result.documentId !== document.documentId) {
         return;
       }
-      result.results.forEach((analyzed) => {
-        if (!progressedParagraphIds.has(analyzed.paragraphId)) {
-          const pattern = createPatternForResult(analyzed);
-          if (rootPath && document.source?.format === 'lzl-v1') {
-            window.litelizard
-              .saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, pattern)
-              .catch(() => {});
-          }
-          appendPatternToStore(analyzed.paragraphId, pattern);
-        }
-      });
 
-      const succeededParagraphIds = new Set([
-        ...Array.from(progressedParagraphIds),
-        ...result.results.map((analyzed) => analyzed.paragraphId),
-      ]);
+      await Promise.all(saveTasks);
+
+      for (const analyzed of result.results) {
+        if (!persistedParagraphIds.has(analyzed.paragraphId)) {
+          await persistPattern(analyzed.paragraphId, createPatternForResult(analyzed));
+        }
+      }
+
+      const succeededParagraphIds = new Set(persistedParagraphIds);
       const summary = {
         targetCount: staleParagraphs.length,
         successCount: staleParagraphs.filter((paragraph) => succeededParagraphIds.has(paragraph.id)).length,
@@ -718,8 +719,10 @@ export const useAppStore = create<AppState>((set, get) => {
                       lizard: {
                         status: 'failed',
                         error: {
-                          code: 'ANALYSIS_PARTIAL_FAILURE',
-                          message: '解析結果が返りませんでした。',
+                          code: saveFailureByParagraphId.has(paragraph.id)
+                            ? 'ANALYSIS_SAVE_FAILED'
+                            : 'ANALYSIS_PARTIAL_FAILURE',
+                          message: saveFailureByParagraphId.get(paragraph.id) ?? '解析結果が返りませんでした。',
                         },
                       },
                     }
@@ -736,9 +739,10 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!isAnalysisTargetCurrent()) {
         return;
       }
+      await Promise.all(saveTasks);
       const message = error instanceof Error ? error.message : 'Analysis failed';
       const successCount = staleParagraphs.filter((paragraph) =>
-        progressedParagraphIds.has(paragraph.id),
+        persistedParagraphIds.has(paragraph.id),
       ).length;
       const summary = {
         targetCount: staleParagraphs.length,
@@ -1422,7 +1426,21 @@ export const useAppStore = create<AppState>((set, get) => {
         return;
       }
 
-      set({ dirty: false, revision: result.revision, statusMessage: '保存しました' });
+      const stateAfterSuccessfulSave = get();
+      if (
+        !stateAfterSuccessfulSave.document ||
+        stateAfterSuccessfulSave.currentFilePath !== currentFilePath ||
+        stateAfterSuccessfulSave.document.documentId !== document.documentId
+      ) {
+        return;
+      }
+
+      const savedCurrentDocument = stateAfterSuccessfulSave.document === document;
+      set({
+        dirty: savedCurrentDocument ? false : true,
+        revision: result.revision,
+        statusMessage: savedCurrentDocument ? '保存しました' : '保存中に新しい変更がありました',
+      });
       const stateAfterSave = get();
       if (
         stateAfterSave.document &&
@@ -1623,48 +1641,79 @@ export const useAppStore = create<AppState>((set, get) => {
         ).length,
         hasAdditionalInstruction: Boolean(payload.additionalInstruction),
       });
-    const progressedParagraphIds = new Set<string>();
+    let persistedParagraphId: string | null = null;
+    let saveFailureMessage: string | null = null;
+    const saveTasks: Promise<void>[] = [];
     const analysisTargetSignature = getAnalysisStructureSignature(document);
+    const isAnalysisTargetCurrent = () => {
+      const state = get();
+      return Boolean(
+        state.document &&
+          state.document.documentId === document.documentId &&
+          !state.generationSyncPending &&
+          getAnalysisStructureSignature(state.document) === analysisTargetSignature,
+      );
+    };
+    const persistPattern = async (targetParagraphId: string, pattern: ParagraphAnalysisPattern) => {
+      try {
+        if (rootPath && document.source?.format === 'lzl-v1') {
+          await window.litelizard.saveAnalysisResult(rootPath, document.documentId, targetParagraphId, pattern);
+        }
+        if (!isAnalysisTargetCurrent()) {
+          return;
+        }
+        appendPatternToStore(targetParagraphId, pattern);
+        persistedParagraphId = targetParagraphId;
+        saveFailureMessage = null;
+      } catch (error) {
+        saveFailureMessage = error instanceof Error ? error.message : '分析結果の保存に失敗しました。';
+      }
+    };
     const unsubscribe = window.litelizard.onAnalysisProgress(({ paragraphId: progressedParagraphId, result }) => {
       if (progressedParagraphId !== paragraphId) {
         return;
       }
-      const state = get();
-      if (
-        !state.document ||
-        state.document.documentId !== document.documentId ||
-        state.generationSyncPending ||
-        getAnalysisStructureSignature(state.document) !== analysisTargetSignature
-      ) {
+      if (!isAnalysisTargetCurrent()) {
         return;
       }
 
-      progressedParagraphIds.add(progressedParagraphId);
-      const pattern = createPatternForResult(result);
-      if (rootPath && document.source?.format === 'lzl-v1') {
-        window.litelizard
-          .saveAnalysisResult(rootPath, document.documentId, progressedParagraphId, pattern)
-          .catch(() => {});
-      }
-      appendPatternToStore(progressedParagraphId, pattern);
+      saveTasks.push(persistPattern(progressedParagraphId, createPatternForResult(result)));
     });
 
     try {
       const result = await window.litelizard.runAnalysis(payload);
       const analyzed = result.results.find((r) => r.paragraphId === paragraphId);
 
-      if (analyzed && !progressedParagraphIds.has(paragraphId)) {
-        const pattern = createPatternForResult(analyzed);
-        if (rootPath && document.source?.format === 'lzl-v1') {
-          await Promise.allSettled([
-            window.litelizard.saveAnalysisResult(rootPath, document.documentId, analyzed.paragraphId, pattern),
-          ]);
-        }
-        appendPatternToStore(analyzed.paragraphId, pattern);
+      await Promise.all(saveTasks);
+
+      if (analyzed && persistedParagraphId !== paragraphId) {
+        await persistPattern(analyzed.paragraphId, createPatternForResult(analyzed));
       }
 
       set((state) => {
         if (!state.document || !analyzed) return {};
+        if (persistedParagraphId !== paragraphId) {
+          return {
+            document: {
+              ...state.document,
+              paragraphs: state.document.paragraphs.map((p) =>
+                p.id === paragraphId
+                  ? {
+                      ...p,
+                      lizard: {
+                        status: 'failed',
+                        error: {
+                          code: saveFailureMessage ? 'ANALYSIS_SAVE_FAILED' : 'ANALYSIS_PARTIAL_FAILURE',
+                          message: saveFailureMessage ?? '解析結果が返りませんでした。',
+                        },
+                      },
+                    }
+                  : p
+              ),
+            },
+            statusMessage: `解析に失敗しました: ${saveFailureMessage ?? '解析結果が返りませんでした。'}`,
+          };
+        }
         return {
           document: {
             ...state.document,
@@ -1686,6 +1735,7 @@ export const useAppStore = create<AppState>((set, get) => {
         };
       });
     } catch (error) {
+      await Promise.all(saveTasks);
       const message = error instanceof Error ? error.message : 'Analysis failed';
       set((state) => {
         if (!state.document) return {};
