@@ -225,13 +225,24 @@ button {
  * ========================================================= */
 .left-icon-rail {
   grid-column: 1;
-  border-right: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding-top: var(--top-pad);
   gap: 2px;
   background: var(--paper);
+  position: relative;
+}
+
+.left-icon-rail::after {
+  content: '';
+  position: absolute;
+  top: var(--top-pad);
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+  pointer-events: none;
 }
 
 .rail-icon-button {
@@ -283,12 +294,23 @@ button {
  * ========================================================= */
 .workspace-sidebar {
   grid-column: 2;
-  border-right: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
   padding-top: var(--top-pad);
   background: var(--paper);
   min-width: 0;
+  position: relative;
+}
+
+.workspace-sidebar::after {
+  content: '';
+  position: absolute;
+  top: var(--top-pad);
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule);
+  pointer-events: none;
 }
 
 .sidebar-section-header {
@@ -2049,6 +2071,7 @@ button {
 
 .panel-resizer-sidebar {
   right: -3px;
+  top: var(--top-pad);
 }
 
 .panel-resizer-analysis {

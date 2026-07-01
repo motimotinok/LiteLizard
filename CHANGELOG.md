@@ -1,3 +1,6 @@
+[2026/07/01]#102 macOSのウィンドウ操作ボタン周辺の境界線を整理
+左 rail とサイドバーの縦境界線を `border-right` ではなく `top-pad` より下から始まる疑似要素で描画するように変更し、macOS の hiddenInset traffic light 領域に線が重ならないようにした。サイドバー幅リサイズハンドルも同じ高さから始め、タイトルバー周辺のドラッグ領域を邪魔しない配置に揃えた。
+
 [2026/07/01]#104 GitHub Release 運用手順書を追加
 MVP 公開の運用手順として `docs/release-runbook.md` を追加し、`MVP Release` workflow が使う `mvp-latest` tag、`LiteLizard-latest-arm64.dmg` asset、Release title/body、APP_VERSION と packaged app version の一致確認、失敗時の確認入口を整理した。README と公開前チェックリストから runbook へ辿れるようにし、自動検証と人間が残す GUI 確認の境界も明示した。
 
