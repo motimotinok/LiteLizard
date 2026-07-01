@@ -1,3 +1,6 @@
+[2026/07/01]#131 縦書き執筆専用モードを現行公開版では非採用として記録
+縦書き対応は CSS の `writing-mode` だけでは Lexical、IME、段落DnD、章/段落ガター、Undo/Redo、分析連動の実用性を保証できないため、現行公開版では実装しない判断を `docs/specs/vertical-writing-mode.md` と `docs/decisions.md` に記録した。`docs/LiteLizard_spec_v003.md` の縦書き記述には将来案である注記を追加した。
+
 [2026/07/01]#114 自由な画面配色・任意フォントカスタマイズを非採用として記録
 表示調整は既存の Editor Tweaks（明朝/ゴシック、本文サイズ、行間、紙面の黄ばみ、分析パネル表示方式）に限定し、背景色・本文色・アクセント色・任意フォントを自由指定するテーマ機能は実装しない判断を `docs/specs/theme-customization.md` と `docs/decisions.md` に記録した。可読性、状態色、フォントライセンス/OS差異の保守負荷を理由として明示した。
 
