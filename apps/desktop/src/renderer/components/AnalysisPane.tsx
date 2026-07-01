@@ -1,9 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { AnalysisSettings, LiteLizardDocument, ReadingAgent } from '@litelizard/shared';
+import type {
+  AnalysisSettings,
+  LiteLizardDocument,
+  ParagraphAnalysisPattern,
+  ReadingAgent,
+} from '@litelizard/shared';
 import type { AnalysisMode } from '../store/useAppStore.js';
 import { ChapterSummaryList } from './ChapterSummaryList.js';
 import { AnalysisRunConfirm } from './AnalysisRunConfirm.js';
 import { useAppStore } from '../store/useAppStore.js';
+import { getVisiblePatternIndices } from '../store/analysisHistory.js';
 import { aggregateChapterAnalyses } from '../utils/chapterAnalysisAggregation.js';
 import { IconChevronDown, IconChevronRight, IconPlay, IconPlus, IconRefresh } from './ui/icons.js';
 
@@ -142,6 +148,106 @@ function analysisTags(paragraph: LiteLizardDocument['paragraphs'][number]) {
   ];
 }
 
+function formatHistoryDate(analyzedAt: string) {
+  const date = new Date(analyzedAt);
+  if (Number.isNaN(date.getTime())) {
+    return analyzedAt;
+  }
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function historyAgentLabel(pattern: ParagraphAnalysisPattern | null) {
+  return pattern?.provenance?.agentName?.trim() || '旧形式の履歴';
+}
+
+export function AnalysisHistoryPanel({
+  history,
+  visibleIndices,
+  displayedIndex,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  history: ParagraphAnalysisPattern[];
+  visibleIndices: number[];
+  displayedIndex: number | null;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (patternIndex: number) => void;
+}) {
+  if (visibleIndices.length === 0 || displayedIndex === null) {
+    return null;
+  }
+
+  const position = visibleIndices.indexOf(displayedIndex);
+  const currentPosition = position >= 0 ? position : visibleIndices.length - 1;
+  const currentPattern = history[displayedIndex] ?? null;
+  const previousIndex = currentPosition > 0 ? visibleIndices[currentPosition - 1] : null;
+  const nextIndex = currentPosition < visibleIndices.length - 1 ? visibleIndices[currentPosition + 1] : null;
+
+  return (
+    <section className={open ? 'analysis-history is-open' : 'analysis-history'} aria-label="分析履歴">
+      <button
+        type="button"
+        className="analysis-history-toggle"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        <span>履歴</span>
+        <span className="analysis-history-toggle-index">
+          {currentPosition + 1}/{visibleIndices.length}
+        </span>
+      </button>
+      {open ? (
+        <div className="analysis-history-body">
+          <div className="analysis-card-history-nav" aria-label="履歴を切り替え">
+            <button
+              type="button"
+              className="analysis-card-history-btn"
+              onClick={() => {
+                if (previousIndex !== null) onSelect(previousIndex);
+              }}
+              disabled={previousIndex === null}
+              aria-label="前の分析結果"
+            >
+              ‹
+            </button>
+            <span className="analysis-card-history-index">
+              {currentPosition + 1}/{visibleIndices.length}
+            </span>
+            <button
+              type="button"
+              className="analysis-card-history-btn"
+              onClick={() => {
+                if (nextIndex !== null) onSelect(nextIndex);
+              }}
+              disabled={nextIndex === null}
+              aria-label="次の分析結果"
+            >
+              ›
+            </button>
+          </div>
+          <dl className="analysis-history-meta">
+            <div>
+              <dt>Reading Agent</dt>
+              <dd>{historyAgentLabel(currentPattern)}</dd>
+            </div>
+            <div>
+              <dt>保存</dt>
+              <dd>{currentPattern ? formatHistoryDate(currentPattern.analyzedAt) : '-'}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function AnalysisPane({
   document,
   activeParagraphId,
@@ -161,6 +267,9 @@ export function AnalysisPane({
   const analysisAdditionalInstruction = useAppStore((s) => s.analysisAdditionalInstruction);
   const setAnalysisAdditionalInstruction = useAppStore((s) => s.setAnalysisAdditionalInstruction);
   const analysisRunSummary = useAppStore((s) => s.analysisRunSummary);
+  const analysisHistoriesByParagraphId = useAppStore((s) => s.analysisHistoriesByParagraphId);
+  const selectedPatternIndexByParagraphId = useAppStore((s) => s.selectedPatternIndexByParagraphId);
+  const selectAnalysisPatternIndex = useAppStore((s) => s.selectAnalysisPatternIndex);
   const agents = useAppStore((s) => s.agents);
   const activeAgentId = useAppStore((s) => s.activeAgentId);
   const agentsLoaded = useAppStore((s) => s.agentsLoaded);
@@ -180,6 +289,7 @@ export function AnalysisPane({
   const [draftByParagraphId, setDraftByParagraphId] = useState<Record<string, string>>({});
   const [messagesByParagraphId, setMessagesByParagraphId] = useState<Record<string, ParagraphChatMessage[]>>({});
   const [sendingParagraphId, setSendingParagraphId] = useState<string | null>(null);
+  const [historyOpenParagraphId, setHistoryOpenParagraphId] = useState<string | null>(null);
 
   const activeAgent = useMemo(
     () => agents.find((agent) => agent.id === activeAgentId) ?? agents[0] ?? null,
@@ -190,6 +300,21 @@ export function AnalysisPane({
     () => document?.paragraphs.find((paragraph) => paragraph.id === activeParagraphId) ?? null,
     [activeParagraphId, document],
   );
+  const focusedHistory = focusedParagraph ? analysisHistoriesByParagraphId[focusedParagraph.id] ?? [] : [];
+  const visibleHistoryIndices = focusedParagraph
+    ? getVisiblePatternIndices(focusedHistory, focusedParagraph.light.text)
+    : [];
+  const selectedHistoryIndex = focusedParagraph
+    ? selectedPatternIndexByParagraphId[focusedParagraph.id]
+    : undefined;
+  const displayedHistoryIndex =
+    selectedHistoryIndex !== undefined && visibleHistoryIndices.includes(selectedHistoryIndex)
+      ? selectedHistoryIndex
+      : visibleHistoryIndices[visibleHistoryIndices.length - 1] ?? null;
+  const displayedPattern = displayedHistoryIndex !== null ? focusedHistory[displayedHistoryIndex] ?? null : null;
+  const displayedAgentLabel = displayedPattern
+    ? historyAgentLabel(displayedPattern)
+    : activeAgent?.name ?? 'Reading Agent';
 
   const selectedMessages = focusedParagraph ? messagesByParagraphId[focusedParagraph.id] ?? [] : [];
   const draft = focusedParagraph ? draftByParagraphId[focusedParagraph.id] ?? '' : '';
@@ -438,7 +563,7 @@ export function AnalysisPane({
               <header className="analysis-focus-card-header">
                 <div className="analysis-focus-kicker">
                   <span>{focusedParagraph.order}</span>
-                  <span>{activeAgent?.name ?? 'Reading Agent'}</span>
+                  <span>{displayedAgentLabel}</span>
                 </div>
                 <button
                   type="button"
@@ -479,6 +604,18 @@ export function AnalysisPane({
                     : ''}
                 </p>
               )}
+              <AnalysisHistoryPanel
+                history={focusedHistory}
+                visibleIndices={visibleHistoryIndices}
+                displayedIndex={displayedHistoryIndex}
+                open={historyOpenParagraphId === focusedParagraph.id}
+                onToggle={() =>
+                  setHistoryOpenParagraphId((current) =>
+                    current === focusedParagraph.id ? null : focusedParagraph.id,
+                  )
+                }
+                onSelect={(patternIndex) => selectAnalysisPatternIndex(focusedParagraph.id, patternIndex)}
+              />
               <form
                 className="analysis-followup"
                 onSubmit={(event) => {

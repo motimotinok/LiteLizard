@@ -1,3 +1,6 @@
+[2026/07/01]#121 分析インスペクターに静かな履歴参照導線を追加
+段落詳細インスペクターに「履歴」入口を追加し、開いたときだけ前後移動、現在位置、保存日時、実行時のReading Agent名を確認できるようにした。通常時は表示中結果のAgent名だけを控えめに示し、旧形式でAgent情報がない履歴は「旧形式の履歴」として表示する。検証: `corepack pnpm --filter @litelizard/desktop test`、`corepack pnpm -w lint`、`CI=true PNPM_CONFIG_CONFIRM_MODULES_PURGE=false PNPM_CONFIG_DANGEROUSLY_ALLOW_ALL_BUILDS=true corepack pnpm -w build`、`git diff --check`。
+
 [2026/07/01]#118・#134 段落以外の分析対象スコープを現行公開版では非採用として記録
 一文ごとの超ミクロ分析と文書全体スコープ分析は、`sentence` / `document` の保存、履歴、要再分析判定、UI状態を新たに設計する必要があるため、現行公開版では実装しない判断を記録した。`docs/specs/analysis-scope-boundaries.md` には #117 と合わせて、現行で実行できるAI分析対象は段落のみであることを整理した。
 
