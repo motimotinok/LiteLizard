@@ -1,3 +1,6 @@
+[2026/07/01]#94 Gemini provider を現行公開版では追加しない判断を記録
+分析 provider は OpenAI / Anthropic / Local LLM の3系統に限定し、Gemini provider は追加しない判断を `docs/specs/provider-support-boundary.md` と `docs/decisions.md` に記録した。provider追加は型、settings、safeStorage、preload、renderer、privacy/security、実API検証へ横断し、保守停止前提では既存3経路の安定を優先する。
+
 [2026/07/01]#131 縦書き執筆専用モードを現行公開版では非採用として記録
 縦書き対応は CSS の `writing-mode` だけでは Lexical、IME、段落DnD、章/段落ガター、Undo/Redo、分析連動の実用性を保証できないため、現行公開版では実装しない判断を `docs/specs/vertical-writing-mode.md` と `docs/decisions.md` に記録した。`docs/LiteLizard_spec_v003.md` の縦書き記述には将来案である注記を追加した。
 

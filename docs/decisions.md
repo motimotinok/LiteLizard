@@ -6,6 +6,18 @@
 
 ---
 
+## [2026-07-01] Gemini provider は現行公開版では追加しない (#94)
+
+- **決定**: LiteLizard の現行公開版でサポートする分析 provider は OpenAI、Anthropic、Local LLM（Ollama 互換 endpoint）の3系統に限定し、Gemini provider は追加しない
+- **理由**: provider 追加は型、settings、safeStorage、preload、renderer、provider実装、mock、privacy/security文書、実API検証へ横断する。Gemini の structured output 仕様やモデル名は継続的な公式ドキュメント確認が必要であり、保守停止前提では第4 provider の追従より既存3経路の安定を優先する
+- **仕様**: [`docs/specs/provider-support-boundary.md`](specs/provider-support-boundary.md), [`docs/specs/analysis-api.md`](specs/analysis-api.md)
+- **却下した案**:
+  - mock テストだけで Gemini provider を追加する: 実APIの structured output 運用可否を十分に証明できない
+  - 無料枠を理由に provider を増やす: 料金、quota、地域差、モデル差をアプリが管理できない
+  - provider 固有レスポンスを renderer へ漏らす: 既存の `AnalysisResult` 正規化境界を壊す
+
+---
+
 ## [2026-07-01] 縦書き執筆専用モードは現行公開版では実装しない (#131)
 
 - **決定**: LiteLizard は現行公開版では縦書きに対応した執筆専用モードを実装しない。将来再検討する場合は、分析モードとは分離した執筆専用モードとして扱い、Lexical / IME / DnD / Undo / スクロール / 分析連動を先に実機検証する
